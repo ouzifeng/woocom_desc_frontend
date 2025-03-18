@@ -6,6 +6,8 @@ import Box from '@mui/material/Box';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
+console.log('API_URL:', API_URL); // Add this line to log the value of API_URL
+
 export default function ImproveGrammarButton({ description, setDescription, setModalOpen }) {
   const [loading, setLoading] = useState(false);
 
