@@ -6,7 +6,6 @@ import CssBaseline from '@mui/material/CssBaseline';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Grid from '@mui/material/Grid';
-import Button from '@mui/material/Button';
 import AppNavbar from '../dashboard/components/AppNavbar';
 import Header from '../dashboard/components/Header';
 import SideMenu from '../dashboard/components/SideMenu';
@@ -23,6 +22,7 @@ import {
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import ImportProductsButton from './components/ImportProductsButton';
+import UpdateProductsButton from './components/UpdateProductsButton';
 import ProductsTable from './components/ProductsTable';
 import ProductPage from './ProductPage';
 
@@ -38,6 +38,7 @@ export default function Products(props) {
   const [storeUrl, setStoreUrl] = useState('');
   const [apiId, setApiId] = useState('');
   const [secretKey, setSecretKey] = useState('');
+  const [refresh, setRefresh] = useState(false); // Add this line
   const location = useLocation();
 
   useEffect(() => {
@@ -90,8 +91,8 @@ export default function Products(props) {
                 <Grid item xs={12} md={3}>
                   {!isProductPage && (
                     <Box sx={{ display: 'flex', gap: 2 }}>
-                      <ImportProductsButton storeUrl={storeUrl} apiId={apiId} secretKey={secretKey} />
-                      <Button variant="outlined">Update Products</Button>
+                      <ImportProductsButton storeUrl={storeUrl} apiId={apiId} secretKey={secretKey} setRefresh={setRefresh} />
+                      <UpdateProductsButton storeUrl={storeUrl} apiId={apiId} secretKey={secretKey} setRefresh={setRefresh} />
                     </Box>
                   )}
                 </Grid>
@@ -100,7 +101,7 @@ export default function Products(props) {
                 </Grid>
                 <Grid item xs={12} md={9}>
                   <Routes>
-                    <Route path="*" element={<ProductsTable />} />
+                    <Route path="*" element={<ProductsTable refresh={refresh} setRefresh={setRefresh} />} />
                     <Route path=":productId" element={<ProductPage />} />
                   </Routes>
                 </Grid>

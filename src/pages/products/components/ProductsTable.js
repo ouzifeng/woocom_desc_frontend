@@ -26,10 +26,11 @@ function renderStatus(status) {
   );
 }
 
-export default function ProductsTable() {
+export default function ProductsTable({ refresh, setRefresh }) {
   const [user] = useAuthState(auth);
   const [rows, setRows] = useState([]);
   const [error, setError] = useState(null);
+  const [message, setMessage] = useState(''); // Add this line
   const navigate = useNavigate();
 
   // Keep pagination model in state so it doesn't default to 100 rows
@@ -39,25 +40,27 @@ export default function ProductsTable() {
   });
 
   // Fetch Firestore data
-  useEffect(() => {
-    const fetchData = async () => {
-      if (user) {
-        try {
-          const productsCollection = collection(db, 'users', user.uid, 'products');
-          const productsSnapshot = await getDocs(productsCollection);
-          const products = productsSnapshot.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          }));
-          setRows(products);
-        } catch (err) {
-          console.error('Error fetching products:', err);
-          setError(err.message);
-        }
+  const fetchData = async () => {
+    if (user) {
+      try {
+        const productsCollection = collection(db, 'users', user.uid, 'products');
+        const productsSnapshot = await getDocs(productsCollection);
+        const products = productsSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setRows(products);
+        setMessage(`Fetched ${products.length} products`); // Add this line
+      } catch (err) {
+        console.error('Error fetching products:', err);
+        setError(err.message);
       }
-    };
+    }
+  };
+
+  useEffect(() => {
     fetchData();
-  }, [user]);
+  }, [user, refresh]); // Add refresh to the dependency array
 
   // Define your columns
   const columns = [
@@ -98,66 +101,73 @@ export default function ProductsTable() {
           {`Error fetching products: ${error}`}
         </Typography>
       ) : (
-        <DataGrid
-          // Enable pagination and control it
-          pagination
-          paginationModel={paginationModel}
-          onPaginationModelChange={setPaginationModel}
-          pageSizeOptions={[10, 20, 50]}
-          rowHeight={70}
-          rows={rows}
-          columns={columns}
-          checkboxSelection
-          disableColumnResize
-          onRowClick={handleRowClick}
+        <>
+          {message && (
+            <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+              {message}
+            </Typography>
+          )}
+          <DataGrid
+            // Enable pagination and control it
+            pagination
+            paginationModel={paginationModel}
+            onPaginationModelChange={setPaginationModel}
+            pageSizeOptions={[10, 20, 50]}
+            rowHeight={70}
+            rows={rows}
+            columns={columns}
+            checkboxSelection
+            disableColumnResize
+            onRowClick={handleRowClick}
 
-          // Even/odd row striping
-          getRowClassName={(params) =>
-            params.indexRelativeToCurrentPage % 2 === 0 ? 'even' : 'odd'
-          }
+            // Even/odd row striping
+            getRowClassName={(params) =>
+              params.indexRelativeToCurrentPage % 2 === 0 ? 'even' : 'odd'
+            }
 
-          // Filter panel styling (optional)
-          slotProps={{
-            filterPanel: {
-              filterFormProps: {
-                logicOperatorInputProps: {
-                  variant: 'outlined',
-                  size: 'small',
-                },
-                columnInputProps: {
-                  variant: 'outlined',
-                  size: 'small',
-                  sx: { mt: 'auto' },
-                },
-                operatorInputProps: {
-                  variant: 'outlined',
-                  size: 'small',
-                  sx: { mt: 'auto' },
-                },
-                valueInputProps: {
-                  InputComponentProps: {
+            // Filter panel styling (optional)
+            slotProps={{
+              filterPanel: {
+                filterFormProps: {
+                  logicOperatorInputProps: {
                     variant: 'outlined',
                     size: 'small',
                   },
+                  columnInputProps: {
+                    variant: 'outlined',
+                    size: 'small',
+                    sx: { mt: 'auto' },
+                  },
+                  operatorInputProps: {
+                    variant: 'outlined',
+                    size: 'small',
+                    sx: { mt: 'auto' },
+                  },
+                  valueInputProps: {
+                    InputComponentProps: {
+                      variant: 'outlined',
+                      size: 'small',
+                    },
+                  },
                 },
               },
-            },
-          }}
+            }}
 
-          // Extra styling: row striping, consistent row heights
-          sx={{
-            '& .even': { backgroundColor: '#fafafa' },
-            '& .odd': { backgroundColor: '#ffffff' },
-            '.MuiDataGrid-row': {
-              cursor: 'pointer',
-            },
-            '.MuiDataGrid-cell': {
-              lineHeight: 'normal !important',
-              display: 'flex',
-              alignItems: 'center',
-            },
-          }}
-        />
+            // Extra styling: row striping, consistent row heights
+            sx={{
+              '& .even': { backgroundColor: '#fafafa' },
+              '& .odd': { backgroundColor: '#ffffff' },
+              '.MuiDataGrid-row': {
+                cursor: 'pointer',
+              },
+              '.MuiDataGrid-cell': {
+                lineHeight: 'normal !important',
+                display: 'flex',
+                alignItems: 'center',
+              },
+            }}
+          />
+        </>
       )}
     </Box>
   );
