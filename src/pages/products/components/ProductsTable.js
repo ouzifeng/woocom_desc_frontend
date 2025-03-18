@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../../../firebase';
@@ -30,17 +30,17 @@ export default function ProductsTable({ refresh, setRefresh }) {
   const [user] = useAuthState(auth);
   const [rows, setRows] = useState([]);
   const [error, setError] = useState(null);
-  const [message, setMessage] = useState(''); // Add this line
+  const [message, setMessage] = useState('');
   const navigate = useNavigate();
 
   // Keep pagination model in state so it doesn't default to 100 rows
   const [paginationModel, setPaginationModel] = useState({
-    pageSize: 10, // default page size
+    pageSize: 10,
     page: 0,
   });
 
   // Fetch Firestore data
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (user) {
       try {
         const productsCollection = collection(db, 'users', user.uid, 'products');
@@ -50,17 +50,17 @@ export default function ProductsTable({ refresh, setRefresh }) {
           ...doc.data(),
         }));
         setRows(products);
-        setMessage(`Fetched ${products.length} products`); // Add this line
+        setMessage(`Fetched ${products.length} products`);
       } catch (err) {
         console.error('Error fetching products:', err);
         setError(err.message);
       }
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     fetchData();
-  }, [user, refresh]); // Add refresh to the dependency array
+  }, [user, refresh, fetchData]);
 
   // Define your columns
   const columns = [
@@ -69,7 +69,6 @@ export default function ProductsTable({ refresh, setRefresh }) {
       field: 'status',
       headerName: 'Status',
       width: 150,
-      // Convert "publish" -> "Published" and "draft" -> "Draft" before rendering
       renderCell: (params) => {
         const value = params.value === 'publish' ? 'Published' : 'Draft';
         return renderStatus(value);
@@ -108,7 +107,6 @@ export default function ProductsTable({ refresh, setRefresh }) {
             </Typography>
           )}
           <DataGrid
-            // Enable pagination and control it
             pagination
             paginationModel={paginationModel}
             onPaginationModelChange={setPaginationModel}
@@ -119,13 +117,9 @@ export default function ProductsTable({ refresh, setRefresh }) {
             checkboxSelection
             disableColumnResize
             onRowClick={handleRowClick}
-
-            // Even/odd row striping
             getRowClassName={(params) =>
               params.indexRelativeToCurrentPage % 2 === 0 ? 'even' : 'odd'
             }
-
-            // Filter panel styling (optional)
             slotProps={{
               filterPanel: {
                 filterFormProps: {
@@ -152,8 +146,6 @@ export default function ProductsTable({ refresh, setRefresh }) {
                 },
               },
             }}
-
-            // Extra styling: row striping, consistent row heights
             sx={{
               '& .even': { backgroundColor: '#fafafa' },
               '& .odd': { backgroundColor: '#ffffff' },

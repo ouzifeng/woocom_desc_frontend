@@ -78,16 +78,20 @@ export default function ProductPage() {
   const handleSave = async () => {
     if (user && productId) {
       try {
-        const productDocRef = doc(db, 'users', user.uid, 'products', productId);
-        await setDoc(productDocRef, { description, name: product.name }, { merge: true });
-
-        const response = await fetch(`${storeUrl}/wp-json/wc/v3/products/${productId}`, {
-          method: 'PUT',
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/woocommerce/update-product`, {
+          method: 'POST',
           headers: {
-            'Authorization': `Basic ${btoa(`${apiId}:${secretKey}`)}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ description, name: product.name }),
+          body: JSON.stringify({
+            storeUrl,
+            apiId,
+            secretKey,
+            userId: user.uid,
+            productId,
+            description,
+            name: product.name,
+          }),
         });
 
         if (response.status === 200) {
