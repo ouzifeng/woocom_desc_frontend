@@ -6,6 +6,8 @@ import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../../../firebase';
 
+const API_URL = process.env.REACT_APP_API_URL;
+
 const SettingsCard = styled(Card)(({ theme }) => ({
   display: 'flex',
   flexDirection: 'column',
@@ -53,7 +55,7 @@ export default function WooCommerceSettingsCard() {
     try {
       const formattedUrl = storeUrl.endsWith('/') ? storeUrl.slice(0, -1) : storeUrl;
       console.log('Sending request to backend server');
-      const response = await fetch('http://localhost:5000/woocommerce', {
+      const response = await fetch(`${API_URL}/woocommerce`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

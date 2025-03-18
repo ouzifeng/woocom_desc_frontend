@@ -4,6 +4,8 @@ import { Button, Box, Typography } from '@mui/material';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '../../../firebase';
 
+const API_URL = process.env.REACT_APP_API_URL;
+
 export default function ImportProductsButton({ storeUrl, apiId, secretKey }) {
   const [user] = useAuthState(auth);
   const [loading, setLoading] = useState(false);
@@ -24,7 +26,7 @@ export default function ImportProductsButton({ storeUrl, apiId, secretKey }) {
 
     try {
       // Fetch the total number of products first
-      const totalResponse = await fetch('http://localhost:5000/woocommerce/total', {
+      const totalResponse = await fetch(`${API_URL}/woocommerce/total`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -42,7 +44,7 @@ export default function ImportProductsButton({ storeUrl, apiId, secretKey }) {
       }
 
       // Start importing products
-      const response = await fetch('http://localhost:5000/woocommerce/import', {
+      const response = await fetch(`${API_URL}/woocommerce/import`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

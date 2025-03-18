@@ -6,6 +6,8 @@ import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
 import { DataGrid } from '@mui/x-data-grid';
 
+const API_URL = process.env.REACT_APP_API_URL;
+
 export default function SearchResults() {
   const location = useLocation();
   const [loading, setLoading] = useState(true);
@@ -22,7 +24,7 @@ export default function SearchResults() {
       }
 
       try {
-        const response = await fetch(`http://localhost:5000/search?query=${query}`);
+        const response = await fetch(`${API_URL}/search?query=${query}`);
         const result = await response.json();
 
         if (result.result === 'Success') {

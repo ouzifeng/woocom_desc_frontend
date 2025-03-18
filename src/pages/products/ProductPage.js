@@ -17,6 +17,8 @@ import ImproveGrammarButton from './components/ImproveGrammarButton';
 import InstructionsDrawer from './components/InstructionsDrawer';
 import AiSettings from './components/AiSettings';
 
+const API_URL = process.env.REACT_APP_API_URL;
+
 export default function ProductPage() {
   const { productId } = useParams();
   const [user] = useAuthState(auth);
@@ -37,7 +39,6 @@ export default function ProductPage() {
   const [wordCount, setWordCount] = useState('');
   const [useEmojis, setUseEmojis] = useState(false);
   const [addSpecifications, setAddSpecifications] = useState(false);
-  const [aiCost, setAiCost] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiNameLoading, setAiNameLoading] = useState(false);
 
@@ -165,7 +166,7 @@ export default function ProductPage() {
 
         console.log('AI Request Message Content:', messageContent);
 
-        const response = await fetch('http://localhost:5000/generate-ai-description', {
+        const response = await fetch(`${API_URL}/generate-ai-description`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -176,7 +177,6 @@ export default function ProductPage() {
         const data = await response.json();
         if (data.result === 'Success') {
           setDescription(data.aiDescription);
-          setAiCost(data.cost);
           setModalOpen(true);
         } else {
           alert('Failed to generate AI description');
@@ -200,7 +200,7 @@ export default function ProductPage() {
 
         console.log('AI Request Message Content:', messageContent);
 
-        const response = await fetch('http://localhost:5000/generate-ai-name', {
+        const response = await fetch(`${API_URL}/generate-ai-name`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

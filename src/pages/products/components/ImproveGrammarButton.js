@@ -4,13 +4,15 @@ import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
 
+const API_URL = process.env.REACT_APP_API_URL;
+
 export default function ImproveGrammarButton({ description, setDescription, setModalOpen }) {
   const [loading, setLoading] = useState(false);
 
   const handleImproveGrammar = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/improve-grammar', {
+      const response = await fetch(`${API_URL}/improve-grammar`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
