@@ -49,6 +49,8 @@ export default function ProductsTable({ refresh, setRefresh }) {
           id: doc.id,
           ...doc.data(),
         }));
+        // Sort products in descending order by product ID
+        products.sort((a, b) => b.id - a.id);
         setRows(products);
         setMessage(`Fetched ${products.length} products`);
       } catch (err) {

@@ -6,7 +6,7 @@ import { auth } from '../../../firebase';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
-export default function ImportProductsButton({ storeUrl, apiId, secretKey }) {
+export default function ImportProductsButton({ storeUrl, apiId, secretKey, setRefresh }) {
   const [user] = useAuthState(auth);
   const [loading, setLoading] = useState(false);
   const [importedCount, setImportedCount] = useState(0);
@@ -69,6 +69,7 @@ export default function ImportProductsButton({ storeUrl, apiId, secretKey }) {
               setMessage(`Imported ${data.importedCount} products successfully.`);
               setImportedCount(data.importedCount);
               setLoading(false);
+              setRefresh((prev) => !prev); // Trigger refresh after import
               return;
             } else {
               setImportedCount(data.importedCount);

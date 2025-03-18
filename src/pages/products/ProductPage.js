@@ -170,7 +170,7 @@ export default function ProductPage() {
 
         console.log('AI Request Message Content:', messageContent);
 
-        const response = await fetch(`${API_URL}/generate-ai-description`, {
+        const response = await fetch(`${API_URL}/openai/generate-ai-description`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -204,7 +204,7 @@ export default function ProductPage() {
 
         console.log('AI Request Message Content:', messageContent);
 
-        const response = await fetch(`${API_URL}/generate-ai-name`, {
+        const response = await fetch(`${API_URL}/openai/generate-ai-name`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

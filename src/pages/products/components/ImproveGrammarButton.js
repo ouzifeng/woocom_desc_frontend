@@ -6,7 +6,7 @@ import Box from '@mui/material/Box';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
-console.log('API_URL:', API_URL); // Add this line to log the value of API_URL
+console.log('API_URL:', API_URL);
 
 export default function ImproveGrammarButton({ description, setDescription, setModalOpen }) {
   const [loading, setLoading] = useState(false);
@@ -14,7 +14,7 @@ export default function ImproveGrammarButton({ description, setDescription, setM
   const handleImproveGrammar = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/improve-grammar`, {
+      const response = await fetch(`${API_URL}/openai/improve-grammar`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
