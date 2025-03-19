@@ -3,10 +3,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../../../firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
+import Switch from '@mui/material/Switch';
 import { useNavigate } from 'react-router-dom';
 
 /** A helper that converts Firestore status -> UI label + MUI color */
@@ -38,8 +39,7 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
     page: 0,
   });
 
-  // This will hold the current selection
-  // so that DataGrid knows which checkboxes are checked
+  // This holds the current selection so that DataGrid knows which switches (checkboxes) are selected
   const [rowSelectionModel, setRowSelectionModel] = useState([]);
 
   // Fetch Firestore data
@@ -48,11 +48,19 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
       try {
         const productsCollection = collection(db, 'users', user.uid, 'products');
         const productsSnapshot = await getDocs(productsCollection);
-        const products = productsSnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
+        const products = productsSnapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data(),
         }));
-        products.sort((a, b) => b.id - a.id);
+        // Sort products in descending order by product ID.
+        products.sort((a, b) => {
+          const aNum = Number(a.id);
+          const bNum = Number(b.id);
+          if (!isNaN(aNum) && !isNaN(bNum)) {
+            return bNum - aNum;
+          }
+          return b.id.localeCompare(a.id);
+        });
         setRows(products);
         setMessage(`Fetched ${products.length} products`);
       } catch (err) {
@@ -65,8 +73,37 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
     fetchData();
   }, [user, refresh, fetchData]);
 
+  const handleImprovedChange = async (id, checked) => {
+    if (user) {
+      try {
+        // Ensure id is a string for Firestore
+        const productDocRef = doc(db, 'users', user.uid, 'products', String(id));
+        await updateDoc(productDocRef, { improved: checked });
+        setRefresh((prev) => !prev);
+      } catch (err) {
+        console.error('Error updating product:', err);
+      }
+    }
+  };
+
   const columns = [
     { field: 'id', headerName: 'ID', width: 150 },
+    {
+      field: 'improved',
+      headerName: 'Improved',
+      width: 150,
+      renderCell: (params) => (
+        <Switch
+          checked={Boolean(params.value)}
+          // Prevent row click navigation when toggling the switch
+          onClick={(event) => event.stopPropagation()}
+          onChange={(event) =>
+            handleImprovedChange(params.id, event.target.checked)
+          }
+          inputProps={{ 'aria-label': 'Improved switch' }}
+        />
+      ),
+    },
     {
       field: 'status',
       headerName: 'Status',
@@ -117,10 +154,8 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
             rows={rows}
             columns={columns}
             checkboxSelection
-            // Prevent row click from automatically selecting rows
-            disableSelectionOnClick
+            disableRowSelectionOnClick
             disableColumnResize
-            // This is the new v6+ approach:
             rowSelectionModel={rowSelectionModel}
             onRowSelectionModelChange={(newSelection) => {
               setRowSelectionModel(newSelection);
