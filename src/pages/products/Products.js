@@ -25,6 +25,8 @@ import ImportProductsButton from './components/ImportProductsButton';
 import UpdateProductsButton from './components/UpdateProductsButton';
 import ProductsTable from './components/ProductsTable';
 import ProductPage from './ProductPage';
+import DeleteProductsButton from './components/DeleteProductsButton';
+import Typography from '@mui/material/Typography';
 
 const xThemeComponents = {
   ...chartsCustomizations,
@@ -38,8 +40,12 @@ export default function Products(props) {
   const [storeUrl, setStoreUrl] = useState('');
   const [apiId, setApiId] = useState('');
   const [secretKey, setSecretKey] = useState('');
-  const [refresh, setRefresh] = useState(false); // Add this line
+  const [refresh, setRefresh] = useState(false);
+  const [selectedRows, setSelectedRows] = useState([]);
   const location = useLocation();
+
+  // NEW: One global notification message
+  const [notificationMessage, setNotificationMessage] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -88,20 +94,70 @@ export default function Products(props) {
             >
               <Header />
               <Grid container spacing={3}>
-                <Grid item xs={12} md={3}>
+                <Grid item xs={12} md={9}>
                   {!isProductPage && (
-                    <Box sx={{ display: 'flex', gap: 2 }}>
-                      <ImportProductsButton storeUrl={storeUrl} apiId={apiId} secretKey={secretKey} setRefresh={setRefresh} />
-                      <UpdateProductsButton storeUrl={storeUrl} apiId={apiId} secretKey={secretKey} setRefresh={setRefresh} />
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      {/* Left side: Import + Update buttons */}
+                      <Box sx={{ display: 'flex', gap: 2 }}>
+                        <ImportProductsButton
+                          storeUrl={storeUrl}
+                          apiId={apiId}
+                          secretKey={secretKey}
+                          setRefresh={setRefresh}
+                          // pass the setter for notifications
+                          setNotificationMessage={setNotificationMessage}
+                        />
+                        <UpdateProductsButton
+                          storeUrl={storeUrl}
+                          apiId={apiId}
+                          secretKey={secretKey}
+                          setRefresh={setRefresh}
+                          // pass the setter for notifications
+                          setNotificationMessage={setNotificationMessage}
+                        />
+                      </Box>
+
+                      {/* Right side: Delete button */}
+                      <DeleteProductsButton
+                        setRefresh={setRefresh}
+                        selectedRows={selectedRows}
+                        // pass the setter for notifications
+                        setNotificationMessage={setNotificationMessage}
+                      />
                     </Box>
                   )}
                 </Grid>
+
+                {/* NEW ROW for the global notification */}
+                <Grid item xs={12} md={9}>
+                  {notificationMessage && (
+                    <Typography variant="body2" color="textSecondary" textAlign={'left'}>
+                      {notificationMessage}
+                    </Typography>
+                  )}
+                </Grid>
+
                 <Grid item xs={12} md={9}>
                   <Outlet />
                 </Grid>
                 <Grid item xs={12} md={9}>
                   <Routes>
-                    <Route path="*" element={<ProductsTable refresh={refresh} setRefresh={setRefresh} />} />
+                    <Route
+                      path="*"
+                      element={
+                        <ProductsTable
+                          refresh={refresh}
+                          setRefresh={setRefresh}
+                          setSelectedRows={setSelectedRows}
+                        />
+                      }
+                    />
                     <Route path=":productId" element={<ProductPage />} />
                   </Routes>
                 </Grid>

@@ -11,7 +11,6 @@ import { useNavigate } from 'react-router-dom';
 
 /** A helper that converts Firestore status -> UI label + MUI color */
 function renderStatus(status) {
-  // Map "Published" -> "success" (green), "Draft" -> "default" (gray)
   const colorMap = {
     Published: 'success',
     Draft: 'default',
@@ -26,7 +25,7 @@ function renderStatus(status) {
   );
 }
 
-export default function ProductsTable({ refresh, setRefresh }) {
+export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) {
   const [user] = useAuthState(auth);
   const [rows, setRows] = useState([]);
   const [error, setError] = useState(null);
@@ -39,6 +38,10 @@ export default function ProductsTable({ refresh, setRefresh }) {
     page: 0,
   });
 
+  // This will hold the current selection
+  // so that DataGrid knows which checkboxes are checked
+  const [rowSelectionModel, setRowSelectionModel] = useState([]);
+
   // Fetch Firestore data
   const fetchData = useCallback(async () => {
     if (user) {
@@ -49,12 +52,10 @@ export default function ProductsTable({ refresh, setRefresh }) {
           id: doc.id,
           ...doc.data(),
         }));
-        // Sort products in descending order by product ID
         products.sort((a, b) => b.id - a.id);
         setRows(products);
         setMessage(`Fetched ${products.length} products`);
       } catch (err) {
-        console.error('Error fetching products:', err);
         setError(err.message);
       }
     }
@@ -64,7 +65,6 @@ export default function ProductsTable({ refresh, setRefresh }) {
     fetchData();
   }, [user, refresh, fetchData]);
 
-  // Define your columns
   const columns = [
     { field: 'id', headerName: 'ID', width: 150 },
     {
@@ -84,7 +84,7 @@ export default function ProductsTable({ refresh, setRefresh }) {
         <img
           src={params.value}
           alt=""
-          style={{ width: '50px', height: '50px', marginTop: "10px", marginBottom: "10px" }}
+          style={{ width: '50px', height: '50px', marginTop: '10px', marginBottom: '10px' }}
         />
       ),
     },
@@ -117,7 +117,15 @@ export default function ProductsTable({ refresh, setRefresh }) {
             rows={rows}
             columns={columns}
             checkboxSelection
+            // Prevent row click from automatically selecting rows
+            disableSelectionOnClick
             disableColumnResize
+            // This is the new v6+ approach:
+            rowSelectionModel={rowSelectionModel}
+            onRowSelectionModelChange={(newSelection) => {
+              setRowSelectionModel(newSelection);
+              setSelectedRows(newSelection);
+            }}
             onRowClick={handleRowClick}
             getRowClassName={(params) =>
               params.indexRelativeToCurrentPage % 2 === 0 ? 'even' : 'odd'

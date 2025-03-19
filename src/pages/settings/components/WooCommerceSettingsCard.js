@@ -55,7 +55,7 @@ export default function WooCommerceSettingsCard() {
     try {
       const formattedUrl = storeUrl.endsWith('/') ? storeUrl.slice(0, -1) : storeUrl;
       console.log('Sending request to backend server');
-      const response = await fetch(`${API_URL}/woocommerce`, {
+      const response = await fetch(`${API_URL}/woocommerce/test`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -64,7 +64,7 @@ export default function WooCommerceSettingsCard() {
       });
       const result = await response.json();
       console.log('Received response from backend server:', result);
-      setTestResult(result.result);
+      setTestResult(result.result === 'Success' ? 'Success' : 'Failed');
     } catch (error) {
       console.error('Error sending request to backend server:', error);
       setTestResult('Failed');

@@ -1,31 +1,36 @@
 import * as React from 'react';
 import { useState } from 'react';
-import { Button, Box, Typography } from '@mui/material';
+import { Button, Box } from '@mui/material';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '../../../firebase';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
-export default function ImportProductsButton({ storeUrl, apiId, secretKey, setRefresh }) {
+export default function ImportProductsButton({
+  storeUrl,
+  apiId,
+  secretKey,
+  setRefresh,
+  setNotificationMessage,
+}) {
   const [user] = useAuthState(auth);
   const [loading, setLoading] = useState(false);
   const [importedCount, setImportedCount] = useState(0);
   const [totalProducts, setTotalProducts] = useState(0);
-  const [message, setMessage] = useState('');
 
   const importProducts = async () => {
     if (!user) {
-      setMessage('User not authenticated');
+      setNotificationMessage('User not authenticated');
       return;
     }
 
     setLoading(true);
     setImportedCount(0);
     setTotalProducts(0);
-    setMessage('Starting import...');
+    setNotificationMessage('Starting import...');
 
     try {
-      // Fetch the total number of products first
+      // 1) Fetch total product count
       const totalResponse = await fetch(`${API_URL}/woocommerce/total`, {
         method: 'POST',
         headers: {
@@ -36,14 +41,14 @@ export default function ImportProductsButton({ storeUrl, apiId, secretKey, setRe
       const totalResult = await totalResponse.json();
 
       if (totalResult.result === 'Success') {
-        setTotalProducts(totalResult.totalProducts);
+        setTotalProducts(parseInt(totalResult.totalProducts, 10));
       } else {
-        setMessage('Failed to fetch total products.');
+        setNotificationMessage('Failed to fetch total products.');
         setLoading(false);
         return;
       }
 
-      // Start importing products
+      // 2) Start importing
       const response = await fetch(`${API_URL}/woocommerce/import`, {
         method: 'POST',
         headers: {
@@ -61,25 +66,28 @@ export default function ImportProductsButton({ storeUrl, apiId, secretKey, setRe
         if (done) break;
         result += decoder.decode(value, { stream: true });
 
+        // The server may send multiple JSON lines in the stream
         const lines = result.split('\n\n');
         for (const line of lines) {
           if (line.trim()) {
             const data = JSON.parse(line.replace('data: ', ''));
             if (data.result === 'Success') {
-              setMessage(`Imported ${data.importedCount} products successfully.`);
+              setNotificationMessage(`Imported ${data.importedCount} products successfully.`);
               setImportedCount(data.importedCount);
               setLoading(false);
-              setRefresh((prev) => !prev); // Trigger refresh after import
+              setRefresh((prev) => !prev);
               return;
             } else {
+              // If streaming partial updates, you can set a partial message:
               setImportedCount(data.importedCount);
+              setNotificationMessage(`Importing ${data.importedCount}/${totalResult.totalProducts}`);
             }
           }
         }
       }
     } catch (error) {
       console.error('Error importing products:', error);
-      setMessage('Failed to import products.');
+      setNotificationMessage('Failed to import products.');
       setLoading(false);
     }
   };
@@ -87,18 +95,10 @@ export default function ImportProductsButton({ storeUrl, apiId, secretKey, setRe
   return (
     <Box>
       <Button variant="contained" onClick={importProducts} disabled={loading}>
-        {loading ? `Importing ${importedCount}/${totalProducts}` : 'Import All Products'}
+        {loading
+          ? `Importing ${importedCount}/${totalProducts}`
+          : 'Import All Products'}
       </Button>
-      {loading && (
-        <Box sx={{ width: '100%', mt: 2 }}>
-          <Typography variant="body2" color="textSecondary">{`Importing ${importedCount}/${totalProducts}`}</Typography>
-        </Box>
-      )}
-      {message && (
-        <Typography variant="body2" color="textSecondary" sx={{ mt: 2 }}>
-          {message}
-        </Typography>
-      )}
     </Box>
   );
 }
