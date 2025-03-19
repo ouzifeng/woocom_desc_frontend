@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../../firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -95,6 +95,10 @@ export default function ProductPage() {
         });
 
         if (response.status === 200) {
+          // Mark the product as improved
+          const productDocRef = doc(db, 'users', user.uid, 'products', productId);
+          await updateDoc(productDocRef, { improved: true });
+
           setModalOpen(true);
         } else {
           alert('Failed to update product description on WooCommerce');

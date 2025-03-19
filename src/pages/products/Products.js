@@ -23,10 +23,13 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import ImportProductsButton from './components/ImportProductsButton';
 import UpdateProductsButton from './components/UpdateProductsButton';
+import UpdateAllProductsButton from './components/UpdateAllProductsButton';
 import ProductsTable from './components/ProductsTable';
 import ProductPage from './ProductPage';
 import DeleteProductsButton from './components/DeleteProductsButton';
+import Instructions from './components/Instructions';
 import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
 
 const xThemeComponents = {
   ...chartsCustomizations,
@@ -46,6 +49,7 @@ export default function Products(props) {
 
   // NEW: One global notification message
   const [notificationMessage, setNotificationMessage] = useState('');
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -64,6 +68,13 @@ export default function Products(props) {
   }, [user]);
 
   const isProductPage = location.pathname.includes('/products/');
+
+  const toggleDrawer = (open) => (event) => {
+    if (event.type === 'keydown' && (event.key === 'Tab' || event.key === 'Shift')) {
+      return;
+    }
+    setDrawerOpen(open);
+  };
 
   return (
     <AppTheme {...props} themeComponents={xThemeComponents}>
@@ -121,15 +132,28 @@ export default function Products(props) {
                           // pass the setter for notifications
                           setNotificationMessage={setNotificationMessage}
                         />
+                        <UpdateAllProductsButton
+                          storeUrl={storeUrl}
+                          apiId={apiId}
+                          secretKey={secretKey}
+                          setRefresh={setRefresh}
+                          // pass the setter for notifications
+                          setNotificationMessage={setNotificationMessage}
+                        />
                       </Box>
 
-                      {/* Right side: Delete button */}
-                      <DeleteProductsButton
-                        setRefresh={setRefresh}
-                        selectedRows={selectedRows}
-                        // pass the setter for notifications
-                        setNotificationMessage={setNotificationMessage}
-                      />
+                      {/* Right side: Instructions + Delete buttons */}
+                      <Box sx={{ display: 'flex', gap: 2 }}>
+                        <Button size="small" variant="outlined" onClick={toggleDrawer(true)}>
+                          Instructions
+                        </Button>
+                        <DeleteProductsButton
+                          setRefresh={setRefresh}
+                          selectedRows={selectedRows}
+                          // pass the setter for notifications
+                          setNotificationMessage={setNotificationMessage}
+                        />
+                      </Box>
                     </Box>
                   )}
                 </Grid>
@@ -166,6 +190,7 @@ export default function Products(props) {
           </LocalizationProvider>
         </Box>
       </Box>
+      <Instructions drawerOpen={drawerOpen} toggleDrawer={toggleDrawer} />
     </AppTheme>
   );
 }

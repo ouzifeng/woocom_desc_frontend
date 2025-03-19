@@ -8,7 +8,6 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
 import Switch from '@mui/material/Switch';
-import { useNavigate } from 'react-router-dom';
 
 /** A helper that converts Firestore status -> UI label + MUI color */
 function renderStatus(status) {
@@ -30,8 +29,6 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
   const [user] = useAuthState(auth);
   const [rows, setRows] = useState([]);
   const [error, setError] = useState(null);
-  const [message, setMessage] = useState('');
-  const navigate = useNavigate();
 
   // Keep pagination model in state so it doesn't default to 100 rows
   const [paginationModel, setPaginationModel] = useState({
@@ -62,7 +59,6 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
           return b.id.localeCompare(a.id);
         });
         setRows(products);
-        setMessage(`Fetched ${products.length} products`);
       } catch (err) {
         setError(err.message);
       }
@@ -129,7 +125,7 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
   ];
 
   const handleRowClick = (params) => {
-    navigate(`/products/${params.id}`);
+    window.open(`/products/${params.id}`, '_blank');
   };
 
   return (
@@ -140,11 +136,6 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
         </Typography>
       ) : (
         <>
-          {message && (
-            <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-              {message}
-            </Typography>
-          )}
           <DataGrid
             pagination
             paginationModel={paginationModel}

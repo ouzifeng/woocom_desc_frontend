@@ -6,7 +6,7 @@ import { auth } from '../../../firebase';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
-export default function ImportProductsButton({
+export default function UpdateAllProductsButton({
   storeUrl,
   apiId,
   secretKey,
@@ -15,41 +15,18 @@ export default function ImportProductsButton({
 }) {
   const [user] = useAuthState(auth);
   const [loading, setLoading] = useState(false);
-  const [importedCount, setImportedCount] = useState(0);
-  const [totalProducts, setTotalProducts] = useState(0);
 
-  const importProducts = async () => {
+  const updateAllProducts = async () => {
     if (!user) {
       setNotificationMessage('User not authenticated');
       return;
     }
 
     setLoading(true);
-    setImportedCount(0);
-    setTotalProducts(0);
-    setNotificationMessage('Starting import...');
+    setNotificationMessage('Starting update...');
 
     try {
-      // 1) Fetch total product count
-      const totalResponse = await fetch(`${API_URL}/woocommerce/total`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ storeUrl, apiId, secretKey }),
-      });
-      const totalResult = await totalResponse.json();
-
-      if (totalResult.result === 'Success') {
-        setTotalProducts(parseInt(totalResult.totalProducts, 10));
-      } else {
-        setNotificationMessage('Failed to fetch total products.');
-        setLoading(false);
-        return;
-      }
-
-      // 2) Start importing
-      const response = await fetch(`${API_URL}/woocommerce/import`, {
+      const response = await fetch(`${API_URL}/woocommerce/updateexistingproducts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -72,32 +49,30 @@ export default function ImportProductsButton({
           if (line.trim()) {
             const data = JSON.parse(line.replace('data: ', ''));
             if (data.result === 'Success') {
-              setNotificationMessage(`Imported ${data.importedCount} products successfully.`);
-              setImportedCount(data.importedCount);
+              setNotificationMessage(`Update successful. All products updated.`);
               setLoading(false);
               setRefresh((prev) => !prev);
               return;
             } else {
               // If streaming partial updates, you can set a partial message:
-              setImportedCount(data.importedCount);
-              setNotificationMessage(`Importing ${data.importedCount}/${totalResult.totalProducts}`);
+              setNotificationMessage(`Updating ${data.updatedCount}...`);
             }
           }
         }
       }
-    } catch (error) {
-      console.error('Error importing products:', error);
-      setNotificationMessage('Failed to import products.');
+    } catch (err) {
+      console.error('Error updating products:', err);
+      setNotificationMessage('Failed to update products');
       setLoading(false);
     }
   };
 
   return (
     <Box>
-      <Button size="small" variant="contained" onClick={importProducts} disabled={loading}>
+      <Button size="small" variant="outlined" onClick={updateAllProducts} disabled={loading}>
         {loading
-          ? `Importing ${importedCount}/${totalProducts}`
-          : 'Import All Products'}
+          ? `Updating....`
+          : 'Update All Products'}
       </Button>
     </Box>
   );

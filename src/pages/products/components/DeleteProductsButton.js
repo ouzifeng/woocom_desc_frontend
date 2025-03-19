@@ -40,7 +40,7 @@ export default function DeleteProductsButton({
 
   return (
     <Box>
-      <Button variant="contained" color="error" onClick={handleDelete} disabled={loading}>
+      <Button size="small" variant="outlined" color="error" onClick={handleDelete} disabled={loading}>
         {loading ? 'Deleting...' : 'Delete'}
       </Button>
     </Box>

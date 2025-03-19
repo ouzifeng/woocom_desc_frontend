@@ -27,6 +27,14 @@ export default function AiSettings({
   // State to toggle whether SEO terms should be used
   const [useSeoTerms, setUseSeoTerms] = React.useState(false);
 
+  // Set default values for the checkboxes
+  React.useEffect(() => {
+    setUseBrandGuidelines(true);
+    setUseProductImage(true);
+    setUseWordCount(true);
+    setWordCount('500');
+  }, [setUseBrandGuidelines, setUseProductImage, setUseWordCount, setWordCount]);
+
   return (
     <Box
       sx={{

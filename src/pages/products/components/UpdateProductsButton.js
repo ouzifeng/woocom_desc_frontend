@@ -7,14 +7,7 @@ import { doc, getDoc } from 'firebase/firestore';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
-export default function UpdateProductsButton({
-  storeUrl,
-  apiId,
-  secretKey,
-  setRefresh,
-  // NEW: pass down from parent
-  setNotificationMessage,
-}) {
+export default function UpdateProductsButton({ storeUrl, apiId, secretKey, setRefresh, setNotificationMessage }) {
   const [user] = useAuthState(auth);
   const [loading, setLoading] = useState(false);
 
@@ -39,37 +32,47 @@ export default function UpdateProductsButton({
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            storeUrl,
-            apiId,
-            secretKey,
-            lastImport,
-            userId: user.uid,
-          }),
+          body: JSON.stringify({ storeUrl, apiId, secretKey, lastImport, userId: user.uid }),
         });
 
-        const data = await response.json();
-        if (response.status === 200 && data.result === 'Success') {
-          setNotificationMessage(
-            `New product check successful. ${data.updatedCount} products imported.`
-          );
-          setRefresh((prev) => !prev);
-        } else {
-          setNotificationMessage('Failed to update products');
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let result = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          result += decoder.decode(value, { stream: true });
+
+          // The server may send multiple JSON lines in the stream
+          const lines = result.split('\n\n');
+          for (const line of lines) {
+            if (line.trim()) {
+              const data = JSON.parse(line.replace('data: ', ''));
+              if (data.result === 'Success') {
+                setNotificationMessage(`Update successful. ${data.updatedCount} products updated.`);
+                setLoading(false);
+                setRefresh((prev) => !prev);
+                return;
+              } else {
+                // If streaming partial updates, you can set a partial message:
+                setNotificationMessage(`Updating ${data.updatedCount}...`);
+              }
+            }
+          }
         }
       }
     } catch (err) {
       console.error('Error updating products:', err);
       setNotificationMessage('Failed to update products');
-    } finally {
       setLoading(false);
     }
   };
 
   return (
     <Box>
-      <Button variant="contained" onClick={updateProducts} disabled={loading}>
-        {loading ? 'Updating...' : 'Update Products'}
+      <Button size="small" variant="outlined" onClick={updateProducts} disabled={loading}>
+        {loading ? 'Updating...' : 'Import New Products'}
       </Button>
     </Box>
   );
