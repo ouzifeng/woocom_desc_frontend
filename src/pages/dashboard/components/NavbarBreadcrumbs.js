@@ -1,34 +1,75 @@
 import * as React from 'react';
-import { styled } from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
-import Breadcrumbs, { breadcrumbsClasses } from '@mui/material/Breadcrumbs';
-import NavigateNextRoundedIcon from '@mui/icons-material/NavigateNextRounded';
-import { useLocation } from 'react-router-dom';
+import Breadcrumbs from '@mui/material/Breadcrumbs';
+import Link from '@mui/material/Link';
+import { useLocation, Link as RouterLink } from 'react-router-dom';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth, db } from '../../../firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
-const StyledBreadcrumbs = styled(Breadcrumbs)(({ theme }) => ({
-  margin: theme.spacing(1, 0),
-  [`& .${breadcrumbsClasses.separator}`]: {
-    color: (theme.vars || theme).palette.action.disabled,
-    margin: 1,
-  },
-  [`& .${breadcrumbsClasses.ol}`]: {
-    alignItems: 'center',
-  },
-}));
+function capitalizeFirstLetter(string) {
+  return string.charAt(0).toUpperCase() + string.slice(1);
+}
 
 export default function NavbarBreadcrumbs() {
   const location = useLocation();
-  const pageName = location.pathname.split('/').pop() || 'home';
+  const [user] = useAuthState(auth);
+  const [productName, setProductName] = React.useState('');
+  const pathnames = location.pathname.split('/').filter((x) => x);
+
+  React.useEffect(() => {
+    const fetchProductName = async () => {
+      if (pathnames[0] === 'products' && pathnames[1] && user) {
+        try {
+          const productDoc = await getDoc(doc(db, 'users', user.uid, 'products', pathnames[1]));
+          if (productDoc.exists()) {
+            setProductName(productDoc.data().name);
+          }
+        } catch (error) {
+          console.error('Error fetching product:', error);
+        }
+      }
+    };
+
+    fetchProductName();
+  }, [pathnames, user]);
 
   return (
-    <StyledBreadcrumbs
-      aria-label="breadcrumb"
-      separator={<NavigateNextRoundedIcon fontSize="small" />}
-    >
-      <Typography variant="body1">Dashboard</Typography>
-      <Typography variant="body1" sx={{ color: 'text.primary', fontWeight: 600 }}>
-        {pageName.charAt(0).toUpperCase() + pageName.slice(1)}
-      </Typography>
-    </StyledBreadcrumbs>
+    <Breadcrumbs aria-label="breadcrumb">
+      {pathnames.map((value, index) => {
+        const last = index === pathnames.length - 1;
+        const to = `/${pathnames.slice(0, index + 1).join('/')}`;
+
+        let displayName = value;
+        if (value === 'products' && last) {
+          displayName = 'Products';
+        } else if (pathnames[0] === 'products' && index === 1) {
+          displayName = productName || 'Loading...';
+        } else {
+          displayName = value.split('-').map(capitalizeFirstLetter).join(' ');
+        }
+
+        return last ? (
+          <Typography color="text.primary" key={to}>
+            {displayName}
+          </Typography>
+        ) : (
+          <Link
+            component={RouterLink}
+            to={to}
+            key={to}
+            color="inherit"
+            sx={{ 
+              textDecoration: 'none',
+              '&:hover': {
+                textDecoration: 'underline'
+              }
+            }}
+          >
+            {displayName}
+          </Link>
+        );
+      })}
+    </Breadcrumbs>
   );
 }

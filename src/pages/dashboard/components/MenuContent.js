@@ -13,6 +13,11 @@ import AssignmentRoundedIcon from '@mui/icons-material/AssignmentRounded';
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
 import InfoRoundedIcon from '@mui/icons-material/InfoRounded';
 import HelpRoundedIcon from '@mui/icons-material/HelpRounded';
+import Chip from '@mui/material/Chip';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth, db } from '../../../firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 const mainListItems = [
   { text: 'Home', icon: <HomeRoundedIcon />, link: '/dashboard' },
@@ -22,13 +27,30 @@ const mainListItems = [
 ];
 
 const secondaryListItems = [
-  { text: 'Settings', icon: <SettingsRoundedIcon />, link: '/settings' },
+  { text: 'Integrations', icon: <SettingsRoundedIcon />, link: '/settings' },
   { text: 'About', icon: <InfoRoundedIcon /> },
   { text: 'Feedback', icon: <HelpRoundedIcon /> },
 ];
 
 export default function MenuContent() {
   const location = useLocation();
+  const [user] = useAuthState(auth);
+  const [credits, setCredits] = React.useState(0);
+
+  React.useEffect(() => {
+    if (user) {
+      const userDocRef = doc(db, 'users', user.uid);
+      // Set up a real-time listener for credits changes
+      const unsubscribe = onSnapshot(userDocRef, (doc) => {
+        if (doc.exists()) {
+          setCredits(doc.data().credits || 0);
+        }
+      });
+
+      // Cleanup the listener when component unmounts
+      return () => unsubscribe();
+    }
+  }, [user]);
 
   return (
     <Stack sx={{ flexGrow: 1, p: 1, justifyContent: 'space-between' }}>
@@ -47,6 +69,22 @@ export default function MenuContent() {
         ))}
       </List>
       <List dense>
+        <ListItem sx={{ display: 'block', py: 1 }}>
+          <Chip
+            icon={<AutoAwesomeIcon />}
+            label={`${credits} credits left`}
+            color="primary"
+            variant="outlined"
+            size="large"
+            sx={{ 
+              width: '100%',
+              borderColor: 'primary.main',
+              '& .MuiChip-label': {
+                px: 1,
+              }
+            }}
+          />
+        </ListItem>
         {secondaryListItems.map((item, index) => (
           <ListItem key={index} disablePadding sx={{ display: 'block' }}>
             <ListItemButton

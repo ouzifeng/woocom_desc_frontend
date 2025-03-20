@@ -10,10 +10,8 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 
 function ButtonField(props) {
   const {
-    setOpen,
     label,
     id,
-    disabled,
     InputProps: { ref } = {},
     inputProps: { 'aria-label': ariaLabel } = {},
   } = props;
@@ -22,13 +20,14 @@ function ButtonField(props) {
     <Button
       variant="outlined"
       id={id}
-      disabled={disabled}
       ref={ref}
       aria-label={ariaLabel}
       size="small"
-      onClick={() => setOpen?.((prev) => !prev)}
       startIcon={<CalendarTodayRoundedIcon fontSize="small" />}
-      sx={{ minWidth: 'fit-content' }}
+      sx={{ 
+        minWidth: 'fit-content',
+        pointerEvents: 'none'
+      }}
     >
       {label ? `${label}` : 'Pick a date'}
     </Button>
@@ -36,11 +35,6 @@ function ButtonField(props) {
 }
 
 ButtonField.propTypes = {
-  /**
-   * If `true`, the component is disabled.
-   * @default false
-   */
-  disabled: PropTypes.bool,
   id: PropTypes.string,
   inputProps: PropTypes.shape({
     'aria-label': PropTypes.string,
@@ -50,29 +44,22 @@ ButtonField.propTypes = {
     startAdornment: PropTypes.node,
   }),
   label: PropTypes.node,
-  setOpen: PropTypes.func,
 };
 
 export default function CustomDatePicker() {
-  const [value, setValue] = React.useState(dayjs('2023-04-17'));
-  const [open, setOpen] = React.useState(false);
+  const [value] = React.useState(dayjs('2023-04-17'));
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <DatePicker
         value={value}
         label={value == null ? null : value.format('MMM DD, YYYY')}
-        onChange={(newValue) => setValue(newValue)}
         slots={{ field: ButtonField }}
         slotProps={{
-          field: { setOpen },
           nextIconButton: { size: 'small' },
           previousIconButton: { size: 'small' },
         }}
-        open={open}
-        onClose={() => setOpen(false)}
-        onOpen={() => setOpen(true)}
-        views={['day', 'month', 'year']}
+        readOnly={true}
       />
     </LocalizationProvider>
   );

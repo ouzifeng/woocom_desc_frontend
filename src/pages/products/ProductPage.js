@@ -141,6 +141,20 @@ export default function ProductPage() {
     if (user && productId) {
       setAiLoading(true);
       try {
+        // First check if user has enough credits
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userDocRef);
+        if (!userDoc.exists() || userDoc.data().credits < 1) {
+          alert('You need at least 1 credit to generate an AI description');
+          setAiLoading(false);
+          return;
+        }
+
+        // Deduct one credit
+        await updateDoc(userDocRef, {
+          credits: userDoc.data().credits - 1
+        });
+
         const brandDocRef = doc(db, 'users', user.uid, 'BrandIdentity', 'settings');
         const brandDoc = await getDoc(brandDocRef);
         const brandData = brandDoc.exists() ? brandDoc.data() : {};
@@ -203,6 +217,10 @@ export default function ProductPage() {
           setDescription(data.aiDescription);
           setModalOpen(true);
         } else {
+          // If the AI generation fails, refund the credit
+          await updateDoc(userDocRef, {
+            credits: userDoc.data().credits + 1
+          });
           alert('Failed to generate AI description');
         }
       } catch (err) {

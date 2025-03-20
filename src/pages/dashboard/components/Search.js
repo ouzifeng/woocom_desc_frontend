@@ -18,6 +18,7 @@ import Avatar from '@mui/material/Avatar';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
 import ClickAwayListener from '@mui/material/ClickAwayListener';
+import { alpha } from '@mui/material/styles';
 
 /** A helper that decodes HTML entities */
 function decodeHtmlEntities(text) {
@@ -98,7 +99,7 @@ export default function Search() {
 
   return (
     <ClickAwayListener onClickAway={handleClickAway}>
-      <Box sx={{ position: 'relative', width: { xs: '100%', md: '25ch' } }}>
+      <Box sx={{ position: 'relative', width: { xs: '100%', md: '50ch' } }}>
         <FormControl
           component="form"
           onSubmit={handleSearchSubmit}
@@ -111,16 +112,41 @@ export default function Search() {
             placeholder="Search products..."
             value={searchQuery}
             onChange={handleSearchChange}
-            sx={{ flexGrow: 1 }}
+            sx={{
+              flexGrow: 1,
+              backgroundColor: (theme) => alpha(theme.palette.background.paper, 0.9),
+              borderRadius: '12px',
+              transition: 'all 0.2s ease-in-out',
+              '&:hover': {
+                backgroundColor: (theme) => alpha(theme.palette.background.paper, 1),
+                boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+              },
+              '&.Mui-focused': {
+                backgroundColor: (theme) => alpha(theme.palette.background.paper, 1),
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              }
+            }}
             startAdornment={
-              <InputAdornment position="start" sx={{ color: 'text.primary' }}>
-                <SearchRoundedIcon fontSize="small" />
+              <InputAdornment position="start">
+                <SearchRoundedIcon 
+                  sx={{ 
+                    color: 'primary.main',
+                    opacity: 0.8
+                  }} 
+                  fontSize="small" 
+                />
               </InputAdornment>
             }
             endAdornment={
               isLoading && (
                 <InputAdornment position="end">
-                  <CircularProgress size={20} />
+                  <CircularProgress 
+                    size={20} 
+                    sx={{ 
+                      color: 'primary.main',
+                      opacity: 0.8
+                    }} 
+                  />
                 </InputAdornment>
               )
             }
@@ -132,7 +158,7 @@ export default function Search() {
 
         {showDropdown && (searchResults.length > 0 ? (
           <Paper
-            elevation={3}
+            elevation={0}
             sx={{
               position: 'absolute',
               top: '100%',
@@ -143,17 +169,25 @@ export default function Search() {
               overflow: 'auto',
               zIndex: 1000,
               backgroundColor: 'background.paper',
+              borderRadius: '12px',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+              border: '1px solid',
+              borderColor: 'divider'
             }}
           >
-            <List>
+            <List sx={{ py: 1 }}>
               {searchResults.map((product) => (
                 <ListItem
                   key={product.id}
                   button
                   onClick={() => handleProductSelect(product.id)}
                   sx={{
+                    px: 2,
+                    py: 1,
+                    transition: 'all 0.2s ease-in-out',
                     '&:hover': {
-                      backgroundColor: 'action.hover',
+                      backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.08),
+                      transform: 'translateX(4px)'
                     },
                   }}
                 >
@@ -162,30 +196,58 @@ export default function Search() {
                       src={product.image}
                       alt={product.name}
                       variant="rounded"
-                      sx={{ width: 40, height: 40 }}
+                      sx={{ 
+                        width: 40, 
+                        height: 40,
+                        borderRadius: '8px',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                      }}
                     />
                   </ListItemAvatar>
-                  <ListItemText primary={product.name} />
+                  <ListItemText 
+                    primary={
+                      <Typography 
+                        variant="body1" 
+                        sx={{ 
+                          fontWeight: 500,
+                          color: 'text.primary'
+                        }}
+                      >
+                        {product.name}
+                      </Typography>
+                    } 
+                  />
                 </ListItem>
               ))}
             </List>
           </Paper>
         ) : searchQuery.length >= 3 && (
           <Paper
-            elevation={3}
+            elevation={0}
             sx={{
               position: 'absolute',
               top: '100%',
               left: 0,
               right: 0,
               mt: 1,
-              p: 2,
+              p: 3,
               zIndex: 1000,
               backgroundColor: 'background.paper',
+              borderRadius: '12px',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+              border: '1px solid',
+              borderColor: 'divider',
               textAlign: 'center',
             }}
           >
-            <Typography color="text.secondary">
+            <Typography 
+              color="text.secondary"
+              sx={{ 
+                fontSize: '0.9rem',
+                fontWeight: 500,
+                opacity: 0.8
+              }}
+            >
               No results found
             </Typography>
           </Paper>

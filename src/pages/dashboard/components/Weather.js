@@ -18,33 +18,48 @@ const IconBox = styled(Box)(({ theme }) => ({
 const Weather = () => {
   const [weather, setWeather] = useState(null);
   const [unit, setUnit] = useState('C'); // State to track the unit (Celsius or Fahrenheit)
-  const apiKey = process.env.WEATHER_API_KEY
+  const [error, setError] = useState(null);
+  const apiKey = process.env.REACT_APP_WEATHER_API_KEY;
 
   useEffect(() => {
     const fetchLocationAndWeather = async () => {
       try {
-        // Fetch the user's IP address and location
+        // Get location data directly from ipapi.co
         const locationResponse = await axios.get('https://ipapi.co/json/');
         const location = locationResponse.data;
 
-        // Fetch the weather data using the location
+        // Get weather data using the coordinates
         const weatherResponse = await axios.get(
-          `http://api.weatherstack.com/current?access_key=${apiKey}&query=${location.city}`
+          `https://api.weatherapi.com/v1/current.json?key=${apiKey}&q=${location.latitude},${location.longitude}&aqi=no`
         );
-        setWeather(weatherResponse.data);
+        
+        if (weatherResponse.data && weatherResponse.data.current) {
+          setWeather(weatherResponse.data);
+        } else {
+          setError('Invalid weather data received');
+        }
       } catch (error) {
         console.error('Error fetching weather data:', error);
+        setError(error.response?.data?.error?.message || 'Failed to fetch weather data');
       }
     };
 
-    fetchLocationAndWeather();
-  }, []);
+    if (apiKey) {
+      fetchLocationAndWeather();
+    } else {
+      setError('Weather API key not found');
+    }
+  }, [apiKey]);
+
+  if (error) {
+    return <Typography variant="caption" color="error">{error}</Typography>;
+  }
 
   if (!weather) {
     return <Typography>..</Typography>;
   }
 
-  // If there's no `weather.current` for some reason, handle gracefully:
+  // If there's no current weather data, handle gracefully
   if (!weather.current) {
     return <Typography>No weather data available.</Typography>;
   }
@@ -54,8 +69,8 @@ const Weather = () => {
   };
 
   const temperature = unit === 'C' 
-    ? Math.round(weather.current.temperature) 
-    : Math.round((weather.current.temperature * 9/5) + 32);
+    ? Math.round(weather.current.temp_c) 
+    : Math.round(weather.current.temp_f);
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'center' }} onClick={toggleUnit}>
