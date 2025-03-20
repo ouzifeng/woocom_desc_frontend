@@ -8,6 +8,8 @@ import { tabsClasses } from '@mui/material/Tabs';
 import Typography from '@mui/material/Typography';
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
 import DashboardRoundedIcon from '@mui/icons-material/DashboardRounded';
+import Chip from '@mui/material/Chip';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import SideMenuMobile from './SideMenuMobile';
 import MenuButton from './MenuButton';
 import ColorModeIconDropdown from '../../shared-theme/ColorModeIconDropdown';
@@ -31,6 +33,8 @@ const Toolbar = styled(MuiToolbar)({
 
 export default function AppNavbar() {
   const [open, setOpen] = React.useState(false);
+  // Hardcoded credits for now
+  const credits = 10;
 
   const toggleDrawer = (newOpen) => () => {
     setOpen(newOpen);
@@ -62,18 +66,38 @@ export default function AppNavbar() {
           <Stack
             direction="row"
             spacing={1}
-            sx={{ justifyContent: 'center', mr: 'auto' }}
+            sx={{ alignItems: 'center' }}
           >
             <CustomIcon />
             <Typography variant="h4" component="h1" sx={{ color: 'text.primary' }}>
               Dashboard
             </Typography>
           </Stack>
-          <ColorModeIconDropdown />
-          <TodayDate />
-          <MenuButton aria-label="menu" onClick={toggleDrawer(true)}>
-            <MenuRoundedIcon />
-          </MenuButton>
+          <Box sx={{ flexGrow: 1 }} />
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{ alignItems: 'center' }}
+          >
+            <Chip
+              icon={<AutoAwesomeIcon />}
+              label={`${credits} credits`}
+              color="primary"
+              variant="outlined"
+              size="small"
+              sx={{ 
+                borderColor: 'primary.main',
+                '& .MuiChip-label': {
+                  px: 1,
+                }
+              }}
+            />
+            <ColorModeIconDropdown />
+            <TodayDate />
+            <MenuButton aria-label="menu" onClick={toggleDrawer(true)}>
+              <MenuRoundedIcon />
+            </MenuButton>
+          </Stack>
           <SideMenuMobile open={open} toggleDrawer={toggleDrawer} />
         </Stack>
       </Toolbar>

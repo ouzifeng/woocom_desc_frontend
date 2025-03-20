@@ -25,6 +25,13 @@ function renderStatus(status) {
   );
 }
 
+/** A helper that decodes HTML entities */
+function decodeHtmlEntities(text) {
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = text;
+  return textarea.value;
+}
+
 export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) {
   const [user] = useAuthState(auth);
   const [rows, setRows] = useState([]);
@@ -121,7 +128,12 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
         />
       ),
     },
-    { field: 'name', headerName: 'Name', flex: 1 },
+    { 
+      field: 'name', 
+      headerName: 'Name', 
+      flex: 1,
+      renderCell: (params) => decodeHtmlEntities(params.value)
+    },
   ];
 
   const handleRowClick = (params) => {

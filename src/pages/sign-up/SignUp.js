@@ -119,16 +119,17 @@ export default function SignUp(props) {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
 
-      console.log('Google user created:', user.uid); // Log Google user creation
+      console.log('Google user created:', user.uid);
 
-      // Create a document in Firestore with blank WooCommerce credentials
+      // Create a document in Firestore with blank WooCommerce credentials and 10 credits
       await setDoc(doc(db, 'users', user.uid), {
         wc_url: '',
         wc_key: '',
-        wc_secret: ''
+        wc_secret: '',
+        credits: 10
       });
 
-      console.log('Firestore document created for Google user:', user.uid); // Log Firestore document creation
+      console.log('Firestore document created for Google user:', user.uid);
 
       navigate('/settings');
     } catch (error) {
@@ -145,16 +146,17 @@ export default function SignUp(props) {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      console.log('User created:', user.uid); // Log user creation
+      console.log('User created:', user.uid);
 
-      // Create a document in Firestore with blank WooCommerce credentials
+      // Create a document in Firestore with blank WooCommerce credentials and 10 credits
       await setDoc(doc(db, 'users', user.uid), {
         wc_url: '',
         wc_key: '',
-        wc_secret: ''
+        wc_secret: '',
+        credits: 10
       });
 
-      console.log('Firestore document created for user:', user.uid); // Log Firestore document creation
+      console.log('Firestore document created for user:', user.uid);
 
       navigate('/dashboard');
     } catch (error) {

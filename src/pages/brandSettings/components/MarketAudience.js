@@ -19,6 +19,7 @@ import { doc, setDoc, getDoc } from 'firebase/firestore';
 
 const genders = ['Male', 'Female', 'Mixed'];
 const regionalHumorOptions = ['Yes', 'No'];
+const languageVariants = ['US English', 'UK English'];
 
 export default function MarketAudience() {
   const [user] = useAuthState(auth);
@@ -26,6 +27,7 @@ export default function MarketAudience() {
   const [location, setLocation] = React.useState('');
   const [gender, setGender] = React.useState('');
   const [regionalHumor, setRegionalHumor] = React.useState('');
+  const [languageVariant, setLanguageVariant] = React.useState('');
   const [modalOpen, setModalOpen] = React.useState(false);
 
   React.useEffect(() => {
@@ -40,6 +42,7 @@ export default function MarketAudience() {
             setLocation(data.location || '');
             setGender(data.gender || '');
             setRegionalHumor(data.regionalHumor || '');
+            setLanguageVariant(data.languageVariant || '');
           }
         } catch (error) {
           console.error('Error fetching market audience data:', error);
@@ -56,6 +59,7 @@ export default function MarketAudience() {
       if (location) marketAudienceData.location = location;
       if (gender) marketAudienceData.gender = gender;
       if (regionalHumor) marketAudienceData.regionalHumor = regionalHumor;
+      if (languageVariant) marketAudienceData.languageVariant = languageVariant;
 
       try {
         const userDocRef = doc(db, 'users', user.uid, 'MarketAudience', 'settings');
@@ -158,6 +162,26 @@ export default function MarketAudience() {
                   </TextField>
                 </TableCell>
                 <TableCell>Avoid cultural misunderstanding.</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>Language Variant</TableCell>
+                <TableCell>
+                  <TextField
+                    select
+                    variant="outlined"
+                    placeholder="Select language variant"
+                    fullWidth
+                    value={languageVariant}
+                    onChange={(e) => setLanguageVariant(e.target.value)}
+                  >
+                    {languageVariants.map((option) => (
+                      <MenuItem key={option} value={option}>
+                        {option}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </TableCell>
+                <TableCell>Choose between US or UK English spelling and grammar</TableCell>
               </TableRow>
             </TableBody>
           </Table>

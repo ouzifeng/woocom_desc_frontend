@@ -21,15 +21,25 @@ import {
 } from '../dashboard/theme/customizations';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import ImportProductsButton from './components/ImportProductsButton';
-import UpdateProductsButton from './components/UpdateProductsButton';
-import UpdateAllProductsButton from './components/UpdateAllProductsButton';
-import ProductsTable from './components/ProductsTable';
-import ProductPage from './ProductPage';
-import DeleteProductsButton from './components/DeleteProductsButton';
-import Instructions from './components/Instructions';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress';
+
+// Lazy load components
+const ImportProductsButton = React.lazy(() => import('./components/ImportProductsButton'));
+const UpdateProductsButton = React.lazy(() => import('./components/UpdateProductsButton'));
+const UpdateAllProductsButton = React.lazy(() => import('./components/UpdateAllProductsButton'));
+const ProductsTable = React.lazy(() => import('./components/ProductsTable'));
+const ProductPage = React.lazy(() => import('./ProductPage'));
+const DeleteProductsButton = React.lazy(() => import('./components/DeleteProductsButton'));
+const Instructions = React.lazy(() => import('./components/Instructions'));
+
+// Loading component
+const LoadingFallback = () => (
+  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+    <CircularProgress />
+  </Box>
+);
 
 const xThemeComponents = {
   ...chartsCustomizations,
@@ -46,8 +56,6 @@ export default function Products(props) {
   const [refresh, setRefresh] = useState(false);
   const [selectedRows, setSelectedRows] = useState([]);
   const location = useLocation();
-
-  // NEW: One global notification message
   const [notificationMessage, setNotificationMessage] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -82,7 +90,6 @@ export default function Products(props) {
       <Box sx={{ display: 'flex' }}>
         <SideMenu user={user} />
         <AppNavbar />
-        {/* Main content */}
         <Box
           component="main"
           sx={(theme) => ({
@@ -114,51 +121,52 @@ export default function Products(props) {
                         alignItems: 'center',
                       }}
                     >
-                      {/* Left side: Import + Update buttons */}
                       <Box sx={{ display: 'flex', gap: 2 }}>
-                        <ImportProductsButton
-                          storeUrl={storeUrl}
-                          apiId={apiId}
-                          secretKey={secretKey}
-                          setRefresh={setRefresh}
-                          // pass the setter for notifications
-                          setNotificationMessage={setNotificationMessage}
-                        />
-                        <UpdateProductsButton
-                          storeUrl={storeUrl}
-                          apiId={apiId}
-                          secretKey={secretKey}
-                          setRefresh={setRefresh}
-                          // pass the setter for notifications
-                          setNotificationMessage={setNotificationMessage}
-                        />
-                        <UpdateAllProductsButton
-                          storeUrl={storeUrl}
-                          apiId={apiId}
-                          secretKey={secretKey}
-                          setRefresh={setRefresh}
-                          // pass the setter for notifications
-                          setNotificationMessage={setNotificationMessage}
-                        />
+                        <React.Suspense fallback={<CircularProgress size={24} />}>
+                          <ImportProductsButton
+                            storeUrl={storeUrl}
+                            apiId={apiId}
+                            secretKey={secretKey}
+                            setRefresh={setRefresh}
+                            setNotificationMessage={setNotificationMessage}
+                          />
+                        </React.Suspense>
+                        <React.Suspense fallback={<CircularProgress size={24} />}>
+                          <UpdateProductsButton
+                            storeUrl={storeUrl}
+                            apiId={apiId}
+                            secretKey={secretKey}
+                            setRefresh={setRefresh}
+                            setNotificationMessage={setNotificationMessage}
+                          />
+                        </React.Suspense>
+                        <React.Suspense fallback={<CircularProgress size={24} />}>
+                          <UpdateAllProductsButton
+                            storeUrl={storeUrl}
+                            apiId={apiId}
+                            secretKey={secretKey}
+                            setRefresh={setRefresh}
+                            setNotificationMessage={setNotificationMessage}
+                          />
+                        </React.Suspense>
                       </Box>
 
-                      {/* Right side: Instructions + Delete buttons */}
                       <Box sx={{ display: 'flex', gap: 2 }}>
                         <Button size="small" variant="outlined" onClick={toggleDrawer(true)}>
                           Instructions
                         </Button>
-                        <DeleteProductsButton
-                          setRefresh={setRefresh}
-                          selectedRows={selectedRows}
-                          // pass the setter for notifications
-                          setNotificationMessage={setNotificationMessage}
-                        />
+                        <React.Suspense fallback={<CircularProgress size={24} />}>
+                          <DeleteProductsButton
+                            setRefresh={setRefresh}
+                            selectedRows={selectedRows}
+                            setNotificationMessage={setNotificationMessage}
+                          />
+                        </React.Suspense>
                       </Box>
                     </Box>
                   )}
                 </Grid>
 
-                {/* NEW ROW for the global notification */}
                 <Grid item xs={12} md={9}>
                   {notificationMessage && (
                     <Typography variant="body2" color="textSecondary" textAlign={'left'}>
@@ -175,14 +183,23 @@ export default function Products(props) {
                     <Route
                       path="*"
                       element={
-                        <ProductsTable
-                          refresh={refresh}
-                          setRefresh={setRefresh}
-                          setSelectedRows={setSelectedRows}
-                        />
+                        <React.Suspense fallback={<LoadingFallback />}>
+                          <ProductsTable
+                            refresh={refresh}
+                            setRefresh={setRefresh}
+                            setSelectedRows={setSelectedRows}
+                          />
+                        </React.Suspense>
                       }
                     />
-                    <Route path=":productId" element={<ProductPage />} />
+                    <Route 
+                      path=":productId" 
+                      element={
+                        <React.Suspense fallback={<LoadingFallback />}>
+                          <ProductPage />
+                        </React.Suspense>
+                      } 
+                    />
                   </Routes>
                 </Grid>
               </Grid>
@@ -190,7 +207,9 @@ export default function Products(props) {
           </LocalizationProvider>
         </Box>
       </Box>
-      <Instructions drawerOpen={drawerOpen} toggleDrawer={toggleDrawer} />
+      <React.Suspense fallback={<LoadingFallback />}>
+        <Instructions drawerOpen={drawerOpen} toggleDrawer={toggleDrawer} />
+      </React.Suspense>
     </AppTheme>
   );
 }

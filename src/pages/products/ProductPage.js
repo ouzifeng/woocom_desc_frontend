@@ -11,13 +11,29 @@ import Button from '@mui/material/Button';
 import Modal from '@mui/material/Modal';
 import Alert from '@mui/material/Alert';
 import Grid from '@mui/material/Grid';
-import ProductDetails from './components/ProductDetails';
-import ProductEditor from './components/ProductEditor';
-import ImproveGrammarButton from './components/ImproveGrammarButton';
-import InstructionsDrawer from './components/InstructionsDrawer';
-import AiSettings from './components/AiSettings';
+
+// Lazy load components
+const ProductDetails = React.lazy(() => import('./components/ProductDetails'));
+const ProductEditor = React.lazy(() => import('./components/ProductEditor'));
+const ImproveGrammarButton = React.lazy(() => import('./components/ImproveGrammarButton'));
+const InstructionsDrawer = React.lazy(() => import('./components/InstructionsDrawer'));
+const AiSettings = React.lazy(() => import('./components/AiSettings'));
+
+// Loading component
+const LoadingFallback = () => (
+  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+    <CircularProgress />
+  </Box>
+);
 
 const API_URL = process.env.REACT_APP_API_URL;
+
+/** A helper that decodes HTML entities */
+function decodeHtmlEntities(text) {
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = text;
+  return textarea.value;
+}
 
 export default function ProductPage() {
   const { productId } = useParams();
@@ -170,7 +186,7 @@ export default function ProductPage() {
           messageContent += ` Add a specifications section to the product description.`;
         }
 
-        messageContent += ` Product name: ${product?.name || ''}. Product description: ${description}.`;
+        messageContent += ` Product name: ${decodeHtmlEntities(product?.name || '')}. Product description: ${description}.`;
 
         console.log('AI Request Message Content:', messageContent);
 
@@ -234,11 +250,7 @@ export default function ProductPage() {
   };
 
   if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <CircularProgress />
-      </Box>
-    );
+    return <LoadingFallback />;
   }
 
   if (error) {
@@ -275,7 +287,9 @@ export default function ProductPage() {
                   'AI Name'
                 )}
               </Button>
-              <ImproveGrammarButton description={description} setDescription={setDescription} setModalOpen={setModalOpen} />
+              <React.Suspense fallback={<CircularProgress size={24} />}>
+                <ImproveGrammarButton description={description} setDescription={setDescription} setModalOpen={setModalOpen} />
+              </React.Suspense>
             </Box>
             <Box sx={{ display: 'flex', gap: 2 }}>
               <Button variant="contained" color="primary" onClick={handleSave}>
@@ -286,28 +300,34 @@ export default function ProductPage() {
               </Button>
             </Box>
           </Box>
-          <ProductDetails product={product} setProduct={setProduct} />
-          <ProductEditor description={description} setDescription={setDescription} />
+          <React.Suspense fallback={<LoadingFallback />}>
+            <ProductDetails product={product} setProduct={setProduct} />
+          </React.Suspense>
+          <React.Suspense fallback={<LoadingFallback />}>
+            <ProductEditor description={description} setDescription={setDescription} />
+          </React.Suspense>
         </Grid>
         <Grid item xs={12} md={2}>
-          <AiSettings
-            useBrandGuidelines={useBrandGuidelines}
-            setUseBrandGuidelines={setUseBrandGuidelines}
-            useProductImage={useProductImage}
-            setUseProductImage={setUseProductImage}
-            updateProductName={updateProductName}
-            setUpdateProductName={setUpdateProductName}
-            seoTerms={seoTerms}
-            setSeoTerms={setSeoTerms}
-            useWordCount={useWordCount}
-            setUseWordCount={setUseWordCount}
-            wordCount={wordCount}
-            setWordCount={setWordCount}
-            useEmojis={useEmojis}
-            setUseEmojis={setUseEmojis}
-            addSpecifications={addSpecifications}
-            setAddSpecifications={setAddSpecifications}
-          />
+          <React.Suspense fallback={<LoadingFallback />}>
+            <AiSettings
+              useBrandGuidelines={useBrandGuidelines}
+              setUseBrandGuidelines={setUseBrandGuidelines}
+              useProductImage={useProductImage}
+              setUseProductImage={setUseProductImage}
+              updateProductName={updateProductName}
+              setUpdateProductName={setUpdateProductName}
+              seoTerms={seoTerms}
+              setSeoTerms={setSeoTerms}
+              useWordCount={useWordCount}
+              setUseWordCount={setUseWordCount}
+              wordCount={wordCount}
+              setWordCount={setWordCount}
+              useEmojis={useEmojis}
+              setUseEmojis={setUseEmojis}
+              addSpecifications={addSpecifications}
+              setAddSpecifications={setAddSpecifications}
+            />
+          </React.Suspense>
         </Grid>
       </Grid>
       <Modal
@@ -322,7 +342,9 @@ export default function ProductPage() {
           </Alert>
         </Box>
       </Modal>
-      <InstructionsDrawer drawerOpen={drawerOpen} toggleDrawer={toggleDrawer} />
+      <React.Suspense fallback={<LoadingFallback />}>
+        <InstructionsDrawer drawerOpen={drawerOpen} toggleDrawer={toggleDrawer} />
+      </React.Suspense>
     </Box>
   );
 }

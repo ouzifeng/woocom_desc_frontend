@@ -2,9 +2,24 @@ import * as React from 'react';
 import TextField from '@mui/material/TextField';
 import Box from '@mui/material/Box';
 
+/** A helper that decodes HTML entities */
+function decodeHtmlEntities(text) {
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = text;
+  return textarea.value;
+}
+
+/** A helper that encodes HTML entities */
+function encodeHtmlEntities(text) {
+  const textarea = document.createElement('textarea');
+  textarea.textContent = text;
+  return textarea.innerHTML;
+}
+
 export default function ProductDetails({ product, setProduct }) {
   const handleNameChange = (event) => {
-    const updatedProduct = { ...product, name: event.target.value };
+    const encodedName = encodeHtmlEntities(event.target.value);
+    const updatedProduct = { ...product, name: encodedName };
     setProduct(updatedProduct);
   };
 
@@ -12,7 +27,7 @@ export default function ProductDetails({ product, setProduct }) {
     <Box>
       <TextField
         label="Name"
-        value={product?.name || ''}
+        value={decodeHtmlEntities(product?.name || '')}
         fullWidth
         margin="normal"
         InputProps={{
