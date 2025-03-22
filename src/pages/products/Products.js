@@ -24,6 +24,7 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
+import DownloadCSVButton from './components/DownloadCSVButton';
 
 // Lazy load components
 const ImportProductsButton = React.lazy(() => import('./components/ImportProductsButton'));
@@ -33,6 +34,7 @@ const ProductsTable = React.lazy(() => import('./components/ProductsTable'));
 const ProductPage = React.lazy(() => import('./ProductPage'));
 const DeleteProductsButton = React.lazy(() => import('./components/DeleteProductsButton'));
 const Instructions = React.lazy(() => import('./components/Instructions'));
+
 
 // Loading component
 const LoadingFallback = () => (
@@ -152,6 +154,10 @@ export default function Products(props) {
                       </Box>
 
                       <Box sx={{ display: 'flex', gap: 2 }}>
+                        <DownloadCSVButton
+                          selectedRows={selectedRows}
+                          setNotificationMessage={setNotificationMessage}
+                        />
                         <Button size="small" variant="outlined" onClick={toggleDrawer(true)}>
                           Instructions
                         </Button>
@@ -159,7 +165,6 @@ export default function Products(props) {
                           <DeleteProductsButton
                             setRefresh={setRefresh}
                             selectedRows={selectedRows}
-                            setNotificationMessage={setNotificationMessage}
                           />
                         </React.Suspense>
                       </Box>
