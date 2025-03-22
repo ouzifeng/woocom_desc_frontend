@@ -20,6 +20,7 @@ import { getFirestore, doc, setDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
+
 const Card = styled(MuiCard)(({ theme }) => ({
   display: 'flex',
   flexDirection: 'column',
@@ -180,6 +181,10 @@ export default function SignUp(props) {
       navigate('/dashboard');
     } catch (error) {
       console.error('Error signing up with email and password', error);
+      if (error.code === 'auth/email-already-in-use') {
+        setEmailError(true);
+        setEmailErrorMessage('Email already exists.');
+      }
     }
   };
 
@@ -214,6 +219,7 @@ export default function SignUp(props) {
                 error={nameError}
                 helperText={nameErrorMessage}
                 color={nameError ? 'error' : 'primary'}
+                onChange={(e) => setFirstName(e.target.value)}
               />
             </FormControl>
             <FormControl>
@@ -228,7 +234,7 @@ export default function SignUp(props) {
                 variant="outlined"
                 error={emailError}
                 helperText={emailErrorMessage}
-                color={passwordError ? 'error' : 'primary'}
+                color={emailError ? 'error' : 'primary'}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
@@ -285,7 +291,7 @@ export default function SignUp(props) {
             <Button
               fullWidth
               variant="outlined"
-              onClick={handleGoogleSignUp} // Update onClick handler
+              onClick={handleGoogleSignUp}
               startIcon={<GoogleIcon />}
             >
               Sign up with Google
