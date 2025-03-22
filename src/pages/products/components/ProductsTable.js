@@ -8,8 +8,8 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
 import Switch from '@mui/material/Switch';
+import TextField from '@mui/material/TextField';
 
-/** A helper that converts Firestore status -> UI label + MUI color */
 function renderStatus(status) {
   const colorMap = {
     Published: 'success',
@@ -25,7 +25,6 @@ function renderStatus(status) {
   );
 }
 
-/** A helper that decodes HTML entities */
 function decodeHtmlEntities(text) {
   const textarea = document.createElement('textarea');
   textarea.innerHTML = text;
@@ -35,18 +34,17 @@ function decodeHtmlEntities(text) {
 export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) {
   const [user] = useAuthState(auth);
   const [rows, setRows] = useState([]);
+  const [filteredRows, setFilteredRows] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState(null);
 
-  // Keep pagination model in state so it doesn't default to 100 rows
   const [paginationModel, setPaginationModel] = useState({
     pageSize: 10,
     page: 0,
   });
 
-  // This holds the current selection so that DataGrid knows which switches (checkboxes) are selected
   const [rowSelectionModel, setRowSelectionModel] = useState([]);
 
-  // Fetch Firestore data
   const fetchData = useCallback(async () => {
     if (user) {
       try {
@@ -56,7 +54,7 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
           id: docSnap.id,
           ...docSnap.data(),
         }));
-        // Sort products in descending order by product ID.
+
         products.sort((a, b) => {
           const aNum = Number(a.id);
           const bNum = Number(b.id);
@@ -65,7 +63,9 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
           }
           return b.id.localeCompare(a.id);
         });
+
         setRows(products);
+        setFilteredRows(products);
       } catch (err) {
         setError(err.message);
       }
@@ -76,10 +76,17 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
     fetchData();
   }, [user, refresh, fetchData]);
 
+  useEffect(() => {
+    const lower = searchTerm.toLowerCase();
+    const filtered = rows.filter((row) =>
+      decodeHtmlEntities(row.name || '').toLowerCase().includes(lower)
+    );
+    setFilteredRows(filtered);
+  }, [searchTerm, rows]);
+
   const handleImprovedChange = async (id, checked) => {
     if (user) {
       try {
-        // Ensure id is a string for Firestore
         const productDocRef = doc(db, 'users', user.uid, 'products', String(id));
         await updateDoc(productDocRef, { improved: checked });
         setRefresh((prev) => !prev);
@@ -98,11 +105,8 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
       renderCell: (params) => (
         <Switch
           checked={Boolean(params.value)}
-          // Prevent row click navigation when toggling the switch
           onClick={(event) => event.stopPropagation()}
-          onChange={(event) =>
-            handleImprovedChange(params.id, event.target.checked)
-          }
+          onChange={(event) => handleImprovedChange(params.id, event.target.checked)}
           inputProps={{ 'aria-label': 'Improved switch' }}
         />
       ),
@@ -128,11 +132,11 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
         />
       ),
     },
-    { 
-      field: 'name', 
-      headerName: 'Name', 
+    {
+      field: 'name',
+      headerName: 'Name',
       flex: 1,
-      renderCell: (params) => decodeHtmlEntities(params.value)
+      renderCell: (params) => decodeHtmlEntities(params.value),
     },
   ];
 
@@ -148,13 +152,24 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
         </Typography>
       ) : (
         <>
+          <Box sx={{ mb: 2 }}>
+            <TextField
+              label="Search Products"
+              variant="outlined"
+              size="small"
+              fullWidth
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </Box>
+
           <DataGrid
             pagination
             paginationModel={paginationModel}
             onPaginationModelChange={setPaginationModel}
             pageSizeOptions={[10, 20, 50]}
             rowHeight={70}
-            rows={rows}
+            rows={filteredRows}
             columns={columns}
             checkboxSelection
             disableRowSelectionOnClick
@@ -171,25 +186,11 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
             slotProps={{
               filterPanel: {
                 filterFormProps: {
-                  logicOperatorInputProps: {
-                    variant: 'outlined',
-                    size: 'small',
-                  },
-                  columnInputProps: {
-                    variant: 'outlined',
-                    size: 'small',
-                    sx: { mt: 'auto' },
-                  },
-                  operatorInputProps: {
-                    variant: 'outlined',
-                    size: 'small',
-                    sx: { mt: 'auto' },
-                  },
+                  logicOperatorInputProps: { variant: 'outlined', size: 'small' },
+                  columnInputProps: { variant: 'outlined', size: 'small', sx: { mt: 'auto' } },
+                  operatorInputProps: { variant: 'outlined', size: 'small', sx: { mt: 'auto' } },
                   valueInputProps: {
-                    InputComponentProps: {
-                      variant: 'outlined',
-                      size: 'small',
-                    },
+                    InputComponentProps: { variant: 'outlined', size: 'small' },
                   },
                 },
               },
@@ -197,9 +198,7 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
             sx={{
               '& .even': { backgroundColor: '#fafafa' },
               '& .odd': { backgroundColor: '#ffffff' },
-              '.MuiDataGrid-row': {
-                cursor: 'pointer',
-              },
+              '.MuiDataGrid-row': { cursor: 'pointer' },
               '.MuiDataGrid-cell': {
                 lineHeight: 'normal !important',
                 display: 'flex',
