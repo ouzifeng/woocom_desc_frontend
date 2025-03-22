@@ -7,19 +7,38 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import OutlinedInput from '@mui/material/OutlinedInput';
+import { auth } from '../../../firebase'; // Adjust the import path as necessary
+import { sendPasswordResetEmail } from 'firebase/auth';
+import Typography from '@mui/material/Typography'; // Import Typography for the success message
 
 function ForgotPassword({ open, handleClose }) {
+  const [email, setEmail] = React.useState('');
+  const [successMessage, setSuccessMessage] = React.useState(''); // State for success message
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setSuccessMessage('Password reset email sent!'); // Set success message
+    } catch (error) {
+      console.error('Error sending password reset email', error);
+      setSuccessMessage('Failed to send password reset email. Please try again.'); // Handle error appropriately
+    }
+  };
+
+  const handleCloseDialog = () => {
+    handleClose();
+    setSuccessMessage(''); // Clear success message when closing the dialog
+  };
+
   return (
     <Dialog
       open={open}
-      onClose={handleClose}
+      onClose={handleCloseDialog}
       slotProps={{
         paper: {
           component: 'form',
-          onSubmit: (event) => {
-            event.preventDefault();
-            handleClose();
-          },
+          onSubmit: handleSubmit,
           sx: { backgroundImage: 'none' },
         },
       }}
@@ -42,10 +61,17 @@ function ForgotPassword({ open, handleClose }) {
           placeholder="Email address"
           type="email"
           fullWidth
+          value={email}
+          onChange={(e) => setEmail(e.target.value)} // Update email state
         />
+        {successMessage && ( // Conditionally render the success message
+          <Typography variant="body2" color="success.main" sx={{ mt: 2 }}>
+            {successMessage}
+          </Typography>
+        )}
       </DialogContent>
       <DialogActions sx={{ pb: 3, px: 3 }}>
-        <Button onClick={handleClose}>Cancel</Button>
+        <Button onClick={handleCloseDialog}>Cancel</Button>
         <Button variant="contained" type="submit">
           Continue
         </Button>

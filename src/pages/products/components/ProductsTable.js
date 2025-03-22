@@ -45,6 +45,7 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
   const [statusFilter, setStatusFilter] = useState('');
   const [improvedFilter, setImprovedFilter] = useState('');
   const [rowSelectionModel, setRowSelectionModel] = useState([]);
+  const [rowsLoaded, setRowsLoaded] = useState(false);
   const [error, setError] = useState(null);
 
   const [paginationModel, setPaginationModel] = useState({
@@ -63,7 +64,6 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
         ...docSnap.data(),
       }));
 
-      // Sort descending by numeric ID if possible
       products.sort((a, b) => {
         const aNum = Number(a.id);
         const bNum = Number(b.id);
@@ -72,12 +72,14 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
 
       setRows(products);
       setFilteredRows(products);
+      setRowsLoaded(true); // ✅ set after data is ready
     } catch (err) {
       setError(err.message);
     }
   }, [user]);
 
   useEffect(() => {
+    setRowsLoaded(false); // ✅ reset before fetching
     fetchData();
   }, [user, refresh, fetchData]);
 
@@ -102,7 +104,7 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
       }
 
       setFilteredRows(filtered);
-      setRowSelectionModel([]); // Clear selection to prevent crash
+      setRowSelectionModel([]); // clear selection
       setSelectedRows([]);
     }, 300), [setSelectedRows]
   );
@@ -173,7 +175,7 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
   ];
 
   const handleRowClick = (params) => {
-    window.open(`/products/${params.id}`, '_blank');
+    window.location.href = `/products/${params.id}`;
   };
 
   return (
@@ -240,7 +242,7 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
             checkboxSelection
             disableRowSelectionOnClick
             disableColumnResize
-            rowSelectionModel={rowSelectionModel}
+            rowSelectionModel={rowsLoaded ? rowSelectionModel : []} // ✅ only use when ready
             onRowSelectionModelChange={(newSelection) => {
               const validSelection = newSelection.filter((id) =>
                 filteredRows.some((row) => row.id === id)
