@@ -9,6 +9,10 @@ import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
 import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
+import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
 
 function renderStatus(status) {
   const colorMap = {
@@ -36,6 +40,8 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
   const [rows, setRows] = useState([]);
   const [filteredRows, setFilteredRows] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [improvedFilter, setImprovedFilter] = useState('');
   const [error, setError] = useState(null);
 
   const [paginationModel, setPaginationModel] = useState({
@@ -77,12 +83,25 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
   }, [user, refresh, fetchData]);
 
   useEffect(() => {
-    const lower = searchTerm.toLowerCase();
-    const filtered = rows.filter((row) =>
-      decodeHtmlEntities(row.name || '').toLowerCase().includes(lower)
-    );
+    let filtered = rows;
+
+    if (searchTerm) {
+      const lower = searchTerm.toLowerCase();
+      filtered = filtered.filter((row) =>
+        decodeHtmlEntities(row.name || '').toLowerCase().includes(lower)
+      );
+    }
+
+    if (statusFilter) {
+      filtered = filtered.filter((row) => (row.status || '').toLowerCase() === statusFilter);
+    }
+
+    if (improvedFilter) {
+      filtered = filtered.filter((row) => String(row.improved) === improvedFilter);
+    }
+
     setFilteredRows(filtered);
-  }, [searchTerm, rows]);
+  }, [searchTerm, statusFilter, improvedFilter, rows]);
 
   const handleImprovedChange = async (id, checked) => {
     if (user) {
@@ -152,15 +171,49 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
         </Typography>
       ) : (
         <>
-          <Box sx={{ mb: 2 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 2,
+              mb: 2,
+            }}
+          >
             <TextField
               label="Search Products"
               variant="outlined"
               size="small"
-              fullWidth
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              sx={{ flexGrow: 1 }}
             />
+
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <InputLabel>Status</InputLabel>
+              <Select
+                value={statusFilter}
+                label="Status"
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <MenuItem value="">All</MenuItem>
+                <MenuItem value="publish">Published</MenuItem>
+                <MenuItem value="draft">Draft</MenuItem>
+              </Select>
+            </FormControl>
+
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <InputLabel>Improved</InputLabel>
+              <Select
+                value={improvedFilter}
+                label="Improved"
+                onChange={(e) => setImprovedFilter(e.target.value)}
+              >
+                <MenuItem value="">All</MenuItem>
+                <MenuItem value="true">Yes</MenuItem>
+                <MenuItem value="false">No</MenuItem>
+              </Select>
+            </FormControl>
           </Box>
 
           <DataGrid
