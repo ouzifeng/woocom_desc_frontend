@@ -1,34 +1,36 @@
 import * as React from 'react';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../../../firebase';
 import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
-import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
-import Chip from '@mui/material/Chip';
-import Switch from '@mui/material/Switch';
-import TextField from '@mui/material/TextField';
-import MenuItem from '@mui/material/MenuItem';
-import Select from '@mui/material/Select';
-import FormControl from '@mui/material/FormControl';
-import InputLabel from '@mui/material/InputLabel';
 
+import {
+  Box,
+  Typography,
+  Chip,
+  Switch,
+  TextField,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel,
+} from '@mui/material';
+
+import debounce from 'lodash.debounce';
+
+/** Helper to render status chip */
 function renderStatus(status) {
   const colorMap = {
     Published: 'success',
     Draft: 'default',
   };
-
   return (
-    <Chip
-      label={status}
-      color={colorMap[status] || 'default'}
-      size="small"
-    />
+    <Chip label={status} color={colorMap[status] || 'default'} size="small" />
   );
 }
 
+/** Decode HTML entities */
 function decodeHtmlEntities(text) {
   const textarea = document.createElement('textarea');
   textarea.innerHTML = text;
@@ -42,6 +44,7 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [improvedFilter, setImprovedFilter] = useState('');
+  const [rowSelectionModel, setRowSelectionModel] = useState([]);
   const [error, setError] = useState(null);
 
   const [paginationModel, setPaginationModel] = useState({
@@ -49,32 +52,28 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
     page: 0,
   });
 
-  const [rowSelectionModel, setRowSelectionModel] = useState([]);
-
   const fetchData = useCallback(async () => {
-    if (user) {
-      try {
-        const productsCollection = collection(db, 'users', user.uid, 'products');
-        const productsSnapshot = await getDocs(productsCollection);
-        const products = productsSnapshot.docs.map((docSnap) => ({
-          id: docSnap.id,
-          ...docSnap.data(),
-        }));
+    if (!user) return;
 
-        products.sort((a, b) => {
-          const aNum = Number(a.id);
-          const bNum = Number(b.id);
-          if (!isNaN(aNum) && !isNaN(bNum)) {
-            return bNum - aNum;
-          }
-          return b.id.localeCompare(a.id);
-        });
+    try {
+      const productsCollection = collection(db, 'users', user.uid, 'products');
+      const productsSnapshot = await getDocs(productsCollection);
+      const products = productsSnapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+      }));
 
-        setRows(products);
-        setFilteredRows(products);
-      } catch (err) {
-        setError(err.message);
-      }
+      // Sort descending by numeric ID if possible
+      products.sort((a, b) => {
+        const aNum = Number(a.id);
+        const bNum = Number(b.id);
+        return !isNaN(aNum) && !isNaN(bNum) ? bNum - aNum : b.id.localeCompare(a.id);
+      });
+
+      setRows(products);
+      setFilteredRows(products);
+    } catch (err) {
+      setError(err.message);
     }
   }, [user]);
 
@@ -82,36 +81,45 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
     fetchData();
   }, [user, refresh, fetchData]);
 
+  // Debounced filter logic
+  const debouncedFilter = useMemo(() =>
+    debounce((input, status, improved, allRows) => {
+      let filtered = [...allRows];
+
+      if (input) {
+        const lower = input.toLowerCase();
+        filtered = filtered.filter((row) =>
+          decodeHtmlEntities(row.name || '').toLowerCase().includes(lower)
+        );
+      }
+
+      if (status) {
+        filtered = filtered.filter((row) => (row.status || '').toLowerCase() === status);
+      }
+
+      if (improved) {
+        filtered = filtered.filter((row) => String(row.improved) === improved);
+      }
+
+      setFilteredRows(filtered);
+      setRowSelectionModel([]); // Clear selection to prevent crash
+      setSelectedRows([]);
+    }, 300), [setSelectedRows]
+  );
+
   useEffect(() => {
-    let filtered = rows;
-
-    if (searchTerm) {
-      const lower = searchTerm.toLowerCase();
-      filtered = filtered.filter((row) =>
-        decodeHtmlEntities(row.name || '').toLowerCase().includes(lower)
-      );
-    }
-
-    if (statusFilter) {
-      filtered = filtered.filter((row) => (row.status || '').toLowerCase() === statusFilter);
-    }
-
-    if (improvedFilter) {
-      filtered = filtered.filter((row) => String(row.improved) === improvedFilter);
-    }
-
-    setFilteredRows(filtered);
-  }, [searchTerm, statusFilter, improvedFilter, rows]);
+    debouncedFilter(searchTerm, statusFilter, improvedFilter, rows);
+  }, [searchTerm, statusFilter, improvedFilter, rows, debouncedFilter]);
 
   const handleImprovedChange = async (id, checked) => {
-    if (user) {
-      try {
-        const productDocRef = doc(db, 'users', user.uid, 'products', String(id));
-        await updateDoc(productDocRef, { improved: checked });
-        setRefresh((prev) => !prev);
-      } catch (err) {
-        console.error('Error updating product:', err);
-      }
+    if (!user) return;
+
+    try {
+      const productDocRef = doc(db, 'users', user.uid, 'products', String(id));
+      await updateDoc(productDocRef, { improved: checked });
+      setRefresh((prev) => !prev);
+    } catch (err) {
+      console.error('Error updating product:', err);
     }
   };
 
@@ -126,7 +134,6 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
           checked={Boolean(params.value)}
           onClick={(event) => event.stopPropagation()}
           onChange={(event) => handleImprovedChange(params.id, event.target.checked)}
-          inputProps={{ 'aria-label': 'Improved switch' }}
         />
       ),
     },
@@ -147,7 +154,13 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
         <img
           src={params.value}
           alt=""
-          style={{ width: '50px', height: '50px', marginTop: '10px', marginBottom: '10px' }}
+          style={{
+            width: '50px',
+            height: '50px',
+            objectFit: 'cover',
+            marginTop: '10px',
+            marginBottom: '10px',
+          }}
         />
       ),
     },
@@ -229,25 +242,16 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
             disableColumnResize
             rowSelectionModel={rowSelectionModel}
             onRowSelectionModelChange={(newSelection) => {
-              setRowSelectionModel(newSelection);
-              setSelectedRows(newSelection);
+              const validSelection = newSelection.filter((id) =>
+                filteredRows.some((row) => row.id === id)
+              );
+              setRowSelectionModel(validSelection);
+              setSelectedRows(validSelection);
             }}
             onRowClick={handleRowClick}
             getRowClassName={(params) =>
               params.indexRelativeToCurrentPage % 2 === 0 ? 'even' : 'odd'
             }
-            slotProps={{
-              filterPanel: {
-                filterFormProps: {
-                  logicOperatorInputProps: { variant: 'outlined', size: 'small' },
-                  columnInputProps: { variant: 'outlined', size: 'small', sx: { mt: 'auto' } },
-                  operatorInputProps: { variant: 'outlined', size: 'small', sx: { mt: 'auto' } },
-                  valueInputProps: {
-                    InputComponentProps: { variant: 'outlined', size: 'small' },
-                  },
-                },
-              },
-            }}
             sx={{
               '& .even': { backgroundColor: '#fafafa' },
               '& .odd': { backgroundColor: '#ffffff' },
