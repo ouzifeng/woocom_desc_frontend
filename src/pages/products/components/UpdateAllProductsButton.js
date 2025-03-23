@@ -12,6 +12,8 @@ export default function UpdateAllProductsButton({
   secretKey,
   setRefresh,
   setNotificationMessage,
+  disabled,
+  onClick,
 }) {
   const [user] = useAuthState(auth);
   const [loading, setLoading] = useState(false);
@@ -19,6 +21,11 @@ export default function UpdateAllProductsButton({
   const updateAllProducts = async () => {
     if (!user) {
       setNotificationMessage('User not authenticated');
+      return;
+    }
+
+    if (disabled) {
+      if (onClick) onClick();
       return;
     }
 
@@ -69,10 +76,13 @@ export default function UpdateAllProductsButton({
 
   return (
     <Box>
-      <Button size="small" variant="outlined" onClick={updateAllProducts} disabled={loading}>
-        {loading
-          ? `Updating....`
-          : 'Update All Products'}
+      <Button 
+        size="small" 
+        variant="outlined" 
+        onClick={updateAllProducts} 
+        disabled={loading || disabled}
+      >
+        {loading ? 'Updating...' : 'Update All Products'}
       </Button>
     </Box>
   );

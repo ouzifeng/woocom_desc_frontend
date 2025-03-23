@@ -7,13 +7,26 @@ import { doc, getDoc } from 'firebase/firestore';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
-export default function UpdateProductsButton({ storeUrl, apiId, secretKey, setRefresh, setNotificationMessage }) {
+export default function UpdateProductsButton({ 
+  storeUrl, 
+  apiId, 
+  secretKey, 
+  setRefresh, 
+  setNotificationMessage,
+  disabled,
+  onClick,
+}) {
   const [user] = useAuthState(auth);
   const [loading, setLoading] = useState(false);
 
   const updateProducts = async () => {
     if (!user) {
       setNotificationMessage('User not authenticated');
+      return;
+    }
+
+    if (disabled) {
+      if (onClick) onClick();
       return;
     }
 
@@ -71,7 +84,12 @@ export default function UpdateProductsButton({ storeUrl, apiId, secretKey, setRe
 
   return (
     <Box>
-      <Button size="small" variant="outlined" onClick={updateProducts} disabled={loading}>
+      <Button 
+        size="small" 
+        variant="outlined" 
+        onClick={updateProducts} 
+        disabled={loading || disabled}
+      >
         {loading ? 'Updating...' : 'Import New Products'}
       </Button>
     </Box>

@@ -12,6 +12,8 @@ export default function ImportProductsButton({
   secretKey,
   setRefresh,
   setNotificationMessage,
+  disabled,
+  onClick,
 }) {
   const [user] = useAuthState(auth);
   const [loading, setLoading] = useState(false);
@@ -21,6 +23,11 @@ export default function ImportProductsButton({
   const importProducts = async () => {
     if (!user) {
       setNotificationMessage('User not authenticated');
+      return;
+    }
+
+    if (disabled) {
+      if (onClick) onClick();
       return;
     }
 
@@ -94,7 +101,12 @@ export default function ImportProductsButton({
 
   return (
     <Box>
-      <Button size="small" variant="contained" onClick={importProducts} disabled={loading}>
+      <Button 
+        size="small" 
+        variant="contained" 
+        onClick={importProducts} 
+        disabled={loading || disabled}
+      >
         {loading
           ? `Importing ${importedCount}/${totalProducts}`
           : 'Import All Products'}

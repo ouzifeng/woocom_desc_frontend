@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { Outlet, Route, Routes, useLocation } from 'react-router-dom';
+import { Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { alpha } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Box from '@mui/material/Box';
@@ -25,6 +25,7 @@ import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import DownloadCSVButton from './components/DownloadCSVButton';
+import Tooltip from '@mui/material/Tooltip';
 
 // Lazy load components
 const ImportProductsButton = React.lazy(() => import('./components/ImportProductsButton'));
@@ -52,6 +53,7 @@ const xThemeComponents = {
 
 export default function Products(props) {
   const [user] = useAuthState(auth);
+  const navigate = useNavigate();
   const [storeUrl, setStoreUrl] = useState('');
   const [apiId, setApiId] = useState('');
   const [secretKey, setSecretKey] = useState('');
@@ -60,6 +62,7 @@ export default function Products(props) {
   const location = useLocation();
   const [notificationMessage, setNotificationMessage] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [hasWooCommerceCredentials, setHasWooCommerceCredentials] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -71,6 +74,8 @@ export default function Products(props) {
           setStoreUrl(data.wc_url || '');
           setApiId(data.wc_key || '');
           setSecretKey(data.wc_secret || '');
+          // Check if all WooCommerce credentials are present
+          setHasWooCommerceCredentials(!!(data.wc_url && data.wc_key && data.wc_secret));
         }
       }
     };
@@ -84,6 +89,13 @@ export default function Products(props) {
       return;
     }
     setDrawerOpen(open);
+  };
+
+  const handleDisabledButtonClick = () => {
+    setNotificationMessage('Please connect your WooCommerce store in Settings first.');
+    setTimeout(() => {
+      navigate('/settings');
+    }, 2000);
   };
 
   return (
@@ -125,31 +137,49 @@ export default function Products(props) {
                     >
                       <Box sx={{ display: 'flex', gap: 2 }}>
                         <React.Suspense fallback={<CircularProgress size={24} />}>
-                          <ImportProductsButton
-                            storeUrl={storeUrl}
-                            apiId={apiId}
-                            secretKey={secretKey}
-                            setRefresh={setRefresh}
-                            setNotificationMessage={setNotificationMessage}
-                          />
+                          <Tooltip title={!hasWooCommerceCredentials ? "Connect WooCommerce on the integrations pagefirst" : ""}>
+                            <span>
+                              <ImportProductsButton
+                                storeUrl={storeUrl}
+                                apiId={apiId}
+                                secretKey={secretKey}
+                                setRefresh={setRefresh}
+                                setNotificationMessage={setNotificationMessage}
+                                disabled={!hasWooCommerceCredentials}
+                                onClick={!hasWooCommerceCredentials ? handleDisabledButtonClick : undefined}
+                              />
+                            </span>
+                          </Tooltip>
                         </React.Suspense>
                         <React.Suspense fallback={<CircularProgress size={24} />}>
-                          <UpdateProductsButton
-                            storeUrl={storeUrl}
-                            apiId={apiId}
-                            secretKey={secretKey}
-                            setRefresh={setRefresh}
-                            setNotificationMessage={setNotificationMessage}
-                          />
+                          <Tooltip title={!hasWooCommerceCredentials ? "Connect WooCommerce on the integrations page first" : ""}>
+                            <span>
+                              <UpdateProductsButton
+                                storeUrl={storeUrl}
+                                apiId={apiId}
+                                secretKey={secretKey}
+                                setRefresh={setRefresh}
+                                setNotificationMessage={setNotificationMessage}
+                                disabled={!hasWooCommerceCredentials}
+                                onClick={!hasWooCommerceCredentials ? handleDisabledButtonClick : undefined}
+                              />
+                            </span>
+                          </Tooltip>
                         </React.Suspense>
                         <React.Suspense fallback={<CircularProgress size={24} />}>
-                          <UpdateAllProductsButton
-                            storeUrl={storeUrl}
-                            apiId={apiId}
-                            secretKey={secretKey}
-                            setRefresh={setRefresh}
-                            setNotificationMessage={setNotificationMessage}
-                          />
+                          <Tooltip title={!hasWooCommerceCredentials ? "Connect WooCommerce on the integrations page first" : ""}>
+                            <span>
+                              <UpdateAllProductsButton
+                                storeUrl={storeUrl}
+                                apiId={apiId}
+                                secretKey={secretKey}
+                                setRefresh={setRefresh}
+                                setNotificationMessage={setNotificationMessage}
+                                disabled={!hasWooCommerceCredentials}
+                                onClick={!hasWooCommerceCredentials ? handleDisabledButtonClick : undefined}
+                              />
+                            </span>
+                          </Tooltip>
                         </React.Suspense>
                       </Box>
 
