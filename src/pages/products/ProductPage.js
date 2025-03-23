@@ -296,7 +296,7 @@ export default function ProductPage() {
                   'AI Description'
                 )}
               </Button>
-              <Button variant="contained" color="secondary" onClick={handleAiName} disabled={aiNameLoading}>
+              <Button variant="outlined" onClick={handleAiName} disabled={aiNameLoading}>
                 {aiNameLoading ? (
                   <>
                     Generating <CircularProgress size={24} sx={{ ml: 1 }} />

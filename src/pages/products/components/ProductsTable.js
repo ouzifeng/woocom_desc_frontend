@@ -173,7 +173,7 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
   ];
 
   const handleRowClick = (params) => {
-    window.location.href = `/products/${params.id}`;
+    window.open(`/products/${params.id}`, '_blank');
   };
 
   return (

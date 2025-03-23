@@ -43,7 +43,7 @@ export default function ImproveGrammarButton({ description, setDescription, setM
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'center' }}>
-      <Button variant="outlined" color="secondary" onClick={handleImproveGrammar} disabled={loading}>
+      <Button variant="outlined" onClick={handleImproveGrammar} disabled={loading}>
         Improve Grammar
       </Button>
       {loading && <CircularProgress size={24} sx={{ ml: 2 }} />}
