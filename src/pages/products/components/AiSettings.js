@@ -42,7 +42,7 @@ export default function AiSettings({
         border: '1px solid #ccc',
         borderRadius: 2,
         width: '100%',
-        minWidth: 500,
+        minWidth: 'auto',
       }}
     >
       <Typography variant="h6" gutterBottom>

@@ -126,7 +126,7 @@ export default function Products(props) {
             >
               <Header />
               <Grid container spacing={3}>
-                <Grid item xs={12} md={9}>
+                <Grid item xs={12} md={12}>
                   {!isProductPage && (
                     <Box
                       sx={{
@@ -202,7 +202,7 @@ export default function Products(props) {
                   )}
                 </Grid>
 
-                <Grid item xs={12} md={9}>
+                <Grid item xs={12} md={12}>
                   {notificationMessage && (
                     <Typography variant="body2" color="textSecondary" textAlign={'left'}>
                       {notificationMessage}
@@ -210,10 +210,10 @@ export default function Products(props) {
                   )}
                 </Grid>
 
-                <Grid item xs={12} md={9}>
+                <Grid item xs={12} md={12}>
                   <Outlet />
                 </Grid>
-                <Grid item xs={12} md={9}>
+                <Grid item xs={12} md={12}>
                   <Routes>
                     <Route
                       path="*"

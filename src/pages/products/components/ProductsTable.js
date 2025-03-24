@@ -41,9 +41,6 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
   const [user] = useAuthState(auth);
   const [rows, setRows] = useState([]);
   const [filteredRows, setFilteredRows] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [improvedFilter, setImprovedFilter] = useState('');
   const [rowSelectionModel, setRowSelectionModel] = useState([]);
   const [error, setError] = useState(null);
 
@@ -51,6 +48,62 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
     pageSize: 10,
     page: 0,
   });
+
+  // Load filters from localStorage or use default values
+  const loadInitialFilters = () => {
+    try {
+      const savedFilters = localStorage.getItem('productTableFilters');
+      if (savedFilters) {
+        const { timestamp, filters } = JSON.parse(savedFilters);
+        const isExpired = Date.now() - timestamp > 24 * 60 * 60 * 1000; // 24 hours
+        
+        if (!isExpired) {
+          return filters;
+        }
+      }
+    } catch (error) {
+      console.error('Error loading saved filters:', error);
+    }
+    
+    // Default values if no saved filters or expired
+    return {
+      searchTerm: '',
+      statusFilter: '',
+      improvedFilter: ''
+    };
+  };
+
+  // Initialize state with saved filters
+  const initialFilters = loadInitialFilters();
+  const [searchTerm, setSearchTerm] = useState(initialFilters.searchTerm);
+  const [statusFilter, setStatusFilter] = useState(initialFilters.statusFilter);
+  const [improvedFilter, setImprovedFilter] = useState(initialFilters.improvedFilter);
+
+  // Save filters to localStorage whenever they change
+  useEffect(() => {
+    const filtersData = {
+      timestamp: Date.now(),
+      filters: {
+        searchTerm,
+        statusFilter,
+        improvedFilter
+      }
+    };
+    localStorage.setItem('productTableFilters', JSON.stringify(filtersData));
+  }, [searchTerm, statusFilter, improvedFilter]);
+
+  // Update the handlers for filter changes
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+  };
+
+  const handleStatusChange = (e) => {
+    setStatusFilter(e.target.value);
+  };
+
+  const handleImprovedFilterChange = (e) => {
+    setImprovedFilter(e.target.value);
+  };
 
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -98,7 +151,14 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
       }
 
       if (improved) {
-        filtered = filtered.filter((row) => String(row.improved) === improved);
+        filtered = filtered.filter((row) => {
+          if (improved === 'true') {
+            return Boolean(row.improved) === true;
+          } else {
+            // Show products where improved is false OR undefined
+            return !row.improved;
+          }
+        });
       }
 
       setFilteredRows(filtered);
@@ -173,7 +233,8 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
   ];
 
   const handleRowClick = (params) => {
-    window.open(`/products/${params.id}`, '_blank');
+    // Open the product details in the same tab
+    window.location.href = `/products/${params.id}`;
   };
 
   return (
@@ -198,7 +259,7 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
               variant="outlined"
               size="small"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={handleSearchChange}
               sx={{ flexGrow: 1 }}
             />
 
@@ -207,7 +268,7 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
               <Select
                 value={statusFilter}
                 label="Status"
-                onChange={(e) => setStatusFilter(e.target.value)}
+                onChange={handleStatusChange}
               >
                 <MenuItem value="">All</MenuItem>
                 <MenuItem value="publish">Published</MenuItem>
@@ -220,7 +281,7 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
               <Select
                 value={improvedFilter}
                 label="Improved"
-                onChange={(e) => setImprovedFilter(e.target.value)}
+                onChange={handleImprovedFilterChange}
               >
                 <MenuItem value="">All</MenuItem>
                 <MenuItem value="true">Yes</MenuItem>
