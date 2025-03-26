@@ -11,6 +11,8 @@ import Button from '@mui/material/Button';
 import Modal from '@mui/material/Modal';
 import Alert from '@mui/material/Alert';
 import Grid from '@mui/material/Grid';
+import AiDescriptionButton from './components/AiDescriptionButton';
+import AiNameButton from './components/AiNameButton';
 
 // Lazy load components
 const ProductDetails = React.lazy(() => import('./components/ProductDetails'));
@@ -55,6 +57,8 @@ export default function ProductPage() {
   const [wordCount, setWordCount] = useState('');
   const [useEmojis, setUseEmojis] = useState(false);
   const [addSpecifications, setAddSpecifications] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState('');
+  const [loadingDots, setLoadingDots] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiNameLoading, setAiNameLoading] = useState(false);
 
@@ -116,6 +120,7 @@ export default function ProductPage() {
           await updateDoc(productDocRef, { improved: true });
 
           setModalOpen(true);
+          setNotificationMessage('Product updated successfully!');
         } else {
           alert('Failed to update product description on WooCommerce');
         }
@@ -140,6 +145,13 @@ export default function ProductPage() {
   const handleAiDescription = async () => {
     if (user && productId) {
       setAiLoading(true);
+      setNotificationMessage('Improving product description');
+      setLoadingDots('');
+
+      const interval = setInterval(() => {
+        setLoadingDots((prev) => (prev.length < 3 ? prev + '.' : ''));
+      }, 500);
+
       try {
         // First check if user has enough credits
         const userDocRef = doc(db, 'users', user.uid);
@@ -215,19 +227,20 @@ export default function ProductPage() {
         const data = await response.json();
         if (data.result === 'Success') {
           setDescription(data.aiDescription);
-          setModalOpen(true);
+          setNotificationMessage('Product description improved successfully!');
         } else {
           // If the AI generation fails, refund the credit
           await updateDoc(userDocRef, {
             credits: userDoc.data().credits + 1
           });
-          alert('Failed to generate AI description');
+          setNotificationMessage('Failed to generate AI description');
         }
       } catch (err) {
         console.error('Error generating AI description:', err);
-        alert('Failed to generate AI description');
+        setNotificationMessage('Failed to generate AI description');
       } finally {
         setAiLoading(false);
+        clearInterval(interval);
       }
     }
   };
@@ -254,13 +267,13 @@ export default function ProductPage() {
         if (data.result === 'Success') {
           const updatedProduct = { ...product, name: data.aiName };
           setProduct(updatedProduct);
-          setModalOpen(true);
+          setNotificationMessage('AI name generated successfully!');
         } else {
-          alert('Failed to generate AI name');
+          setNotificationMessage('Failed to generate AI name');
         }
       } catch (err) {
         console.error('Error generating AI name:', err);
-        alert('Failed to generate AI name');
+        setNotificationMessage('Failed to generate AI name');
       } finally {
         setAiNameLoading(false);
       }
@@ -283,30 +296,34 @@ export default function ProductPage() {
 
   return (
     <Box sx={{ p: 3 }}>
+      <Modal
+        open={modalOpen}
+        onClose={handleCloseModal}
+        aria-labelledby="modal-title"
+        aria-describedby="modal-description"
+      >
+        <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 400, bgcolor: 'background.paper', boxShadow: 24, p: 4 }}>
+          <Alert onClose={handleCloseModal} severity="success">
+            {notificationMessage}
+          </Alert>
+        </Box>
+      </Modal>
       <Grid container spacing={3}>
         <Grid item xs={12} md={10}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2, gap: 2 }}>
             <Box sx={{ display: 'flex', gap: 2 }}>
-              <Button variant="contained" color="primary" onClick={handleAiDescription} disabled={aiLoading}>
-                {aiLoading ? (
-                  <>
-                    Generating <CircularProgress size={24} sx={{ ml: 1 }} />
-                  </>
-                ) : (
-                  'AI Description'
-                )}
-              </Button>
-              <Button variant="outlined" onClick={handleAiName} disabled={aiNameLoading}>
-                {aiNameLoading ? (
-                  <>
-                    Generating <CircularProgress size={24} sx={{ ml: 1 }} />
-                  </>
-                ) : (
-                  'AI Name'
-                )}
-              </Button>
               <React.Suspense fallback={<CircularProgress size={24} />}>
-                <ImproveGrammarButton description={description} setDescription={setDescription} setModalOpen={setModalOpen} />
+                <AiDescriptionButton handleAiDescription={handleAiDescription} aiLoading={aiLoading} />
+              </React.Suspense>
+              <React.Suspense fallback={<CircularProgress size={24} />}>
+                <AiNameButton handleAiName={handleAiName} aiNameLoading={aiNameLoading} />
+              </React.Suspense>
+              <React.Suspense fallback={<CircularProgress size={24} />}>
+                <ImproveGrammarButton 
+                  description={description} 
+                  setDescription={setDescription} 
+                  setNotificationMessage={setNotificationMessage}
+                />
               </React.Suspense>
             </Box>
             <Box sx={{ display: 'flex', gap: 2 }}>
@@ -318,6 +335,11 @@ export default function ProductPage() {
               </Button>
             </Box>
           </Box>
+          {notificationMessage && (
+            <Typography variant="body2" color="textSecondary" textAlign={'left'}>
+              {notificationMessage} {loadingDots}
+            </Typography>
+          )}
           <React.Suspense fallback={<LoadingFallback />}>
             <ProductDetails product={product} setProduct={setProduct} />
           </React.Suspense>
@@ -348,18 +370,6 @@ export default function ProductPage() {
           </React.Suspense>
         </Grid>
       </Grid>
-      <Modal
-        open={modalOpen}
-        onClose={handleCloseModal}
-        aria-labelledby="modal-title"
-        aria-describedby="modal-description"
-      >
-        <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 400, bgcolor: 'background.paper', boxShadow: 24, p: 4 }}>
-          <Alert onClose={handleCloseModal} severity="success">
-            Product updated successfully!
-          </Alert>
-        </Box>
-      </Modal>
       <React.Suspense fallback={<LoadingFallback />}>
         <InstructionsDrawer drawerOpen={drawerOpen} toggleDrawer={toggleDrawer} />
       </React.Suspense>
