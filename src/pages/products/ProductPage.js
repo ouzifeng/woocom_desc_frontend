@@ -8,18 +8,17 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
 import Button from '@mui/material/Button';
-import Modal from '@mui/material/Modal';
-import Alert from '@mui/material/Alert';
 import Grid from '@mui/material/Grid';
 import AiDescriptionButton from './components/AiDescriptionButton';
 import AiNameButton from './components/AiNameButton';
+import ImproveGrammarButton from './components/ImproveGrammarButton';
+import InstructionsDrawer from './components/InstructionsDrawer';
+import AiSettings from './components/AiSettings';
+import SaveProductButton from './components/SaveProductButton';
 
 // Lazy load components
 const ProductDetails = React.lazy(() => import('./components/ProductDetails'));
 const ProductEditor = React.lazy(() => import('./components/ProductEditor'));
-const ImproveGrammarButton = React.lazy(() => import('./components/ImproveGrammarButton'));
-const InstructionsDrawer = React.lazy(() => import('./components/InstructionsDrawer'));
-const AiSettings = React.lazy(() => import('./components/AiSettings'));
 
 // Loading component
 const LoadingFallback = () => (
@@ -47,7 +46,6 @@ export default function ProductPage() {
   const [storeUrl, setStoreUrl] = useState('');
   const [apiId, setApiId] = useState('');
   const [secretKey, setSecretKey] = useState('');
-  const [modalOpen, setModalOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [useBrandGuidelines, setUseBrandGuidelines] = useState(false);
   const [useProductImage, setUseProductImage] = useState(false);
@@ -94,46 +92,6 @@ export default function ProductPage() {
     };
     fetchProduct();
   }, [user, productId]);
-
-  const handleSave = async () => {
-    if (user && productId) {
-      try {
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/woocommerce/update-product`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            storeUrl,
-            apiId,
-            secretKey,
-            userId: user.uid,
-            productId,
-            description,
-            name: product.name,
-          }),
-        });
-
-        if (response.status === 200) {
-          // Mark the product as improved
-          const productDocRef = doc(db, 'users', user.uid, 'products', productId);
-          await updateDoc(productDocRef, { improved: true });
-
-          setModalOpen(true);
-          setNotificationMessage('Product updated successfully!');
-        } else {
-          alert('Failed to update product description on WooCommerce');
-        }
-      } catch (err) {
-        console.error('Error saving product description:', err);
-        alert('Failed to update product description');
-      }
-    }
-  };
-
-  const handleCloseModal = () => {
-    setModalOpen(false);
-  };
 
   const toggleDrawer = (open) => (event) => {
     if (event.type === 'keydown' && (event.key === 'Tab' || event.key === 'Shift')) {
@@ -296,18 +254,6 @@ export default function ProductPage() {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Modal
-        open={modalOpen}
-        onClose={handleCloseModal}
-        aria-labelledby="modal-title"
-        aria-describedby="modal-description"
-      >
-        <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 400, bgcolor: 'background.paper', boxShadow: 24, p: 4 }}>
-          <Alert onClose={handleCloseModal} severity="success">
-            {notificationMessage}
-          </Alert>
-        </Box>
-      </Modal>
       <Grid container spacing={3}>
         <Grid item xs={12} md={10}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2, gap: 2 }}>
@@ -327,9 +273,18 @@ export default function ProductPage() {
               </React.Suspense>
             </Box>
             <Box sx={{ display: 'flex', gap: 2 }}>
-              <Button variant="contained" color="primary" onClick={handleSave}>
-                Save
-              </Button>
+              <React.Suspense fallback={<CircularProgress size={24} />}>
+                <SaveProductButton 
+                  user={user}
+                  productId={productId}
+                  storeUrl={storeUrl}
+                  apiId={apiId}
+                  secretKey={secretKey}
+                  description={description}
+                  product={product}
+                  setNotificationMessage={setNotificationMessage}
+                />
+              </React.Suspense>
               <Button variant="outlined" onClick={toggleDrawer(true)}>
                 Instructions
               </Button>
