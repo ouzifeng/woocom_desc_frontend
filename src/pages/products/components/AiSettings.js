@@ -7,6 +7,8 @@ import FormGroup from '@mui/material/FormGroup';
 import Autocomplete from '@mui/material/Autocomplete';
 import TextField from '@mui/material/TextField';
 import Chip from '@mui/material/Chip';
+import Card from '@mui/material/Card';
+import CardMedia from '@mui/material/CardMedia';
 
 export default function AiSettings({
   useBrandGuidelines,
@@ -22,7 +24,8 @@ export default function AiSettings({
   useEmojis,
   setUseEmojis,
   addSpecifications,
-  setAddSpecifications
+  setAddSpecifications,
+  productImageUrl
 }) {
   // State to toggle whether SEO terms should be used
   const [useSeoTerms, setUseSeoTerms] = React.useState(false);
@@ -59,6 +62,21 @@ export default function AiSettings({
           control={<Checkbox checked={useProductImage} onChange={() => setUseProductImage((prev) => !prev)} />}
           label="Use product image"
         />
+        
+        {useProductImage && productImageUrl && (
+          <Box sx={{ mt: 1, mb: 2 }}>
+            <Card sx={{ maxWidth: 300, mx: 'auto' }}>
+              <CardMedia
+                component="img"
+                height="200"
+                image={productImageUrl}
+                alt="Product Image"
+                sx={{ objectFit: 'contain' }}
+              />
+            </Card>
+          </Box>
+        )}
+        
         <FormControlLabel
           control={
             <Checkbox

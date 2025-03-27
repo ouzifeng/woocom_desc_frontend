@@ -1,48 +1,111 @@
 import * as React from 'react';
-import { styled } from '@mui/material/styles';
+import { styled, useTheme } from '@mui/material/styles';
 import Avatar from '@mui/material/Avatar';
-import MuiDrawer, { drawerClasses } from '@mui/material/Drawer';
+import MuiDrawer from '@mui/material/Drawer';
 import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import SelectContent from './SelectContent';
+import IconButton from '@mui/material/IconButton';
+import MenuIcon from '@mui/icons-material/Menu';
+import Toolbar from '@mui/material/Toolbar';
+import Logo from '@mui/icons-material/Web'; // Placeholder logo icon
 import MenuContent from './MenuContent';
 import OptionsMenu from './OptionsMenu';
 
 const drawerWidth = 240;
 
-const Drawer = styled(MuiDrawer)({
+// Styled drawer for open state
+const openedMixin = (theme) => ({
   width: drawerWidth,
-  flexShrink: 0,
-  boxSizing: 'border-box',
-  mt: 10,
-  [`& .${drawerClasses.paper}`]: {
-    width: drawerWidth,
-    boxSizing: 'border-box',
+  transition: theme.transitions.create('width', {
+    easing: theme.transitions.easing.sharp,
+    duration: theme.transitions.duration.enteringScreen,
+  }),
+  overflowX: 'hidden',
+});
+
+// Styled drawer for closed state
+const closedMixin = (theme) => ({
+  transition: theme.transitions.create('width', {
+    easing: theme.transitions.easing.sharp,
+    duration: theme.transitions.duration.leavingScreen,
+  }),
+  overflowX: 'hidden',
+  width: `calc(${theme.spacing(7)} + 1px)`,
+  [theme.breakpoints.up('sm')]: {
+    width: `calc(${theme.spacing(8)} + 1px)`,
   },
 });
 
+const DrawerHeader = styled('div')(({ theme }) => ({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between', // Changed to space-between for logo and menu
+  padding: theme.spacing(0, 1),
+  // necessary for content to be below app bar
+  ...theme.mixins.toolbar,
+}));
+
+const Drawer = styled(MuiDrawer, { shouldForwardProp: (prop) => prop !== 'open' })(
+  ({ theme, open }) => ({
+    width: drawerWidth,
+    flexShrink: 0,
+    whiteSpace: 'nowrap',
+    boxSizing: 'border-box',
+    ...(open && {
+      ...openedMixin(theme),
+      '& .MuiDrawer-paper': openedMixin(theme),
+    }),
+    ...(!open && {
+      ...closedMixin(theme),
+      '& .MuiDrawer-paper': closedMixin(theme),
+    }),
+  }),
+);
+
 export default function SideMenu({ user }) {
+  const theme = useTheme();
+  const [open, setOpen] = React.useState(true);
+
+  const handleDrawerToggle = () => {
+    setOpen(!open);
+  };
+
   return (
-    <Drawer
-      variant="permanent"
-      sx={{
-        display: { xs: 'none', md: 'block' },
-        [`& .${drawerClasses.paper}`]: {
-          backgroundColor: 'background.paper',
-        },
-      }}
-    >
-      <Box
-        sx={{
-          display: 'flex',
-          mt: 'calc(var(--template-frame-height, 0px) + 4px)',
-          p: 1.5,
-        }}
-      >
-        <SelectContent />
-      </Box>
+    <Drawer variant="permanent" open={open}>
+      <DrawerHeader>
+        <Box 
+          sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            ml: open ? 1 : 'auto',
+            mr: open ? 'auto' : 'auto'
+          }}
+        >
+          <Logo 
+            sx={{ 
+              fontSize: 28, 
+              color: 'primary.main',
+              display: !open ? 'none' : 'block'
+            }} 
+          />
+          {open && (
+            <Typography 
+              variant="h6" 
+              sx={{ 
+                ml: 1, 
+                fontWeight: 'bold' 
+              }}
+            >
+              YourApp
+            </Typography>
+          )}
+        </Box>
+        <IconButton onClick={handleDrawerToggle}>
+          <MenuIcon />
+        </IconButton>
+      </DrawerHeader>
       <Divider />
       <Box
         sx={{
@@ -52,34 +115,45 @@ export default function SideMenu({ user }) {
           flexDirection: 'column',
         }}
       >
-        <MenuContent />
+        <MenuContent collapsed={!open} />
       </Box>
-      <Stack
-        direction="row"
-        sx={{
-          p: 2,
-          gap: 1,
-          alignItems: 'center',
-          borderTop: '1px solid',
-          borderColor: 'divider',
-        }}
-      >
-        <Avatar
-          sizes="small"
-          alt={user.displayName}
-          src={user.photoURL}
-          sx={{ width: 36, height: 36 }}
-        />
-        <Box sx={{ mr: 'auto' }}>
-          <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: '16px' }}>
-            {user.displayName}
-          </Typography>
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            {user.email}
-          </Typography>
+      {open ? (
+        <Stack
+          direction="row"
+          sx={{
+            p: 2,
+            gap: 1,
+            alignItems: 'center',
+            borderTop: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
+          <Avatar
+            sizes="small"
+            alt={user?.displayName}
+            src={user?.photoURL}
+            sx={{ width: 36, height: 36 }}
+          />
+          <Box sx={{ mr: 'auto' }}>
+            <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: '16px' }}>
+              {user?.displayName}
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+              {user?.email}
+            </Typography>
+          </Box>
+          <OptionsMenu />
+        </Stack>
+      ) : (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 1 }}>
+          <Avatar
+            sizes="small"
+            alt={user?.displayName}
+            src={user?.photoURL}
+            sx={{ width: 32, height: 32 }}
+          />
         </Box>
-        <OptionsMenu />
-      </Stack>
+      )}
     </Drawer>
   );
 }

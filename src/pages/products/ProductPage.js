@@ -255,7 +255,7 @@ export default function ProductPage() {
   return (
     <Box sx={{ p: 3 }}>
       <Grid container spacing={3}>
-        <Grid item xs={12} md={10}>
+        <Grid item xs={12} md={9}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2, gap: 2 }}>
             <Box sx={{ display: 'flex', gap: 2 }}>
               <React.Suspense fallback={<CircularProgress size={24} />}>
@@ -302,7 +302,7 @@ export default function ProductPage() {
             <ProductEditor description={description} setDescription={setDescription} />
           </React.Suspense>
         </Grid>
-        <Grid item xs={12} md={2}>
+        <Grid item xs={12} md={3}>
           <React.Suspense fallback={<LoadingFallback />}>
             <AiSettings
               useBrandGuidelines={useBrandGuidelines}
@@ -321,6 +321,7 @@ export default function ProductPage() {
               setUseEmojis={setUseEmojis}
               addSpecifications={addSpecifications}
               setAddSpecifications={setAddSpecifications}
+              productImageUrl={product?.image}
             />
           </React.Suspense>
         </Grid>
