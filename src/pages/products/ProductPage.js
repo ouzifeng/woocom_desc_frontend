@@ -169,6 +169,8 @@ export default function ProductPage() {
         }
         if (addSpecifications) {
           messageContent += ` Add a specifications section to the product description.`;
+        } else {
+          messageContent += ` Do not include any specifications section in the product description.`;
         }
         if (additionalRequests && additionalRequests.length > 0) {
           messageContent += ` Additional instructions: ${additionalRequests.join('. ')}.`;
