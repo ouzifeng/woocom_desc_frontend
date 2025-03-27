@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 
@@ -9,19 +9,20 @@ console.log('API_URL:', API_URL);
 
 export default function ImproveGrammarButton({ description, setDescription, setNotificationMessage }) {
   const [loading, setLoading] = useState(false);
-  const [loadingDots, setLoadingDots] = useState('');
-  const [timer, setTimer] = useState(null);
 
   const handleImproveGrammar = async () => {
     setLoading(true);
-    setLoadingDots('');
-    setNotificationMessage('Improving grammar...');
+    setNotificationMessage('Improving grammar');
 
-    let dotCount = 0;
-    setTimer(setInterval(() => {
-      dotCount = (dotCount + 1) % 4;
-      setLoadingDots('.'.repeat(dotCount));
-    }, 500));
+    // Start the loading dots animation in the notification
+    const interval = setInterval(() => {
+      setNotificationMessage(prev => {
+        const baseMessage = 'Improving grammar';
+        const dots = prev.slice(baseMessage.length);
+        const newDots = dots.length < 3 ? dots + '.' : '';
+        return baseMessage + newDots;
+      });
+    }, 500);
 
     try {
       const response = await fetch(`${API_URL}/openai/improve-grammar`, {
@@ -48,8 +49,7 @@ export default function ImproveGrammarButton({ description, setDescription, setN
       alert('Failed to improve grammar');
     } finally {
       setLoading(false);
-      clearInterval(timer);
-      setLoadingDots('');
+      clearInterval(interval);
     }
   };
 

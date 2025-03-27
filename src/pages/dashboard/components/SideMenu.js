@@ -53,6 +53,10 @@ const Drawer = styled(MuiDrawer, { shouldForwardProp: (prop) => prop !== 'open' 
     flexShrink: 0,
     whiteSpace: 'nowrap',
     boxSizing: 'border-box',
+    display: 'none', // Hide by default
+    [theme.breakpoints.up('md')]: { // Show only on medium and larger screens
+      display: 'block',
+    },
     ...(open && {
       ...openedMixin(theme),
       '& .MuiDrawer-paper': openedMixin(theme),
