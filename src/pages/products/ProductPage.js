@@ -59,6 +59,7 @@ export default function ProductPage() {
   const [loadingDots, setLoadingDots] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiNameLoading, setAiNameLoading] = useState(false);
+  const [additionalRequests, setAdditionalRequests] = useState([]);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -168,6 +169,9 @@ export default function ProductPage() {
         }
         if (addSpecifications) {
           messageContent += ` Add a specifications section to the product description.`;
+        }
+        if (additionalRequests && additionalRequests.length > 0) {
+          messageContent += ` Additional instructions: ${additionalRequests.join('. ')}.`;
         }
 
         messageContent += ` Product name: ${decodeHtmlEntities(product?.name || '')}. Product description: ${description}.`;
@@ -322,6 +326,8 @@ export default function ProductPage() {
               addSpecifications={addSpecifications}
               setAddSpecifications={setAddSpecifications}
               productImageUrl={product?.image}
+              additionalRequests={additionalRequests}
+              setAdditionalRequests={setAdditionalRequests}
             />
           </React.Suspense>
         </Grid>

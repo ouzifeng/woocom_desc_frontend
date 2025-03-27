@@ -25,10 +25,14 @@ export default function AiSettings({
   setUseEmojis,
   addSpecifications,
   setAddSpecifications,
-  productImageUrl
+  productImageUrl,
+  additionalRequests,
+  setAdditionalRequests
 }) {
   // State to toggle whether SEO terms should be used
   const [useSeoTerms, setUseSeoTerms] = React.useState(false);
+  // Add state for additional requests
+  const [useAdditionalRequests, setUseAdditionalRequests] = React.useState(false);
 
   // Set default values for the checkboxes
   React.useEffect(() => {
@@ -145,7 +149,83 @@ export default function AiSettings({
           control={<Checkbox checked={addSpecifications} onChange={() => setAddSpecifications((prev) => !prev)} />}
           label="Add specifications"
         />
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={useAdditionalRequests}
+              onChange={() => setUseAdditionalRequests((prev) => !prev)}
+            />
+          }
+          label="Additional requests"
+        />
       </FormGroup>
+
+      {/* Updated styling for Additional Requests input */}
+      {useAdditionalRequests && (
+        <Box sx={{ mt: 1, mb: 2 }}>
+        <Autocomplete
+          multiple
+          freeSolo
+          options={[]}
+          value={additionalRequests || []}
+          onChange={(event, newValue) => setAdditionalRequests(newValue)}
+          renderTags={(value, getTagProps) =>
+            value.map((option, index) => (
+              <Chip
+                variant="outlined"
+                label={option}
+                {...getTagProps({ index })}
+                sx={{
+                  maxWidth: '100%',
+                  whiteSpace: 'normal',
+                  wordBreak: 'break-word',
+                  height: 'auto',
+                }}
+              />
+            ))
+          }
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              variant="outlined"
+              placeholder="Enter additional requests"
+              size="small"
+              fullWidth
+              InputProps={{
+                ...params.InputProps,
+                sx: {
+                  alignItems: 'flex-start',
+                  minHeight: '150px',
+                  overflowY: 'auto',
+                  p: 1,
+                  flexWrap: 'wrap',
+                },
+              }}
+              inputProps={{
+                ...params.inputProps,
+                style: {
+                  width: '100%',
+                  marginTop: '8px',
+                },
+              }}
+            />
+          )}
+          sx={{
+            width: '100%',
+            '& .MuiAutocomplete-tag': {
+              m: 0.5,
+              height: 'auto',
+            },
+            '& .MuiChip-label': {
+              whiteSpace: 'normal',
+              wordBreak: 'break-word',
+              lineHeight: '1.2',
+            },
+          }}
+        />
+
+        </Box>
+      )}
     </Box>
   );
 }
