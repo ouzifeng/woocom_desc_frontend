@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../../../firebase';
-import { collection, getDocs, doc, updateDoc, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, writeBatch, deleteField } from 'firebase/firestore';
 
 import {
   Box,
@@ -36,7 +36,8 @@ export default function LanguageProductTable({
   refresh, 
   setRefresh, 
   languageCode,
-  isMainTab 
+  isMainTab,
+  onDeleteLanguage
 }) {
   const [user] = useAuthState(auth);
   const [rows, setRows] = useState([]);
@@ -436,6 +437,36 @@ export default function LanguageProductTable({
   useEffect(() => {
     setRowSelectionModel([]); // Clear selection when tab changes
   }, [languageCode]);
+
+  const deleteLanguageTranslations = async (languageToDelete) => {
+    if (!user) return;
+    
+    try {
+      const productsCollection = collection(db, 'users', user.uid, 'products');
+      const productsSnapshot = await getDocs(productsCollection);
+      
+      const batch = writeBatch(db);
+      productsSnapshot.docs.forEach((doc) => {
+        batch.update(doc.ref, {
+          [`${languageToDelete}_name`]: deleteField(),
+          [`${languageToDelete}_description`]: deleteField()
+        });
+      });
+      
+      await batch.commit();
+      setRefresh(prev => !prev);
+      return true;
+    } catch (error) {
+      console.error('Error deleting translations:', error);
+      return false;
+    }
+  };
+
+  useEffect(() => {
+    if (onDeleteLanguage) {
+      onDeleteLanguage(deleteLanguageTranslations);
+    }
+  }, [onDeleteLanguage]);
 
   return (
     <Box sx={{ width: '100%', height: '100%' }}>
