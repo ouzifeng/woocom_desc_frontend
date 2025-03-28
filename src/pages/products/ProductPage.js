@@ -60,17 +60,36 @@ export default function ProductPage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiNameLoading, setAiNameLoading] = useState(false);
   const [additionalRequests, setAdditionalRequests] = useState([]);
+  const [languageCode, setLanguageCode] = useState(null);
 
   useEffect(() => {
+    // Check if productId contains language suffix
+    const [baseId, lang] = productId.split('_');
+    if (lang) {
+      setLanguageCode(lang);
+    }
+
     const fetchProduct = async () => {
-      if (user && productId) {
+      if (user && baseId) {
         try {
-          const productDocRef = doc(db, 'users', user.uid, 'products', productId);
+          const productDocRef = doc(db, 'users', user.uid, 'products', baseId);
           const productDoc = await getDoc(productDocRef);
           if (productDoc.exists()) {
             const productData = productDoc.data();
-            setProduct(productData);
-            setDescription(productData.description || '');
+            // If language code exists, use translated content
+            if (lang) {
+              const translatedProduct = {
+                ...productData,
+                name: productData[`${lang}_name`] || productData.name,
+                description: productData[`${lang}_description`] || productData.description
+              };
+              setProduct(translatedProduct);
+              // Set the translated description for the editor
+              setDescription(productData[`${lang}_description`] || productData.description);
+            } else {
+              setProduct(productData);
+              setDescription(productData.description || '');
+            }
           } else {
             setError('Product not found');
           }

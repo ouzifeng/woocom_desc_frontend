@@ -16,11 +16,14 @@ import {
   FormControl,
   InputLabel,
   Button,
+  CircularProgress,
 } from '@mui/material';
 
 import debounce from 'lodash.debounce';
 import { GridToolbarContainer } from '@mui/x-data-grid';
 import TranslateIcon from '@mui/icons-material/Translate';
+import AutoTranslateIcon from '@mui/icons-material/GTranslate';
+import { languages } from './LanguageOptions';
 
 /** Decode HTML entities */
 function decodeHtmlEntities(text) {
@@ -32,7 +35,6 @@ function decodeHtmlEntities(text) {
 export default function LanguageProductTable({ 
   refresh, 
   setRefresh, 
-  setSelectedRows, 
   languageCode,
   isMainTab 
 }) {
@@ -46,6 +48,10 @@ export default function LanguageProductTable({
     pageSize: 10,
     page: 0,
   });
+
+  // Add these new states near the top with other state declarations
+  const [translationStatus, setTranslationStatus] = useState('');
+  const [translatingProductId, setTranslatingProductId] = useState(null);
 
   // Load filters from localStorage or use default values
   const loadInitialFilters = () => {
@@ -103,37 +109,30 @@ export default function LanguageProductTable({
       const productsSnapshot = await getDocs(productsCollection);
       const products = productsSnapshot.docs.map((docSnap) => {
         const data = docSnap.data();
-        if (!isMainTab) {
-          // For language tabs, show the translated fields (or empty if not translated)
-          return {
-            id: docSnap.id,
-            image: data.image,
-            name: data[`${languageCode}_name`] || '', // Don't fallback to original name
-            description: data[`${languageCode}_description`] || '',
-            translated: Boolean(data[`${languageCode}_name`] && data[`${languageCode}_description`]),
-            original_name: data.name, // Keep original for reference
-            original_description: data.description // Keep original for reference
-          };
-        }
         return {
           id: docSnap.id,
-          ...data
+          image: data.image,
+          // For main tab, use original fields. For language tabs, use translated fields
+          name: isMainTab ? data.name : (data[`${languageCode}_name`] || ''),
+          description: isMainTab ? data.description : (data[`${languageCode}_description`] || ''),
+          translated: Boolean(data[`${languageCode}_name`] && data[`${languageCode}_description`]),
+          // Keep originals for translation function
+          original_name: data.name,
+          original_description: data.description,
+          // Keep the language-specific fields for switch state
+          [`${languageCode}_name`]: data[`${languageCode}_name`] || '',
+          [`${languageCode}_description`]: data[`${languageCode}_description`] || ''
         };
       });
 
-      // Sort descending by numeric ID if possible
-      products.sort((a, b) => {
-        const aNum = Number(a.id);
-        const bNum = Number(b.id);
-        return !isNaN(aNum) && !isNaN(bNum) ? bNum - aNum : b.id.localeCompare(a.id);
-      });
-
+      console.log('Fetched products:', products); // Debug log
       setRows(products);
       setFilteredRows(products);
     } catch (err) {
+      console.error('Error fetching products:', err);
       setError(err.message);
     }
-  }, [user, isMainTab, languageCode]);
+  }, [user, languageCode, isMainTab]);
 
   useEffect(() => {
     fetchData();
@@ -163,15 +162,15 @@ export default function LanguageProductTable({
 
       setFilteredRows(filtered);
       setRowSelectionModel([]);
-      setSelectedRows([]);
-    }, 300), [setSelectedRows]
+    }, 300), []
   );
 
   useEffect(() => {
     debouncedFilter(searchTerm, translatedFilter, rows);
+    setRowSelectionModel([]);
   }, [searchTerm, translatedFilter, rows, debouncedFilter]);
 
-  const handleTranslatedChange = async (id, checked) => {
+  const handleTranslatedChange = useCallback(async (id, checked) => {
     if (!user) return;
 
     try {
@@ -181,9 +180,9 @@ export default function LanguageProductTable({
     } catch (err) {
       console.error('Error updating product:', err);
     }
-  };
+  }, [user, setRefresh]);
 
-  const handleStartTranslation = async (productIds) => {
+  const handleStartTranslation = useCallback(async (productIds) => {
     if (!user) return;
     
     try {
@@ -203,52 +202,67 @@ export default function LanguageProductTable({
     } catch (error) {
       console.error('Error starting translation:', error);
     }
-  };
+  }, [user, languageCode, setRefresh]);
+
+  const handleAutoTranslate = useCallback(async (productId, originalName, originalDescription) => {
+    if (!user) return;
+
+    try {
+      setTranslatingProductId(productId);
+      setTranslationStatus('Sending translation to the translation agent...');
+
+      const languageName = languages.find(lang => lang.code === languageCode)?.name || languageCode;
+
+      setTranslationStatus('Translating...');
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/translations/translate-content`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: {
+            name: originalName,
+            description: originalDescription
+          },
+          targetLanguage: languageName,
+          languageCode: languageCode
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.result === 'Success') {
+        setTranslationStatus('Translation success!');
+        // Update Firestore
+        const productRef = doc(db, 'users', user.uid, 'products', productId);
+        await updateDoc(productRef, {
+          [`${languageCode}_name`]: data.translatedContent.name,
+          [`${languageCode}_description`]: data.translatedContent.description,
+          translated: true
+        });
+
+        // Clear status after a delay
+        setTimeout(() => {
+          setTranslationStatus('');
+          setTranslatingProductId(null);
+        }, 3000);
+
+        await fetchData();
+        setRefresh(prev => !prev);
+      }
+    } catch (error) {
+      console.error('Error auto-translating:', error);
+      setTranslationStatus('Translation failed');
+      setTimeout(() => {
+        setTranslationStatus('');
+        setTranslatingProductId(null);
+      }, 3000);
+    }
+  }, [user, languageCode, setRefresh, fetchData]);
 
   // Update columns definition based on language
   const columns = useMemo(() => {
     if (isMainTab) {
-      return [
-        { field: 'id', headerName: 'ID', width: 150 },
-        {
-          field: 'image',
-          headerName: 'Image',
-          width: 150,
-          renderCell: (params) => (
-            <img
-              src={params.value}
-              alt=""
-              style={{
-                width: '50px',
-                height: '50px',
-                objectFit: 'cover',
-                marginTop: '10px',
-                marginBottom: '10px',
-              }}
-            />
-          ),
-        },
-        {
-          field: 'translated',
-          headerName: 'Translated',
-          width: 150,
-          renderCell: (params) => (
-            <Switch
-              checked={Boolean(params.value)}
-              onClick={(event) => event.stopPropagation()}
-              onChange={(event) => handleTranslatedChange(params.id, event.target.checked)}
-            />
-          ),
-        },
-        {
-          field: 'name',
-          headerName: 'Name',
-          flex: 1,
-          renderCell: (params) => decodeHtmlEntities(params.value),
-        }
-      ];
-    } else {
-      // Language tab columns
       return [
         { field: 'id', headerName: 'ID', width: 100 },
         {
@@ -268,54 +282,84 @@ export default function LanguageProductTable({
           ),
         },
         {
-          field: 'original_name',
-          headerName: 'Original Name',
+          field: 'name',
+          headerName: 'Name',
           flex: 1,
           renderCell: (params) => decodeHtmlEntities(params.value),
         },
         {
-          field: 'translation_status',
-          headerName: 'Status',
-          width: 150,
-          renderCell: (params) => {
-            const hasTranslationStarted = params.row[`${languageCode}_name`] !== undefined;
-            
-            if (!hasTranslationStarted) {
-              return (
-                <Button
-                  startIcon={<TranslateIcon />}
-                  size="small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleStartTranslation([params.row.id]);
-                  }}
-                >
-                  Start Translation
-                </Button>
-              );
-            }
-
-            return (
-              <Chip 
-                label={params.row.translated ? "Translated" : "In Progress"} 
-                color={params.row.translated ? "success" : "warning"}
-                size="small" 
-              />
-            );
-          }
+          field: 'description',
+          headerName: 'Description',
+          flex: 2,
+          renderCell: (params) => decodeHtmlEntities(params.value),
+        }
+      ];
+    } else {
+      // Language tab - ONLY show translated fields
+      return [
+        { field: 'id', headerName: 'ID', width: 80 },
+        {
+          field: 'image',
+          headerName: 'Image',
+          width: 100,
+          renderCell: (params) => (
+            <img
+              src={params.value}
+              alt=""
+              style={{
+                width: '40px',
+                height: '40px',
+                objectFit: 'cover',
+              }}
+            />
+          ),
         },
         {
           field: 'name',
-          headerName: 'Translated Name',
+          headerName: 'Name',
           flex: 1,
-          renderCell: (params) => {
-            const hasTranslationStarted = params.row[`${languageCode}_name`] !== undefined;
-            return hasTranslationStarted ? decodeHtmlEntities(params.value || '') : '-';
-          },
+          renderCell: (params) => decodeHtmlEntities(params.value),
+        },
+        {
+          field: 'description',
+          headerName: 'Description',
+          flex: 2,
+          renderCell: (params) => decodeHtmlEntities(params.value),
+        },
+        {
+          field: 'translated',
+          headerName: 'Translated',
+          width: 100,
+          renderCell: (params) => (
+            <Switch
+              checked={Boolean(params.row[`${languageCode}_name`] && params.row[`${languageCode}_description`])}
+              onClick={(event) => event.stopPropagation()}
+              onChange={(event) => {
+                if (event.target.checked) {
+                  // If turning on, trigger translation
+                  handleAutoTranslate(
+                    params.row.id,
+                    params.row.original_name,
+                    params.row.original_description
+                  );
+                } else {
+                  // If turning off, remove translations
+                  const productRef = doc(db, 'users', user.uid, 'products', params.row.id);
+                  updateDoc(productRef, {
+                    [`${languageCode}_name`]: '',
+                    [`${languageCode}_description`]: '',
+                    translated: false
+                  }).then(() => {
+                    setRefresh(prev => !prev);
+                  });
+                }
+              }}
+            />
+          ),
         }
       ];
     }
-  }, [isMainTab, languageCode, handleTranslatedChange, handleStartTranslation]);
+  }, [isMainTab, languageCode, handleAutoTranslate]);
 
   // Add handler for cell editing
   const handleCellEdit = async (params) => {
@@ -336,7 +380,8 @@ export default function LanguageProductTable({
     if (isMainTab) {
       window.location.href = `/products/${params.id}`;
     } else {
-      window.location.href = `/translations/${params.id}_${languageCode}`;
+      // For language tabs, navigate to product page with language suffix
+      window.location.href = `/products/${params.id}_${languageCode}`;
     }
   };
 
@@ -344,18 +389,53 @@ export default function LanguageProductTable({
   const CustomToolbar = () => {
     if (isMainTab) return null;
 
+    const handleBatchTranslate = async (checked) => {
+      if (rowSelectionModel.length === 0) return;
+
+      for (const id of rowSelectionModel) {
+        const row = rows.find(r => r.id === id);
+        if (row) {
+          if (checked) {
+            // If turning on, translate
+            await handleAutoTranslate(
+              row.id, 
+              row.original_name,
+              row.original_description
+            );
+          } else {
+            // If turning off, remove translations
+            const productRef = doc(db, 'users', user.uid, 'products', row.id);
+            await updateDoc(productRef, {
+              [`${languageCode}_name`]: '',
+              [`${languageCode}_description`]: '',
+              translated: false
+            });
+          }
+        }
+      }
+      setRefresh(prev => !prev);
+    };
+
     return (
       <GridToolbarContainer>
-        <Button
-          startIcon={<TranslateIcon />}
-          disabled={rowSelectionModel.length === 0}
-          onClick={() => handleStartTranslation(rowSelectionModel)}
-        >
-          Start Translation for Selected ({rowSelectionModel.length})
-        </Button>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography variant="body2">
+            Translate Selected ({rowSelectionModel.length})
+          </Typography>
+          <Switch
+            disabled={rowSelectionModel.length === 0}
+            checked={false}
+            onChange={(e) => handleBatchTranslate(e.target.checked)}
+          />
+        </Box>
       </GridToolbarContainer>
     );
   };
+
+  // Add languageCode to dependency array of useEffect to clear selection on tab change
+  useEffect(() => {
+    setRowSelectionModel([]); // Clear selection when tab changes
+  }, [languageCode]);
 
   return (
     <Box sx={{ width: '100%', height: '100%' }}>
@@ -397,6 +477,27 @@ export default function LanguageProductTable({
             </FormControl>
           </Box>
 
+          {/* Add translation status indicator */}
+          {translationStatus && (
+            <Box 
+              sx={{ 
+                mb: 2, 
+                display: 'flex', 
+                alignItems: 'center',
+                gap: 1,
+                color: translationStatus.includes('success') ? 'success.main' : 'info.main'
+              }}
+            >
+              {translationStatus.includes('Translating') && (
+                <CircularProgress size={20} color="inherit" />
+              )}
+              <Typography variant="body2">
+                {translatingProductId && `Product ${translatingProductId}: `}
+                {translationStatus}
+              </Typography>
+            </Box>
+          )}
+
           <DataGrid
             pagination
             paginationModel={paginationModel}
@@ -410,12 +511,12 @@ export default function LanguageProductTable({
             disableColumnResize
             rowSelectionModel={rowSelectionModel}
             onRowSelectionModelChange={(newSelection) => {
-              const validSelection = newSelection.filter((id) =>
-                filteredRows.some((row) => row.id === id)
+              const validSelection = newSelection.filter(id => 
+                filteredRows.some(row => row.id === id)
               );
               setRowSelectionModel(validSelection);
-              setSelectedRows(validSelection);
             }}
+            keepNonExistentRowsSelected={false}
             onRowClick={handleRowClick}
             getRowClassName={(params) =>
               params.indexRelativeToCurrentPage % 2 === 0 ? 'even' : 'odd'

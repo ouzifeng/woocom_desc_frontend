@@ -9,7 +9,6 @@ import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
 import Button from '@mui/material/Button';
 import Grid from '@mui/material/Grid';
-import SaveProductButton from '../../products/components/SaveProductButton';
 
 // Lazy load components
 const ProductDetails = React.lazy(() => import('../../products/components/ProductDetails'));

@@ -6,7 +6,7 @@ import TextField from '@mui/material/TextField';
 import Box from '@mui/material/Box';
 
 // Languages in their native names, alphabetically ordered
-const languages = [
+export const languages = [
   { code: 'ar', name: 'العربية' },        // Arabic
   { code: 'be', name: 'Беларуская' },     // Belarusian
   { code: 'bg', name: 'Български' },      // Bulgarian
