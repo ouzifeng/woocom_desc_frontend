@@ -24,6 +24,7 @@ import { GridToolbarContainer } from '@mui/x-data-grid';
 import TranslateIcon from '@mui/icons-material/Translate';
 import AutoTranslateIcon from '@mui/icons-material/GTranslate';
 import { languages } from './LanguageOptions';
+import DownloadTranslationsCSVButton from './DownloadTranslationsCSVButton';
 
 /** Decode HTML entities */
 function decodeHtmlEntities(text) {
@@ -214,7 +215,11 @@ export default function LanguageProductTable({
 
       const languageName = languages.find(lang => lang.code === languageCode)?.name || languageCode;
 
-      setTranslationStatus('Translating...');
+      console.log('Sending for translation:', {
+        name: originalName,
+        description: originalDescription
+      });
+
       const response = await fetch(`${process.env.REACT_APP_API_URL}/translations/translate-content`, {
         method: 'POST',
         headers: {
@@ -231,10 +236,10 @@ export default function LanguageProductTable({
       });
 
       const data = await response.json();
+      console.log('Translation response:', data);
       
       if (data.result === 'Success') {
         setTranslationStatus('Translation success!');
-        // Update Firestore
         const productRef = doc(db, 'users', user.uid, 'products', productId);
         await updateDoc(productRef, {
           [`${languageCode}_name`]: data.translatedContent.name,
@@ -242,7 +247,6 @@ export default function LanguageProductTable({
           translated: true
         });
 
-        // Clear status after a delay
         setTimeout(() => {
           setTranslationStatus('');
           setTranslatingProductId(null);
@@ -386,52 +390,110 @@ export default function LanguageProductTable({
     }
   };
 
-  // Add toolbar with batch actions
-  const CustomToolbar = () => {
+  // Update the CustomToolbar component
+  const CustomToolbar = React.memo(({ selectedRows }) => {
     if (isMainTab) return null;
 
     const handleBatchTranslate = async (checked) => {
-      if (rowSelectionModel.length === 0) return;
+      if (selectedRows.length === 0) return;
 
-      for (const id of rowSelectionModel) {
-        const row = rows.find(r => r.id === id);
-        if (row) {
-          if (checked) {
-            // If turning on, translate
-            await handleAutoTranslate(
-              row.id, 
-              row.original_name,
-              row.original_description
-            );
-          } else {
-            // If turning off, remove translations
-            const productRef = doc(db, 'users', user.uid, 'products', row.id);
-            await updateDoc(productRef, {
-              [`${languageCode}_name`]: '',
-              [`${languageCode}_description`]: '',
-              translated: false
-            });
+      if (checked) {
+        setTranslationStatus(`Translating ${selectedRows.length} products...`);
+        
+        for (const id of selectedRows) {
+          const row = rows.find(r => r.id === id);
+          if (row) {
+            try {
+              setTranslatingProductId(id);
+              const languageName = languages.find(lang => lang.code === languageCode)?.name || languageCode;
+
+              // Clean HTML before sending
+              const tempDiv = document.createElement('div');
+              tempDiv.innerHTML = row.original_description;
+              const cleanDescription = tempDiv.textContent || tempDiv.innerText;
+
+              const response = await fetch(`${process.env.REACT_APP_API_URL}/translations/translate-content`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  content: {
+                    name: row.original_name,
+                    description: cleanDescription // Send clean text
+                  },
+                  targetLanguage: languageName,
+                  languageCode: languageCode
+                }),
+              });
+
+              const data = await response.json();
+              
+              if (data.result === 'Success') {
+                // Reconstruct HTML structure
+                const translatedDescription = `<p>${data.translatedContent.description}</p>`;
+                
+                const productRef = doc(db, 'users', user.uid, 'products', id);
+                await updateDoc(productRef, {
+                  [`${languageCode}_name`]: data.translatedContent.name,
+                  [`${languageCode}_description`]: translatedDescription,
+                  translated: true
+                });
+              }
+            } catch (error) {
+              console.error(`Error translating product ${id}:`, error);
+            }
           }
         }
+      } else {
+        // If turning off translations, use batch update
+        const batch = writeBatch(db);
+        selectedRows.forEach(id => {
+          const productRef = doc(db, 'users', user.uid, 'products', id);
+          batch.update(productRef, {
+            [`${languageCode}_name`]: '',
+            [`${languageCode}_description`]: '',
+            translated: false
+          });
+        });
+        await batch.commit();
       }
+
+      // Only refresh once after all operations are complete
+      setTranslationStatus('');
+      setTranslatingProductId(null);
       setRefresh(prev => !prev);
     };
 
     return (
       <GridToolbarContainer>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="body2">
-            Translate Selected ({rowSelectionModel.length})
-          </Typography>
-          <Switch
-            disabled={rowSelectionModel.length === 0}
-            checked={false}
-            onChange={(e) => handleBatchTranslate(e.target.checked)}
+        <Box sx={{ 
+          p: 2, 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: 2,
+          width: '100%',
+          borderBottom: '1px solid rgba(224, 224, 224, 1)'
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="body2">
+              Translate Selected ({selectedRows.length})
+            </Typography>
+            <Switch
+              disabled={selectedRows.length === 0}
+              checked={false}
+              onChange={(e) => handleBatchTranslate(e.target.checked)}
+            />
+          </Box>
+          <DownloadTranslationsCSVButton 
+            selectedRows={selectedRows}
+            languageCode={languageCode}
+            isMainTab={isMainTab}
           />
         </Box>
       </GridToolbarContainer>
     );
-  };
+  });
 
   // Add languageCode to dependency array of useEffect to clear selection on tab change
   useEffect(() => {
@@ -563,8 +625,15 @@ export default function LanguageProductTable({
               },
             }}
             onCellEditCommit={handleCellEdit}
-            components={{
-              Toolbar: CustomToolbar
+            slots={{
+              toolbar: CustomToolbar,
+            }}
+            slotProps={{
+              toolbar: {
+                selectedRows: rowSelectionModel,
+                languageCode: languageCode,
+                isMainTab: isMainTab,
+              },
             }}
           />
         </>
