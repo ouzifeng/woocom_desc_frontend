@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { styled, useTheme } from '@mui/material/styles';
+import { styled } from '@mui/material/styles';
 import Avatar from '@mui/material/Avatar';
 import MuiDrawer from '@mui/material/Drawer';
 import Box from '@mui/material/Box';
@@ -8,10 +8,10 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import MenuIcon from '@mui/icons-material/Menu';
-import Toolbar from '@mui/material/Toolbar';
 import Logo from '@mui/icons-material/Web'; // Placeholder logo icon
 import MenuContent from './MenuContent';
 import OptionsMenu from './OptionsMenu';
+import PropTypes from 'prop-types';
 
 const drawerWidth = 240;
 
@@ -69,7 +69,6 @@ const Drawer = styled(MuiDrawer, { shouldForwardProp: (prop) => prop !== 'open' 
 );
 
 export default function SideMenu({ user }) {
-  const theme = useTheme();
   const [open, setOpen] = React.useState(true);
 
   const handleDrawerToggle = () => {
@@ -161,3 +160,15 @@ export default function SideMenu({ user }) {
     </Drawer>
   );
 }
+
+SideMenu.propTypes = {
+  user: PropTypes.shape({
+    displayName: PropTypes.string,
+    email: PropTypes.string,
+    photoURL: PropTypes.string
+  })
+};
+
+SideMenu.defaultProps = {
+  user: null
+};

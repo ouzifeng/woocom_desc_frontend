@@ -21,12 +21,15 @@ import { doc, onSnapshot } from 'firebase/firestore';
 
 const mainListItems = [
   { text: 'Home', icon: <HomeRoundedIcon />, link: '/dashboard' },
-  { text: 'Products', icon: <AnalyticsRoundedIcon />, link: '/products' },
+  { text: 'Product Descriptions', icon: <AnalyticsRoundedIcon />, link: '/products' },
   { text: 'Brand Settings', icon: <PeopleRoundedIcon />, link: '/brandsettings' },
-  { text: 'Tasks', icon: <AssignmentRoundedIcon /> },
+  { text: 'Product Translations', icon: <AssignmentRoundedIcon />, link: '/translations' },
+  { text: 'Content Strategy', icon: <AssignmentRoundedIcon />, link: '/strategy' },
+  { text: 'Content Creation', icon: <AssignmentRoundedIcon />, link: '/creation' },
 ];
 
 const secondaryListItems = [
+  { text: 'Brand Settings', icon: <PeopleRoundedIcon />, link: '/brandsettings' },
   { text: 'Integrations', icon: <SettingsRoundedIcon />, link: '/settings' },
   { text: 'About', icon: <InfoRoundedIcon /> },
   { text: 'Feedback', icon: <HelpRoundedIcon /> },
@@ -69,6 +72,18 @@ export default function MenuContent() {
         ))}
       </List>
       <List dense>
+        {secondaryListItems.map((item, index) => (
+          <ListItem key={index} disablePadding sx={{ display: 'block' }}>
+            <ListItemButton
+              component={item.link ? Link : 'div'}
+              to={item.link}
+              selected={location.pathname === item.link}
+            >
+              <ListItemIcon>{item.icon}</ListItemIcon>
+              <ListItemText primary={item.text} />
+            </ListItemButton>
+          </ListItem>
+        ))}
         <ListItem sx={{ display: 'block', py: 1 }}>
           <Chip
             icon={<AutoAwesomeIcon />}
@@ -84,19 +99,7 @@ export default function MenuContent() {
               }
             }}
           />
-        </ListItem>
-        {secondaryListItems.map((item, index) => (
-          <ListItem key={index} disablePadding sx={{ display: 'block' }}>
-            <ListItemButton
-              component={item.link ? Link : 'div'}
-              to={item.link}
-              selected={location.pathname === item.link}
-            >
-              <ListItemIcon>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.text} />
-            </ListItemButton>
-          </ListItem>
-        ))}
+        </ListItem>        
       </List>
     </Stack>
   );

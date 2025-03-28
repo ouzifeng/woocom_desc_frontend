@@ -9,6 +9,9 @@ import PrivateRoute from './components/PrivateRoute';
 import SettingsPage from './pages/settings/SettingsPage';
 import Products from './pages/products/Products';
 import BrandSettings from './pages/brandSettings/BrandSettings';
+import ProductTranslations from './pages/translations/ProductTranslations';
+import ContentStrategy from './pages/strategy/ContentStrategy';
+import ContentCreation from './pages/creation/ContentCreation';
 import './App.css';
 
 function App() {
@@ -50,6 +53,30 @@ function App() {
             element={
               <PrivateRoute>
                 <BrandSettings />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/translations"
+            element={
+              <PrivateRoute>
+                <ProductTranslations />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/strategy"
+            element={
+              <PrivateRoute>
+                <ContentStrategy />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/creation"
+            element={
+              <PrivateRoute>
+                <ContentCreation />
               </PrivateRoute>
             }
           />
