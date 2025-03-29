@@ -22,13 +22,13 @@ import { doc, onSnapshot } from 'firebase/firestore';
 const mainListItems = [
   { text: 'Home', icon: <HomeRoundedIcon />, link: '/dashboard' },
   { text: 'Product Descriptions', icon: <AnalyticsRoundedIcon />, link: '/products' },
-  { text: 'Brand Settings', icon: <PeopleRoundedIcon />, link: '/brandsettings' },
   { text: 'Product Translations', icon: <AssignmentRoundedIcon />, link: '/translations' },
   { text: 'Content Strategy', icon: <AssignmentRoundedIcon />, link: '/strategy' },
   { text: 'Content Creation', icon: <AssignmentRoundedIcon />, link: '/creation' },
 ];
 
 const secondaryListItems = [
+  { text: 'Brand Strategy', icon: <PeopleRoundedIcon />, link: '/brand-strategy' },
   { text: 'Brand Settings', icon: <PeopleRoundedIcon />, link: '/brandsettings' },
   { text: 'Integrations', icon: <SettingsRoundedIcon />, link: '/settings' },
   { text: 'About', icon: <InfoRoundedIcon /> },

@@ -13,6 +13,7 @@ import ProductTranslations from './pages/translations/ProductTranslations';
 import ContentStrategy from './pages/strategy/ContentStrategy';
 import ContentCreation from './pages/creation/ContentCreation';
 import TranslationProductPage from './pages/translations/components/TranslationProductPage';
+import BrandStrategyPage from './pages/brand-strategy/BrandStrategyPage';
 import './App.css';
 
 function App() {
@@ -89,6 +90,14 @@ function App() {
               </PrivateRoute>
             }
           />
+          <Route
+            path="/brand-strategy"
+            element={
+              <PrivateRoute>
+                <BrandStrategyPage />
+              </PrivateRoute>
+            }
+          />          
           <Route path="/" element={<SignIn />} />
         </Routes>
       </div>
