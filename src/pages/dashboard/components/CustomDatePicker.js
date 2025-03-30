@@ -47,7 +47,7 @@ ButtonField.propTypes = {
 };
 
 export default function CustomDatePicker() {
-  const [value] = React.useState(dayjs('2023-04-17'));
+  const [value] = React.useState(dayjs());
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>

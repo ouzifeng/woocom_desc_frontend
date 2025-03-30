@@ -54,7 +54,7 @@ export default function BrandSettings(props) {
           <LocalizationProvider dateAdapter={AdapterDayjs}>
             <Box sx={{ p: 3, width: '100%' }}>
               <Header />
-              <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 4 }}>
+              <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 4, mt:4 }}>
                 Brand Settings
               </Typography>
               <BrandIdentity />

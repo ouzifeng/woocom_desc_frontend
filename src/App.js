@@ -14,6 +14,7 @@ import ContentStrategy from './pages/strategy/ContentStrategy';
 import ContentCreation from './pages/creation/ContentCreation';
 import TranslationProductPage from './pages/translations/components/TranslationProductPage';
 import BrandStrategyPage from './pages/brand-strategy/BrandStrategyPage';
+import KeywordResearchPage from './pages/keyword-research/KeywordResearchPage';
 import './App.css';
 
 function App() {
@@ -98,6 +99,14 @@ function App() {
               </PrivateRoute>
             }
           />          
+          <Route
+            path="/keyword-research"
+            element={
+              <PrivateRoute>
+                <KeywordResearchPage />
+              </PrivateRoute>
+            }
+          /> 
           <Route path="/" element={<SignIn />} />
         </Routes>
       </div>
