@@ -16,101 +16,103 @@ import TranslationProductPage from './pages/translations/components/TranslationP
 import BrandStrategyPage from './pages/brand-strategy/BrandStrategyPage';
 import KeywordResearchPage from './pages/keyword-research/KeywordResearchPage';
 import './App.css';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
+
 
 function App() {
   return (
-    <Router>
-      <div className="App">
-        <Routes>
-          <Route path="/signup" element={<SignUp />} />
-          <Route path="/signin" element={<SignIn />} />
-          <Route
-            path="/dashboard/*"
-            element={
-              <PrivateRoute>
-                <Dashboard />
-              </PrivateRoute>
-            }
-          >
-            <Route path="home" element={<Home />} />
-            <Route path="settings" element={<Settings />} />
-          </Route>
-          <Route
-            path="/settings/*"
-            element={
-              <PrivateRoute>
-                <SettingsPage />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/products/*"
-            element={
-              <PrivateRoute>
-                <Products />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/brandsettings"
-            element={
-              <PrivateRoute>
-                <BrandSettings />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/translations"
-            element={
-              <PrivateRoute>
-                <ProductTranslations />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/translations/:productId"
-            element={
-              <PrivateRoute>
-                <TranslationProductPage />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/strategy"
-            element={
-              <PrivateRoute>
-                <ContentStrategy />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/creation"
-            element={
-              <PrivateRoute>
-                <ContentCreation />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/brand-strategy"
-            element={
-              <PrivateRoute>
-                <BrandStrategyPage />
-              </PrivateRoute>
-            }
-          />          
-          <Route
-            path="/keyword-research"
-            element={
-              <PrivateRoute>
-                <KeywordResearchPage />
-              </PrivateRoute>
-            }
-          /> 
-          <Route path="/" element={<SignIn />} />
-        </Routes>
-      </div>
-    </Router>
+      <Router>
+        <div className="App">
+          <Routes>
+            <Route path="/signup" element={<SignUp />} />
+            <Route path="/signin" element={<SignIn />} />
+            <Route
+              path="/dashboard/*"
+              element={
+                <PrivateRoute>
+                  <Dashboard />
+                </PrivateRoute>
+              }
+            >
+              <Route path="home" element={<Home />} />
+              <Route path="settings" element={<Settings />} />
+            </Route>
+            <Route
+              path="/settings/*"
+              element={
+                <PrivateRoute>
+                  <SettingsPage />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/products/*"
+              element={
+                <PrivateRoute>
+                  <Products />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/brandsettings"
+              element={
+                <PrivateRoute>
+                  <BrandSettings />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/translations"
+              element={
+                <PrivateRoute>
+                  <ProductTranslations />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/translations/:productId"
+              element={
+                <PrivateRoute>
+                  <TranslationProductPage />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/strategy"
+              element={
+                <PrivateRoute>
+                  <ContentStrategy />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/creation"
+              element={
+                <PrivateRoute>
+                  <ContentCreation />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/brand-strategy"
+              element={
+                <PrivateRoute>
+                  <BrandStrategyPage />
+                </PrivateRoute>
+              }
+            />          
+            <Route
+              path="/keyword-research"
+              element={
+                <PrivateRoute>
+                  <KeywordResearchPage />
+                </PrivateRoute>
+              }
+            /> 
+            <Route path="/" element={<SignIn />} />
+          </Routes>
+        </div>
+      </Router>
   );
 }
 
