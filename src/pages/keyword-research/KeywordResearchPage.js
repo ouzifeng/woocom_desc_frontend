@@ -491,8 +491,8 @@ export default function KeywordResearchPage(props) {
                     aria-label="keyword research tabs"
                   >
                     {/* Render the "real" research tabs */}
-                    {tabs.map((tab, index) => (
-                      <Tab
+                    {tabs.map((tab) => (
+                      <Tab 
                         key={tab.id}
                         label={
                           editingTabId === tab.id ? (
@@ -502,11 +502,15 @@ export default function KeywordResearchPage(props) {
                                 value={editingTabName}
                                 onChange={handleTabNameChange}
                                 onKeyDown={(e) => {
+                                  // Stop propagation for all keys to prevent tab switching
+                                  e.stopPropagation();
+                                  
                                   if (e.key === 'Enter') {
                                     e.preventDefault();
                                     handleTabNameSave();
                                   }
                                   if (e.key === 'Escape') {
+                                    e.preventDefault();
                                     setEditingTabId(null);
                                     setEditingTabName('');
                                   }
@@ -519,32 +523,36 @@ export default function KeywordResearchPage(props) {
                                     fontSize: '0.875rem',
                                     backgroundColor: 'white',
                                   },
+                                  '& input': {
+                                    userSelect: 'none'
+                                  }
                                 }}
                               />
                             </ClickAwayListener>
                           ) : (
-                            <Box
-                              sx={{
-                                display: 'flex',
+                            <Box 
+                              sx={{ 
+                                display: 'flex', 
                                 alignItems: 'center',
-                                cursor: 'text',
+                                cursor: 'text'
                               }}
-                              onDoubleClick={() =>
-                                handleTabDoubleClick(tab.id, tab.label)
-                              }
+                              onDoubleClick={() => handleTabDoubleClick(tab.id, tab.label)}
                             >
                               {tab.label}
                               {tab.isDeletable && (
-                                <IconButton
-                                  size="small"
+                                <span  // Use span instead of Box to avoid button nesting
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleDeleteTab(index);
+                                    handleDeleteTab(tabs.indexOf(tab));
                                   }}
-                                  sx={{ ml: 1 }}
+                                  sx={{ 
+                                    display: 'inline-flex',
+                                    ml: 1,
+                                    cursor: 'pointer'
+                                  }}
                                 >
                                   <CloseIcon fontSize="small" />
-                                </IconButton>
+                                </span>
                               )}
                             </Box>
                           )
@@ -552,12 +560,16 @@ export default function KeywordResearchPage(props) {
                       />
                     ))}
                     {/* The plus tab (index == tabs.length) */}
-                    <Tab
-                      icon={<AddIcon />}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleAddTab();
-                      }}
+                    <Tab 
+                      icon={
+                        <span onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleAddTab();
+                        }}>
+                          <AddIcon />
+                        </span>
+                      }
                       sx={{ minWidth: '50px' }}
                     />
                     {/* Saved Words tab (index == tabs.length+1) */}

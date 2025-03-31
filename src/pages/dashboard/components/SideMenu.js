@@ -68,7 +68,7 @@ const Drawer = styled(MuiDrawer, { shouldForwardProp: (prop) => prop !== 'open' 
   }),
 );
 
-export default function SideMenu({ user }) {
+export default function SideMenu({ user = null }) {
   const [open, setOpen] = React.useState(true);
 
   const handleDrawerToggle = () => {
@@ -167,8 +167,4 @@ SideMenu.propTypes = {
     email: PropTypes.string,
     photoURL: PropTypes.string
   })
-};
-
-SideMenu.defaultProps = {
-  user: null
 };
