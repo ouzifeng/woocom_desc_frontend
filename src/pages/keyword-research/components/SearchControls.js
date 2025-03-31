@@ -44,6 +44,12 @@ export default function SearchControls({
             color="primary"
             onClick={handleSearch}
             disabled={!keywords.trim()}
+            sx={{
+              '&.Mui-disabled': {
+                color: 'grey',
+                backgroundColor: 'white',
+              }
+            }}
           >
             Search Keywords
           </Button>

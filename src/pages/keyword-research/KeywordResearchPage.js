@@ -7,6 +7,15 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import dayjs from 'dayjs';
 import Grid from '@mui/material/Grid';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
+import IconButton from '@mui/material/IconButton';
+import AddIcon from '@mui/icons-material/Add';
+import CloseIcon from '@mui/icons-material/Close';
+import TextField from '@mui/material/TextField';
+import ClickAwayListener from '@mui/material/ClickAwayListener';
+import { doc, collection, setDoc, deleteDoc, getDocs, query } from 'firebase/firestore';
+import { db } from '../../firebase';
 
 import AppNavbar from '../dashboard/components/AppNavbar';
 import Header from '../dashboard/components/Header';
@@ -20,24 +29,48 @@ import { fetchCountries, fetchLanguages } from './utils';   // Or place them her
 import SearchControls from './components/SearchControls';
 import KeywordDataGrid from './components/KeywordDataGrid';
 
-// Caching keys
-const CACHE_KEY = 'keyword-research-cache';
-const CACHE_PAYLOAD_KEY = 'keyword-research-payload';
+// ----------------------------------------------------------------
+// Simple TabPanel helper
+function TabPanel(props) {
+  const { children, value, index, ...other } = props;
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`keyword-research-tabpanel-${index}`}
+      aria-labelledby={`keyword-research-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ py: 3 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------
+// Caching constants for countries/languages
+const COUNTRIES_CACHE_KEY = 'keyword-research-countries-cache';
+const LANGUAGES_CACHE_KEY = 'keyword-research-languages-cache';
+const CACHE_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
 export default function KeywordResearchPage(props) {
   const [user] = useAuthState(auth);
 
-  // Keywords
+  // ------------------ State ------------------
   const [keywords, setKeywords] = useState('');
-  // Country & Language
+
+  // Country/Language
   const [countries, setCountries] = useState([]);
   const [country, setCountry] = useState(null);
   const [countriesLoading, setCountriesLoading] = useState(false);
+
   const [languages, setLanguages] = useState([]);
   const [language, setLanguage] = useState(null);
   const [languagesLoading, setLanguagesLoading] = useState(false);
 
-  // Partners
   const [includePartners, setIncludePartners] = useState(false);
 
   // Date range
@@ -48,16 +81,49 @@ export default function KeywordResearchPage(props) {
   // DataGrid
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [usedCache, setUsedCache] = useState(false);
 
-  // ------------------ FETCHING ON MOUNT ------------------
+  // Tabs
+  const [tabValue, setTabValue] = useState(0);
+  const [tabs, setTabs] = useState([
+    {
+      id: 'tab-1',
+      label: 'Research 1',
+      keywords: '',
+      rows: [],
+      isDeletable: false
+    },
+  ]);
+
+  // Editing tab name
+  const [editingTabId, setEditingTabId] = useState(null);
+  const [editingTabName, setEditingTabName] = useState('');
+
+  // Add to existing state
+  const [savedKeywords, setSavedKeywords] = useState([]);
+
+  // ----------------------------------------------------------------
+  // Load countries/languages on mount
   useEffect(() => {
-    // Load countries
     async function loadCountries() {
       setCountriesLoading(true);
       try {
+        // Check local cache
+        const cachedData = localStorage.getItem(COUNTRIES_CACHE_KEY);
+        if (cachedData) {
+          const { data, timestamp } = JSON.parse(cachedData);
+          if (Date.now() - timestamp < CACHE_EXPIRY) {
+            setCountries(data);
+            setCountriesLoading(false);
+            return;
+          }
+        }
+        // Fetch if no cache or expired
         const data = await fetchCountries();
         setCountries(data || []);
+        localStorage.setItem(
+          COUNTRIES_CACHE_KEY,
+          JSON.stringify({ data, timestamp: Date.now() })
+        );
       } catch (err) {
         console.error('Error fetching countries:', err);
       } finally {
@@ -65,12 +131,26 @@ export default function KeywordResearchPage(props) {
       }
     }
 
-    // Load languages
     async function loadLanguages() {
       setLanguagesLoading(true);
       try {
+        // Check local cache
+        const cachedData = localStorage.getItem(LANGUAGES_CACHE_KEY);
+        if (cachedData) {
+          const { data, timestamp } = JSON.parse(cachedData);
+          if (Date.now() - timestamp < CACHE_EXPIRY) {
+            setLanguages(data);
+            setLanguagesLoading(false);
+            return;
+          }
+        }
+        // Fetch if no cache or expired
         const data = await fetchLanguages();
         setLanguages(data || []);
+        localStorage.setItem(
+          LANGUAGES_CACHE_KEY,
+          JSON.stringify({ data, timestamp: Date.now() })
+        );
       } catch (err) {
         console.error('Error fetching languages:', err);
       } finally {
@@ -82,28 +162,91 @@ export default function KeywordResearchPage(props) {
     loadLanguages();
   }, [user]);
 
-  // Recompute dateFrom/dateTo whenever rangeLabel changes
+  // Update dateFrom/dateTo whenever rangeLabel changes
   useEffect(() => {
     const { from, to } = getDateRangeByLabel(rangeLabel);
     setDateFrom(from);
     setDateTo(to);
   }, [rangeLabel]);
 
-  // Attempt to load existing cache on mount
+  // ----------------------------------------------------------------
+  // Load all saved tabs exactly once when user is defined
   useEffect(() => {
-    const cachedData = localStorage.getItem(CACHE_KEY);
-    const cachedPayload = localStorage.getItem(CACHE_PAYLOAD_KEY);
-    if (cachedData && cachedPayload) {
-      console.log('Found existing cache on mount');
-      const parsedData = JSON.parse(cachedData);
-      const rowsFormatted = formatRows(parsedData);
-      setRows(rowsFormatted);
-      setUsedCache(true);
-    }
-  }, []);
+    if (!user) return;
 
-  // ------------------ SEARCH FUNCTION ------------------
+    const loadSavedResearch = async () => {
+      try {
+        const researchRef = collection(db, 'users', user.uid, 'keywordResearch');
+        const querySnapshot = await getDocs(query(researchRef));
+
+        const savedTabs = [];
+        querySnapshot.forEach((docSnap) => {
+          savedTabs.push({
+            id: docSnap.id,
+            ...docSnap.data(),
+          });
+        });
+
+        if (savedTabs.length > 0) {
+          // Replace local tabs with whatever is in Firestore
+          setTabs(savedTabs);
+          // Show the first tab by default
+          setTabValue(0);
+          setKeywords(savedTabs[0]?.keywords || '');
+          setRows(savedTabs[0]?.rows || []);
+        } else {
+          // If no saved tabs, keep the default single tab
+          setTabs([
+            {
+              id: 'tab-1',
+              label: 'Research 1',
+              keywords: '',
+              rows: [],
+              isDeletable: false
+            },
+          ]);
+          setTabValue(0);
+          setKeywords('');
+          setRows([]);
+        }
+      } catch (error) {
+        console.error('Error loading saved research:', error);
+      }
+    };
+
+    loadSavedResearch();
+  }, [user]);
+
+  // Add this effect to load saved keywords
+  useEffect(() => {
+    if (!user) return;
+
+    const loadSavedKeywords = async () => {
+      try {
+        const savedRef = collection(db, 'users', user.uid, 'savedKeywords');
+        const querySnapshot = await getDocs(query(savedRef));
+        
+        const keywords = [];
+        querySnapshot.forEach(doc => {
+          keywords.push(doc.data());
+        });
+        
+        setSavedKeywords(keywords);
+      } catch (error) {
+        console.error('Error loading saved keywords:', error);
+      }
+    };
+
+    loadSavedKeywords();
+  }, [user]);
+
+  // ----------------------------------------------------------------
+  // Run search
   const handleSearch = async () => {
+    // If user clicked the "Saved Words" tab (the last tab),
+    // or the plus tab, do nothing:
+    if (tabValue >= tabs.length) return;
+
     const keywordArray = keywords
       .split(',')
       .map((k) => k.trim())
@@ -119,52 +262,187 @@ export default function KeywordResearchPage(props) {
       date_to: dateTo.format('YYYY-MM-DD'),
     };
 
-    // Check if same as last cached payload
-    const lastPayload = localStorage.getItem(CACHE_PAYLOAD_KEY);
-    if (lastPayload) {
-      const parsedPayload = JSON.parse(lastPayload);
-      if (JSON.stringify(parsedPayload) === JSON.stringify(payload)) {
-        console.log('✅ Payload unchanged; using cached results');
-        setUsedCache(true);
-        return;
-      }
-    }
-
-    // If changed, clear old cache
-    localStorage.removeItem(CACHE_KEY);
-    localStorage.removeItem(CACHE_PAYLOAD_KEY);
     setLoading(true);
-    setUsedCache(false);
-
     try {
-      // Make request
-      const res = await fetch(`${process.env.REACT_APP_API_URL}/dataforseo/keywords`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      const res = await fetch(
+        `${process.env.REACT_APP_API_URL}/dataforseo/keywords`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
+      );
       const data = await res.json();
-      console.log('API result:', data);
-
       if (data.result && Array.isArray(data.result)) {
         const formatted = formatRows(data.result);
+
+        // Update only the current tab's data in local state
+        const updatedTabs = tabs.map((tab, index) => {
+          if (index === tabValue) {
+            return {
+              ...tab,
+              keywords,
+              rows: formatted,
+              payload,
+              lastUpdated: new Date().toISOString()
+            };
+          }
+          return tab;
+        });
+
+        setTabs(updatedTabs);
         setRows(formatted);
-        // Cache
-        localStorage.setItem(CACHE_KEY, JSON.stringify(data.result));
-        localStorage.setItem(CACHE_PAYLOAD_KEY, JSON.stringify(payload));
-        console.log('🗃️ New data cached');
-      } else {
-        console.warn('No "result" array in data:', data);
-        setRows([]);
+
+        // Save the current tab to Firestore
+        const currentTab = updatedTabs[tabValue];
+        if (user && currentTab) {
+          await setDoc(
+            doc(db, 'users', user.uid, 'keywordResearch', currentTab.id),
+            currentTab,
+            { merge: true }
+          );
+        }
       }
     } catch (error) {
-      console.error('Failed to fetch keyword data:', error);
+      console.error('Failed to fetch or save keyword data:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // ------------------ RENDER ------------------
+  // ----------------------------------------------------------------
+  // Changing which tab is active
+  const handleTabChange = (event, newValue) => {
+    // If newValue == tabs.length, that's the + tab
+    if (newValue === tabs.length) {
+      // ignore here; handleAddTab() is called on its icon's onClick
+      return;
+    }
+    // If newValue == tabs.length+1, that's the "Saved Words" tab
+    if (newValue === tabs.length + 1) {
+      setTabValue(newValue);
+      setKeywords('');
+      setRows([]);
+      return;
+    }
+    // Otherwise it's a normal tab 0..tabs.length-1
+    setTabValue(newValue);
+    const targetTab = tabs[newValue];
+    setKeywords(targetTab?.keywords || '');
+    setRows(targetTab?.rows || []);
+  };
+
+  // Create a new blank tab
+  const handleAddTab = async () => {
+    if (!user) return;
+
+    const newTabId = `tab-${Date.now()}`;
+    const newTab = {
+      id: newTabId,
+      label: 'New Research',
+      keywords: '',
+      rows: [],
+      isDeletable: true,
+      lastUpdated: new Date().toISOString(),
+    };
+
+    try {
+      // Add to local state
+      const newTabs = [...tabs, newTab];
+      setTabs(newTabs);
+
+      // Clear the fields and switch to that new tab
+      setKeywords('');
+      setRows([]);
+      setTabValue(newTabs.length - 1);
+
+      // Save the new tab to Firestore
+      await setDoc(doc(db, 'users', user.uid, 'keywordResearch', newTabId), newTab);
+    } catch (error) {
+      console.error('Error creating new tab:', error);
+    }
+  };
+
+  // Deleting an existing tab
+  const handleDeleteTab = async (tabIndex) => {
+    if (!user) return;
+    const tabToDelete = tabs[tabIndex];
+    if (!tabToDelete) return;
+
+    try {
+      // Remove from Firestore
+      await deleteDoc(doc(db, 'users', user.uid, 'keywordResearch', tabToDelete.id));
+
+      // Remove from local state
+      const newTabs = tabs.filter((_, i) => i !== tabIndex);
+      setTabs(newTabs);
+
+      // If we deleted the currently active tab, switch to another
+      if (tabValue === tabIndex) {
+        const newActive = Math.max(0, tabIndex - 1);
+        setTabValue(newActive);
+        const targetTab = newTabs[newActive];
+        setKeywords(targetTab?.keywords || '');
+        setRows(targetTab?.rows || []);
+      } else if (tabValue > tabIndex) {
+        // Shift active index one back
+        setTabValue((val) => val - 1);
+      }
+    } catch (error) {
+      console.error('Error deleting tab:', error);
+    }
+  };
+
+  // ----------------------------------------------------------------
+  // Renaming a tab
+  const handleTabDoubleClick = (tabId, currentLabel) => {
+    setEditingTabId(tabId);
+    setEditingTabName(currentLabel);
+  };
+  const handleTabNameChange = (event) => {
+    setEditingTabName(event.target.value);
+  };
+  const handleTabNameSave = async () => {
+    if (!user || !editingTabName.trim()) {
+      setEditingTabId(null);
+      setEditingTabName('');
+      return;
+    }
+    try {
+      const updatedTabs = tabs.map((t) =>
+        t.id === editingTabId
+          ? { ...t, label: editingTabName.trim() }
+          : t
+      );
+      const tabToUpdate = updatedTabs.find((t) => t.id === editingTabId);
+
+      // Save in Firestore
+      await setDoc(
+        doc(db, 'users', user.uid, 'keywordResearch', editingTabId),
+        { ...tabToUpdate },
+        { merge: true }
+      );
+
+      setTabs(updatedTabs);
+    } catch (error) {
+      console.error('Error updating tab name:', error);
+    } finally {
+      setEditingTabId(null);
+      setEditingTabName('');
+    }
+  };
+
+  // Add these handlers
+  const handleSaveKeyword = (keyword) => {
+    setSavedKeywords(prev => [...prev, keyword]);
+  };
+
+  const handleRemoveKeyword = (keyword) => {
+    setSavedKeywords(prev => prev.filter(k => k.keyword !== keyword.keyword));
+  };
+
+  // ----------------------------------------------------------------
+  // Render
   return (
     <AppTheme {...props}>
       <CssBaseline enableColorScheme />
@@ -193,46 +471,149 @@ export default function KeywordResearchPage(props) {
             <Header />
             <Grid container spacing={3}>
               <Grid item xs={12} md={12}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Box>
-                    <Typography variant="h4">Keyword Research</Typography>
-                    <Typography variant="body1" color="text.secondary">
-                      Research keywords using Google Ads data
-                    </Typography>
-                  </Box>
-                  {usedCache && (
-                    <Typography variant="body2" color="success.main">
-                      ✅ Showing cached results
-                    </Typography>
-                  )}
+                <Typography variant="h4" component="h1">
+                  Keyword Research
+                </Typography>
+                <Typography
+                  variant="body1"
+                  color="text.secondary"
+                  sx={{ mt: 1, mb: 3 }}
+                >
+                  Research and find keywords for your business
+                </Typography>
+              </Grid>
+
+              <Grid item xs={12} md={12}>
+                <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                  <Tabs
+                    value={tabValue}
+                    onChange={handleTabChange}
+                    aria-label="keyword research tabs"
+                  >
+                    {/* Render the "real" research tabs */}
+                    {tabs.map((tab, index) => (
+                      <Tab
+                        key={tab.id}
+                        label={
+                          editingTabId === tab.id ? (
+                            <ClickAwayListener onClickAway={handleTabNameSave}>
+                              <TextField
+                                size="small"
+                                value={editingTabName}
+                                onChange={handleTabNameChange}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleTabNameSave();
+                                  }
+                                  if (e.key === 'Escape') {
+                                    setEditingTabId(null);
+                                    setEditingTabName('');
+                                  }
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                autoFocus
+                                sx={{
+                                  '& .MuiInputBase-root': {
+                                    height: '24px',
+                                    fontSize: '0.875rem',
+                                    backgroundColor: 'white',
+                                  },
+                                }}
+                              />
+                            </ClickAwayListener>
+                          ) : (
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                cursor: 'text',
+                              }}
+                              onDoubleClick={() =>
+                                handleTabDoubleClick(tab.id, tab.label)
+                              }
+                            >
+                              {tab.label}
+                              {tab.isDeletable && (
+                                <IconButton
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteTab(index);
+                                  }}
+                                  sx={{ ml: 1 }}
+                                >
+                                  <CloseIcon fontSize="small" />
+                                </IconButton>
+                              )}
+                            </Box>
+                          )
+                        }
+                      />
+                    ))}
+                    {/* The plus tab (index == tabs.length) */}
+                    <Tab
+                      icon={<AddIcon />}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleAddTab();
+                      }}
+                      sx={{ minWidth: '50px' }}
+                    />
+                    {/* Saved Words tab (index == tabs.length+1) */}
+                    <Tab
+                      label="Saved Words"
+                      sx={{
+                        borderLeft: 1,
+                        borderColor: 'divider',
+                        minWidth: '120px',
+                      }}
+                    />
+                  </Tabs>
                 </Box>
-              </Grid>
 
-              <Grid item xs={12} md={12}>
-                <SearchControls
-                  keywords={keywords}
-                  setKeywords={setKeywords}
-                  country={country}
-                  setCountry={setCountry}
-                  countries={countries}
-                  countriesLoading={countriesLoading}
-                  language={language}
-                  setLanguage={setLanguage}
-                  languages={languages}
-                  languagesLoading={languagesLoading}
-                  rangeLabel={rangeLabel}
-                  setRangeLabel={setRangeLabel}
-                  includePartners={includePartners}
-                  setIncludePartners={setIncludePartners}
-                  handleSearch={handleSearch}
-                />
-              </Grid>
+                {/* Render each real tab's contents */}
+                {tabs.map((tab, index) => (
+                  <TabPanel key={tab.id} value={tabValue} index={index}>
+                    <SearchControls
+                      keywords={keywords}
+                      setKeywords={setKeywords}
+                      country={country}
+                      setCountry={setCountry}
+                      countries={countries}
+                      countriesLoading={countriesLoading}
+                      language={language}
+                      setLanguage={setLanguage}
+                      languages={languages}
+                      languagesLoading={languagesLoading}
+                      rangeLabel={rangeLabel}
+                      setRangeLabel={setRangeLabel}
+                      includePartners={includePartners}
+                      setIncludePartners={setIncludePartners}
+                      handleSearch={handleSearch}
+                    />
+                    <Box sx={{ mt: 3 }}>
+                      <KeywordDataGrid 
+                        rows={rows} 
+                        loading={loading}
+                        savedKeywords={savedKeywords}
+                        onSaveKeyword={handleSaveKeyword}
+                        onRemoveKeyword={handleRemoveKeyword}
+                      />
+                    </Box>
+                  </TabPanel>
+                ))}
 
-              <Grid item xs={12} md={12}>
-                <KeywordDataGrid
-                  rows={rows}
-                  loading={loading}
-                />
+                {/* Saved Words tab */}
+                <TabPanel value={tabValue} index={tabs.length + 1}>
+                  <KeywordDataGrid 
+                    rows={savedKeywords}
+                    loading={loading}
+                    savedKeywords={savedKeywords}
+                    onSaveKeyword={handleSaveKeyword}
+                    onRemoveKeyword={handleRemoveKeyword}
+                  />
+                </TabPanel>
               </Grid>
             </Grid>
           </Stack>
