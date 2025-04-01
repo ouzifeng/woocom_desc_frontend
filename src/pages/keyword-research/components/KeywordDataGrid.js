@@ -361,35 +361,35 @@ export default function KeywordDataGrid({
     }
   };
 
-  const columns = [
-    {
-      field: 'keyword',
-      headerName: 'Keyword',
-      flex: 1,
-      minWidth: 200
-    },
-    {
-      field: 'searchVolume',
-      headerName: 'Volume',
-      width: 130,
-      type: 'number'
-    },
-    {
-      field: 'cpc',
-      headerName: 'CPC ($)',
-      width: 100,
-      type: 'number'
-    },
-    {
-      field: 'competition',
-      headerName: 'Competition',
-      width: 130
-    },
-    {
-      field: 'competitionIndex',
-      headerName: 'Comp. Index',
-      width: 130,
-      type: 'number'
+const columns = [
+  {
+    field: 'keyword',
+    headerName: 'Keyword',
+    flex: 1,
+    minWidth: 200
+  },
+  {
+    field: 'searchVolume',
+    headerName: 'Volume',
+    width: 130,
+    type: 'number'
+  },
+  {
+    field: 'cpc',
+    headerName: 'CPC ($)',
+    width: 100,
+    type: 'number'
+  },
+  {
+    field: 'competition',
+    headerName: 'Competition',
+    width: 130
+  },
+  {
+    field: 'competitionIndex',
+    headerName: 'Comp. Index',
+    width: 130,
+    type: 'number'
     },
     {
       field: 'save',
