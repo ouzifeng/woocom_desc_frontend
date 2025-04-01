@@ -26,6 +26,7 @@ const mainListItems = [
   { text: 'Content Strategy', icon: <AssignmentRoundedIcon />, link: '/strategy' },
   { text: 'Content Creation', icon: <AssignmentRoundedIcon />, link: '/creation' },
   { text: 'Keyword Research', icon: <AssignmentRoundedIcon />, link: '/keyword-research' },
+  { text: 'Image Generation', icon: <AssignmentRoundedIcon />, link: '/image-creation' },
 ];
 
 const secondaryListItems = [

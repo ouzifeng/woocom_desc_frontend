@@ -12,6 +12,7 @@ import BrandSettings from './pages/brandSettings/BrandSettings';
 import ProductTranslations from './pages/translations/ProductTranslations';
 import ContentStrategy from './pages/strategy/ContentStrategy';
 import ContentCreation from './pages/creation/ContentCreation';
+import ImageCreation from './pages/image-creation/ImageCreation';
 import TranslationProductPage from './pages/translations/components/TranslationProductPage';
 import BrandStrategyPage from './pages/brand-strategy/BrandStrategyPage';
 import KeywordResearchPage from './pages/keyword-research/KeywordResearchPage';
@@ -90,6 +91,14 @@ function App() {
               element={
                 <PrivateRoute>
                   <ContentCreation />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/image-creation"
+              element={
+                <PrivateRoute>
+                  <ImageCreation />
                 </PrivateRoute>
               }
             />
