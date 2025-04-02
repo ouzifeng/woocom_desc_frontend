@@ -188,7 +188,7 @@ export default function AiSettings({
             <TextField
               {...params}
               variant="outlined"
-              placeholder="Enter additional requests"
+              placeholder="Add custom requests and press enter"
               size="small"
               fullWidth
               InputProps={{

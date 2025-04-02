@@ -18,6 +18,14 @@ import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import { Editor } from '@tinymce/tinymce-react';
+import Paper from '@mui/material/Paper';
+import TableContainer from '@mui/material/TableContainer';
+import Table from '@mui/material/Table';
+import TableHead from '@mui/material/TableHead';
+import TableBody from '@mui/material/TableBody';
+import TableRow from '@mui/material/TableRow';
+import TableCell from '@mui/material/TableCell';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
 
 // Loading component
 const LoadingFallback = () => (
@@ -37,6 +45,8 @@ export default function ContentPage() {
   const [notificationMessage, setNotificationMessage] = useState('');
   const [generating, setGenerating] = useState(false);
   const [outlineGenerated, setOutlineGenerated] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisResults, setAnalysisResults] = useState(null);
 
   useEffect(() => {
     const fetchContent = async () => {
@@ -205,6 +215,29 @@ export default function ContentPage() {
                     </Box>
                   )}
 
+                  {analyzing && (
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                        zIndex: 1000,
+                      }}
+                    >
+                      <CircularProgress size={60} />
+                      <Typography variant="h6" sx={{ mt: 2 }}>
+                        Analyzing Content...
+                      </Typography>
+                    </Box>
+                  )}
+
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                     <Typography variant="h4" component="h1">
                       {content?.title || 'Untitled Content'}
@@ -272,6 +305,75 @@ export default function ContentPage() {
                                 bullist numlist outdent indent | removeformat | help`
                     }}
                   />
+
+                  {analysisResults && (
+                    <Box sx={{ mt: 4, mb: 4 }}>
+                      <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <AnalyticsIcon />
+                        Content Analysis Results
+                      </Typography>
+                      
+                      {/* Meta Description */}
+                      <Box sx={{ mb: 3 }}>
+                        <Typography variant="subtitle1" gutterBottom>
+                          Suggested Meta Description
+                        </Typography>
+                        <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                          <Typography variant="body1">
+                            {analysisResults.metaDescription}
+                          </Typography>
+                        </Paper>
+                      </Box>
+
+                      {/* Keyword Analysis */}
+                      <Typography variant="subtitle1" gutterBottom>
+                        Keyword Analysis
+                      </Typography>
+                      <TableContainer component={Paper}>
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell>Keyword</TableCell>
+                              <TableCell align="right">Count</TableCell>
+                              <TableCell align="right">Density</TableCell>
+                              <TableCell>Recommendation</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {analysisResults.keywordAnalysis.map((analysis, index) => (
+                              <TableRow key={index}>
+                                <TableCell>
+                                  {analysis.keyword}
+                                </TableCell>
+                                <TableCell align="right">{analysis.count}</TableCell>
+                                <TableCell align="right">{analysis.density}</TableCell>
+                                <TableCell>
+                                  <Typography
+                                    variant="body2"
+                                    color={
+                                      analysis.recommendation.toLowerCase().includes('good') ? 'success.main' :
+                                      analysis.recommendation.toLowerCase().includes('needs') ? 'warning.main' :
+                                      analysis.recommendation.toLowerCase().includes('over') ? 'error.main' :
+                                      'text.primary'
+                                    }
+                                  >
+                                    {analysis.recommendation}
+                                  </Typography>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+
+                      {/* Total Word Count */}
+                      <Box sx={{ mt: 2 }}>
+                        <Typography variant="body2" color="text.secondary">
+                          Total Word Count: {analysisResults.totalWords}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  )}
                 </Box>
               </Box>
             </Grid>
@@ -311,6 +413,61 @@ export default function ContentPage() {
                       />
                     ))}
                   </Box>
+                </Box>
+
+                <Box sx={{ mt: 3 }}>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    fullWidth
+                    disabled={!editorContent || editorContent.trim().length === 0 || analyzing}
+                    onClick={async () => {
+                      try {
+                        setAnalyzing(true);
+                        // Fetch brand settings
+                        const brandIdentityDoc = await getDoc(doc(db, 'users', user.uid, 'BrandIdentity', 'settings'));
+                        const marketAudienceDoc = await getDoc(doc(db, 'users', user.uid, 'MarketAudience', 'settings'));
+                        const productPositioningDoc = await getDoc(doc(db, 'users', user.uid, 'ProductPositioning', 'settings'));
+                        const referencesExamplesDoc = await getDoc(doc(db, 'users', user.uid, 'ReferencesExamples', 'settings'));
+
+                        const brandSettings = {
+                          brandIdentity: brandIdentityDoc.exists() ? brandIdentityDoc.data() : {},
+                          marketAudience: marketAudienceDoc.exists() ? marketAudienceDoc.data() : {},
+                          productPositioning: productPositioningDoc.exists() ? productPositioningDoc.data() : {},
+                          referencesExamples: referencesExamplesDoc.exists() ? referencesExamplesDoc.data() : {}
+                        };
+
+                        const response = await fetch(`${process.env.REACT_APP_API_URL}/deepseek/analyze-content`, {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                          },
+                          body: JSON.stringify({
+                            content: editorContent,
+                            keywords: content?.outline?.split(','),
+                            title: content?.title,
+                            brandSettings
+                          }),
+                        });
+
+                        const data = await response.json();
+                        if (data.result === 'Success') {
+                          setAnalysisResults(data);
+                          setNotificationMessage('Analysis completed successfully!');
+                        } else {
+                          setError('Failed to analyze content');
+                        }
+                      } catch (err) {
+                        console.error('Error analyzing content:', err);
+                        setError('Failed to analyze content');
+                      } finally {
+                        setAnalyzing(false);
+                      }
+                    }}
+                    startIcon={<AnalyticsIcon />}
+                  >
+                    Analyze Content
+                  </Button>
                 </Box>
               </Card>
             </Grid>
