@@ -1,182 +1,312 @@
 // KeywordDataGrid.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
 import { 
   Box, 
+  Button,
+  FormControl,
+  MenuItem,
   Select, 
-  MenuItem, 
-  FormControl, 
-  InputLabel, 
-  Typography,
   TextField,
-  Stack
+  Typography,
+  IconButton,
+  CircularProgress,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
-import IconButton from '@mui/material/IconButton';
-import { doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '../../../firebase';
 
-// Add debounce helper at the top
-const debounce = (func, wait) => {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
-};
-
+// If you want even fewer re-renders when the parent changes some unrelated props,
+// you can wrap the entire component in React.memo:
+//
+// export default React.memo(function KeywordDataGrid({ ... }) {
 export default function KeywordDataGrid({ 
-  rows, 
+  // Props from parent
+  rows: externalRows = [],
   loading, 
-  savedKeywords = [], // Add default value
+  savedKeywords = [],
   onSaveKeyword, 
-  onRemoveKeyword 
+  onRemoveKeyword,
+  isSavedWordsTab = false,
 }) {
   const [user] = useAuthState(auth);
-  const [rowSelectionModel, setRowSelectionModel] = useState([]);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
-  // Filter states
-  const [volumeRange, setVolumeRange] = useState([0, 0]);
-  const [cpcRange, setCpcRange] = useState([0, 0]);
-  const [competitionValues, setCompetitionValues] = useState([]);
-  const [selectedCompetition, setSelectedCompetition] = useState('all');
-  const [compIndexRange, setCompIndexRange] = useState([0, 0]);
-  
-  // Current filter values
-  const [currentVolumeRange, setCurrentVolumeRange] = useState([0, 0]);
-  const [currentCpcRange, setCurrentCpcRange] = useState([0, 0]);
-  const [currentCompIndexRange, setCurrentCompIndexRange] = useState([0, 0]);
+  // ----------------------------------------------------------------
+  // 1) Keep a local copy of rows (so we filter in memory, no re-fetch).
+  // ----------------------------------------------------------------
+  const [allRows, setAllRows] = useState(externalRows);
 
-  // Add these states for temporary input values
-  const [tempInputs, setTempInputs] = useState({
+  // Update local rows when external rows change
+  useEffect(() => {
+    if (externalRows) {
+      setAllRows(externalRows);
+      // Reset filters when new data comes in
+      setFilteredRows(externalRows);
+    }
+  }, [externalRows]);
+
+  // ----------------------------------------------------------------
+  // 2) This state is the filtered set shown in the DataGrid.
+  // ----------------------------------------------------------------
+  const [filteredRows, setFilteredRows] = useState(allRows);
+
+  // ----------------------------------------------------------------
+  // 3) Figure out min/max for volume, CPC, compIndex
+  // ----------------------------------------------------------------
+  const [ranges, setRanges] = useState({
+    volume: [0, 0],
+    cpc: [0, 0],
+    compIndex: [0, 0],
+  });
+
+  // ----------------------------------------------------------------
+  // 4) Use refs for input values to prevent re-renders while typing
+  // ----------------------------------------------------------------
+  const inputRefs = useRef({
     volumeMin: '',
     volumeMax: '',
     cpcMin: '',
     cpcMax: '',
     compIndexMin: '',
-    compIndexMax: ''
+    compIndexMax: '',
+    competition: 'all',
   });
 
-  // Calculate ranges when rows change
+  // Add state for competition to prevent flickering
+  const [competitionValue, setCompetitionValue] = useState('all');
+
+  // Update ranges when allRows changes
   useEffect(() => {
-    if (rows.length > 0) {
-      const volumes = rows.map(row => row.searchVolume);
-      const cpcs = rows.map(row => row.cpc);
-      const indices = rows.map(row => row.competitionIndex);
-      const uniqueComps = [...new Set(rows.map(row => row.competition))];
-
-      setVolumeRange([Math.min(...volumes), Math.max(...volumes)]);
-      setCpcRange([Math.min(...cpcs), Math.max(...cpcs)]);
-      setCompIndexRange([Math.min(...indices), Math.max(...indices)]);
-      setCompetitionValues(uniqueComps);
-      
-      // Initialize current ranges
-      setCurrentVolumeRange([Math.min(...volumes), Math.max(...volumes)]);
-      setCurrentCpcRange([Math.min(...cpcs), Math.max(...cpcs)]);
-      setCurrentCompIndexRange([Math.min(...indices), Math.max(...indices)]);
-
-      // Initialize temp inputs
-      setTempInputs({
-        volumeMin: Math.min(...volumes).toString(),
-        volumeMax: Math.max(...volumes).toString(),
-        cpcMin: Math.min(...cpcs).toFixed(2),
-        cpcMax: Math.max(...cpcs).toFixed(2),
-        compIndexMin: Math.min(...indices).toString(),
-        compIndexMax: Math.max(...indices).toString()
-      });
+    if (!allRows.length) {
+      setFilteredRows([]);
+      return;
     }
-  }, [rows]);
 
-  // Handle input changes without immediate filtering
+    // Compute min/max
+    const volumes = allRows.map((r) => r.searchVolume);
+    const cpcs = allRows.map((r) => r.cpc);
+    const compIndexes = allRows.map((r) => r.competitionIndex);
+
+    const vmin = Math.min(...volumes);
+    const vmax = Math.max(...volumes);
+    const cmin = Math.min(...cpcs);
+    const cmax = Math.max(...cpcs);
+    const imin = Math.min(...compIndexes);
+    const imax = Math.max(...compIndexes);
+
+    setRanges({
+      volume: [vmin, vmax],
+      cpc: [cmin, cmax],
+      compIndex: [imin, imax],
+    });
+
+    // Reset input refs to match new ranges
+    inputRefs.current = {
+      volumeMin: String(vmin),
+      volumeMax: String(vmax),
+      cpcMin: cmin.toFixed(2),
+      cpcMax: cmax.toFixed(2),
+      compIndexMin: String(imin),
+      compIndexMax: String(imax),
+      competition: 'all',
+    };
+    setCompetitionValue('all');
+  }, [allRows]);
+
   const handleInputChange = (field) => (event) => {
-    const value = event.target.value;
-    setTempInputs(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  // Handle when input loses focus or Enter is pressed
-  const handleInputCommit = (type, index) => (event) => {
-    if (event.type === 'blur' || (event.type === 'keydown' && event.key === 'Enter')) {
-      event.preventDefault();
-      
-      let value = parseFloat(event.target.value);
-      if (isNaN(value)) return;
-
-      switch(type) {
-        case 'volume':
-          setCurrentVolumeRange(prev => {
-            const newRange = [...prev];
-            newRange[index] = value;
-            return newRange;
-          });
-          break;
-        case 'cpc':
-          setCurrentCpcRange(prev => {
-            const newRange = [...prev];
-            newRange[index] = value;
-            return newRange;
-          });
-          break;
-        case 'compIndex':
-          setCurrentCompIndexRange(prev => {
-            const newRange = [...prev];
-            newRange[index] = value;
-            return newRange;
-          });
-          break;
-      }
+    if (field === 'competition') {
+      setCompetitionValue(event.target.value);
+      inputRefs.current[field] = event.target.value;
+    } else {
+      inputRefs.current[field] = event.target.value;
     }
   };
 
-  // Filtered rows
-  const [filteredRows, setFilteredRows] = useState(rows);
+  // ----------------------------------------------------------------
+  // 5) Filter function
+  // ----------------------------------------------------------------
+  const applyFilters = () => {
+    const vMin = parseFloat(inputRefs.current.volumeMin) || 0;
+    const vMax = parseFloat(inputRefs.current.volumeMax) || Number.MAX_VALUE;
+    const cMin = parseFloat(inputRefs.current.cpcMin) || 0;
+    const cMax = parseFloat(inputRefs.current.cpcMax) || Number.MAX_VALUE;
+    const iMin = parseFloat(inputRefs.current.compIndexMin) || 0;
+    const iMax = parseFloat(inputRefs.current.compIndexMax) || Number.MAX_VALUE;
 
-  // Debounced filter function
-  const debouncedFilter = React.useCallback(
-    debounce((newFilters) => {
-      const filtered = rows.filter(row => {
-        const volumeMatch = row.searchVolume >= newFilters.volume[0] && 
-                          row.searchVolume <= newFilters.volume[1];
-        
-        const cpcMatch = row.cpc >= newFilters.cpc[0] && 
-                        row.cpc <= newFilters.cpc[1];
-        
-        const compMatch = newFilters.competition === 'all' || 
-                         row.competition === newFilters.competition;
-        
-        const indexMatch = row.competitionIndex >= newFilters.compIndex[0] && 
-                          row.competitionIndex <= newFilters.compIndex[1];
-        
-        return volumeMatch && cpcMatch && compMatch && indexMatch;
-      });
+    const filtered = allRows.filter((row) => {
+      const inVolume = row.searchVolume >= vMin && row.searchVolume <= vMax;
+      const inCpc = row.cpc >= cMin && row.cpc <= cMax;
+      const inIndex = row.competitionIndex >= iMin && row.competitionIndex <= iMax;
+      const inCompetition = inputRefs.current.competition === 'all' || row.competition === inputRefs.current.competition;
+
+      return inVolume && inCpc && inIndex && inCompetition;
+    });
+
+    setFilteredRows(filtered);
+  };
+
+  // ----------------------------------------------------------------
+  // 6) Save/Remove toggles
+  // ----------------------------------------------------------------
+  const [isBulkSaving, setIsBulkSaving] = useState(false);
+
+  const handleSaveToggle = async (keywordObj) => {
+    if (!user) return;
+
+    const alreadySaved = savedKeywords.some((k) => k.keyword === keywordObj.keyword);
+    try {
+      if (alreadySaved) {
+        // remove
+        await deleteDoc(
+          doc(db, 'users', user.uid, 'savedKeywords', keywordObj.keyword)
+        );
+        onRemoveKeyword?.(keywordObj);
+      } else {
+        // add
+        await setDoc(
+          doc(db, 'users', user.uid, 'savedKeywords', keywordObj.keyword),
+          {
+            ...keywordObj,
+            savedAt: new Date().toISOString(),
+          }
+        );
+        onSaveKeyword?.(keywordObj);
+      }
+    } catch (err) {
+      console.error('Error toggling saved keyword:', err);
+    }
+  };
+
+  // Bulk save/remove selected keywords based on tab context
+  const handleBulkOperation = async () => {
+    if (!user || rowSelectionModel.length === 0) return;
+
+    setIsBulkSaving(true);
+    try {
+      const selectedRows = filteredRows.filter(row => rowSelectionModel.includes(row.id));
+      let operationCount = 0;
       
-      setFilteredRows(filtered);
-    }, 300), // 300ms delay
-    [rows]
+      // Create a batch
+      const batch = writeBatch(db);
+      
+      if (isSavedWordsTab) {
+        // In Saved Words tab, remove the keywords
+        for (const row of selectedRows) {
+          const ref = doc(db, 'users', user.uid, 'savedKeywords', row.keyword);
+          batch.delete(ref);
+          onRemoveKeyword?.(row);
+          operationCount++;
+        }
+      } else {
+        // In Research tab, add new keywords (skip existing ones)
+        for (const row of selectedRows) {
+          const alreadySaved = savedKeywords.some((k) => k.keyword === row.keyword);
+          if (!alreadySaved) {
+            const ref = doc(db, 'users', user.uid, 'savedKeywords', row.keyword);
+            batch.set(ref, {
+              ...row,
+              savedAt: new Date().toISOString(),
+            });
+            onSaveKeyword?.(row);
+            operationCount++;
+          }
+        }
+      }
+      
+      // Commit the batch
+      await batch.commit();
+      
+      // Clear selection before updating rows to prevent the error
+      setRowSelectionModel([]);
+      
+      // Show success message
+      if (operationCount > 0) {
+        setSnackbar({
+          open: true,
+          message: `Successfully ${isSavedWordsTab ? 'removed' : 'added'} ${operationCount} keywords`,
+          severity: 'success'
+        });
+      } else if (!isSavedWordsTab) {
+        setSnackbar({
+          open: true,
+          message: 'All selected keywords were already saved',
+          severity: 'info'
+        });
+      }
+    } catch (err) {
+      console.error('Error in bulk operation:', err);
+      setSnackbar({
+        open: true,
+        message: `Error ${isSavedWordsTab ? 'removing' : 'saving'} keywords. Please try again.`,
+        severity: 'error'
+      });
+    } finally {
+      setIsBulkSaving(false);
+    }
+  };
+
+  // ----------------------------------------------------------------
+  // 7) DataGrid columns
+  // ----------------------------------------------------------------
+  const columns = useMemo(
+    () => [
+      { field: 'keyword', headerName: 'Keyword', flex: 1, minWidth: 200 },
+      { field: 'searchVolume', headerName: 'Volume', width: 130, type: 'number' },
+      { field: 'cpc', headerName: 'CPC ($)', width: 100, type: 'number' },
+      { field: 'competition', headerName: 'Competition', width: 130 },
+      {
+        field: 'competitionIndex',
+        headerName: 'Comp. Index',
+        width: 130,
+        type: 'number',
+      },
+      {
+        field: 'save',
+        headerName: 'Save',
+        width: 70,
+        sortable: false,
+        renderCell: (params) => {
+          const isSaved = savedKeywords.some((k) => k.keyword === params.row.keyword);
+          return (
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSaveToggle(params.row);
+              }}
+            >
+              {isSaved ? <RemoveIcon /> : <AddIcon />}
+            </IconButton>
+          );
+        },
+        headerAlign: 'center',
+        align: 'center',
+      },
+    ],
+    [savedKeywords]
   );
 
-  // Update filters with debounce
-  useEffect(() => {
-    debouncedFilter({
-      volume: currentVolumeRange,
-      cpc: currentCpcRange,
-      competition: selectedCompetition,
-      compIndex: currentCompIndexRange
-    });
-  }, [currentVolumeRange, currentCpcRange, selectedCompetition, currentCompIndexRange]);
+  // ----------------------------------------------------------------
+  // 8) DataGrid pagination, selection, etc.
+  // ----------------------------------------------------------------
+  const [paginationModel, setPaginationModel] = useState({
+    pageSize: 10,
+    page: 0,
+  });
+  const [rowSelectionModel, setRowSelectionModel] = useState([]);
 
-  // Render filter controls with improved layout
+  // ----------------------------------------------------------------
+  // 9) Filter Controls
+  // ----------------------------------------------------------------
   const FilterControls = () => (
-    <Box sx={{ 
+    <Box
+      sx={{
       p: 2, 
       display: 'grid',
       gridTemplateColumns: 'repeat(4, 1fr)',
@@ -184,8 +314,9 @@ export default function KeywordDataGrid({
       alignItems: 'start',
       bgcolor: '#f5f6fa',
       borderRadius: 1,
-      mb: 2
-    }}>
+        mb: 2,
+      }}
+    >
       {/* Volume Filter */}
       <Box>
         <Typography variant="caption" sx={{ display: 'block', mb: 1 }}>
@@ -194,14 +325,12 @@ export default function KeywordDataGrid({
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <TextField
             size="small"
-            type="number"
-            value={tempInputs.volumeMin}
+            type="text"
+            defaultValue={inputRefs.current.volumeMin}
             onChange={handleInputChange('volumeMin')}
-            onBlur={handleInputCommit('volume', 0)}
-            onKeyDown={handleInputCommit('volume', 0)}
             InputProps={{ 
               inputProps: { 
-                min: volumeRange[0],
+                min: ranges.volume[0],
                 step: 1
               },
               sx: { height: '40px' }
@@ -211,14 +340,12 @@ export default function KeywordDataGrid({
           <Typography sx={{ mx: 0.5 }}>-</Typography>
           <TextField
             size="small"
-            type="number"
-            value={tempInputs.volumeMax}
+            type="text"
+            defaultValue={inputRefs.current.volumeMax}
             onChange={handleInputChange('volumeMax')}
-            onBlur={handleInputCommit('volume', 1)}
-            onKeyDown={handleInputCommit('volume', 1)}
             InputProps={{ 
               inputProps: { 
-                max: volumeRange[1],
+                max: ranges.volume[1],
                 step: 1
               },
               sx: { height: '40px' }
@@ -236,14 +363,12 @@ export default function KeywordDataGrid({
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <TextField
             size="small"
-            type="number"
-            value={tempInputs.cpcMin}
+            type="text"
+            defaultValue={inputRefs.current.cpcMin}
             onChange={handleInputChange('cpcMin')}
-            onBlur={handleInputCommit('cpc', 0)}
-            onKeyDown={handleInputCommit('cpc', 0)}
             InputProps={{ 
               inputProps: { 
-                min: cpcRange[0],
+                min: ranges.cpc[0],
                 step: 0.01
               },
               sx: { height: '40px' }
@@ -253,14 +378,12 @@ export default function KeywordDataGrid({
           <Typography sx={{ mx: 0.5 }}>-</Typography>
           <TextField
             size="small"
-            type="number"
-            value={tempInputs.cpcMax}
+            type="text"
+            defaultValue={inputRefs.current.cpcMax}
             onChange={handleInputChange('cpcMax')}
-            onBlur={handleInputCommit('cpc', 1)}
-            onKeyDown={handleInputCommit('cpc', 1)}
             InputProps={{ 
               inputProps: { 
-                max: cpcRange[1],
+                max: ranges.cpc[1],
                 step: 0.01
               },
               sx: { height: '40px' }
@@ -270,22 +393,21 @@ export default function KeywordDataGrid({
         </Box>
       </Box>
 
-      {/* Competition Filter */}
+      {/* Competition */}
       <Box>
         <Typography variant="caption" sx={{ display: 'block', mb: 1 }}>
           Competition
         </Typography>
-        <FormControl fullWidth>
+        <FormControl fullWidth size="small">
           <Select
-            value={selectedCompetition}
-            onChange={(e) => setSelectedCompetition(e.target.value)}
-            size="small"
-            sx={{ height: '40px' }}
+            value={competitionValue}
+            onChange={handleInputChange('competition')}
           >
             <MenuItem value="all">All</MenuItem>
-            {competitionValues.map(value => (
-              <MenuItem key={value} value={value}>{value}</MenuItem>
-            ))}
+            <MenuItem value="LOW">Low</MenuItem>
+            <MenuItem value="MEDIUM">Medium</MenuItem>
+            <MenuItem value="HIGH">High</MenuItem>
+            <MenuItem value="N/A">N/A</MenuItem>
           </Select>
         </FormControl>
       </Box>
@@ -298,14 +420,12 @@ export default function KeywordDataGrid({
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <TextField
             size="small"
-            type="number"
-            value={tempInputs.compIndexMin}
+            type="text"
+            defaultValue={inputRefs.current.compIndexMin}
             onChange={handleInputChange('compIndexMin')}
-            onBlur={handleInputCommit('compIndex', 0)}
-            onKeyDown={handleInputCommit('compIndex', 0)}
             InputProps={{ 
               inputProps: { 
-                min: compIndexRange[0],
+                min: ranges.compIndex[0],
                 step: 1
               },
               sx: { height: '40px' }
@@ -315,14 +435,12 @@ export default function KeywordDataGrid({
           <Typography sx={{ mx: 0.5 }}>-</Typography>
           <TextField
             size="small"
-            type="number"
-            value={tempInputs.compIndexMax}
+            type="text"
+            defaultValue={inputRefs.current.compIndexMax}
             onChange={handleInputChange('compIndexMax')}
-            onBlur={handleInputCommit('compIndex', 1)}
-            onKeyDown={handleInputCommit('compIndex', 1)}
             InputProps={{ 
               inputProps: { 
-                max: compIndexRange[1],
+                max: ranges.compIndex[1],
                 step: 1
               },
               sx: { height: '40px' }
@@ -331,92 +449,37 @@ export default function KeywordDataGrid({
           />
         </Box>
       </Box>
+
+      {/* Apply Filters Button and Bulk Operation Button */}
+      <Box gridColumn="span 4" sx={{ display: 'flex', gap: 2 }}>
+        <Button variant="contained" onClick={applyFilters}>
+          Apply Filters
+        </Button>
+        {rowSelectionModel.length > 0 && (
+          <Button 
+            variant="contained" 
+            color={isSavedWordsTab ? "error" : "primary"}
+            onClick={handleBulkOperation}
+            startIcon={isBulkSaving ? <CircularProgress size={20} color="inherit" /> : (isSavedWordsTab ? <RemoveIcon /> : <AddIcon />)}
+            disabled={isBulkSaving}
+          >
+            {isBulkSaving 
+              ? 'Processing...' 
+              : `${isSavedWordsTab ? 'Bulk Remove' : 'Bulk Save'} (${rowSelectionModel.length})`
+            }
+          </Button>
+        )}
+      </Box>
     </Box>
   );
 
-  // Move handleSaveToggle inside component
-  const handleSaveToggle = async (keyword) => {
-    if (!user) return;
-
-    try {
-      if (savedKeywords.some(k => k.keyword === keyword.keyword)) {
-        // Remove from saved words
-        await deleteDoc(
-          doc(db, 'users', user.uid, 'savedKeywords', keyword.keyword)
-        );
-        onRemoveKeyword?.(keyword);
-      } else {
-        // Add to saved words
-        await setDoc(
-          doc(db, 'users', user.uid, 'savedKeywords', keyword.keyword),
-          {
-            ...keyword,
-            savedAt: new Date().toISOString()
-          }
-        );
-        onSaveKeyword?.(keyword);
-      }
-    } catch (error) {
-      console.error('Error toggling saved keyword:', error);
-    }
-  };
-
-const columns = [
-  {
-    field: 'keyword',
-    headerName: 'Keyword',
-    flex: 1,
-    minWidth: 200
-  },
-  {
-    field: 'searchVolume',
-    headerName: 'Volume',
-    width: 130,
-    type: 'number'
-  },
-  {
-    field: 'cpc',
-    headerName: 'CPC ($)',
-    width: 100,
-    type: 'number'
-  },
-  {
-    field: 'competition',
-    headerName: 'Competition',
-    width: 130
-  },
-  {
-    field: 'competitionIndex',
-    headerName: 'Comp. Index',
-    width: 130,
-    type: 'number'
-    },
-    {
-      field: 'save',
-      headerName: 'Save',
-      width: 70,
-      renderCell: (params) => {
-        const isSaved = savedKeywords.some(k => k.keyword === params.row.keyword);
-        return (
-          <IconButton
-            size="small"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleSaveToggle(params.row);
-            }}
-          >
-            {isSaved ? <RemoveIcon /> : <AddIcon />}
-          </IconButton>
-        );
-      },
-      headerAlign: 'center',
-      align: 'center'
-    }
-  ];
-
+  // ----------------------------------------------------------------
+  // 10) Render
+  // ----------------------------------------------------------------
   return (
-    <Box sx={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
       <FilterControls />
+
       <DataGrid
         rows={filteredRows}
         columns={columns}
@@ -425,91 +488,50 @@ const columns = [
         checkboxSelection
         disableRowSelectionOnClick
         pageSizeOptions={[10, 20, 50]}
-        paginationModel={{
-          pageSize: 10,
-          page: 0,
-        }}
-        rowHeight={70}
+        paginationModel={paginationModel}
+        onPaginationModelChange={setPaginationModel}
+        rowHeight={60}
         rowSelectionModel={rowSelectionModel}
         onRowSelectionModelChange={(newSelection) => {
-          const validSelection = newSelection.filter((id) =>
-            rows.some((row) => row.id === id)
+          // Only keep those that exist in filteredRows
+          const valid = newSelection.filter((id) =>
+            filteredRows.some((row) => row.id === id)
           );
-          setRowSelectionModel(validSelection);
+          setRowSelectionModel(valid);
         }}
         getRowClassName={(params) =>
           params.indexRelativeToCurrentPage % 2 === 0 ? 'even' : 'odd'
         }
         sx={{
-          flex: '1 1 0%',
-          boxSizing: 'border-box',
-          position: 'relative',
-          borderWidth: '1px',
-          borderStyle: 'solid',
-          borderRadius: 'var(--unstable_DataGrid-radius, 8px)',
-          color: 'var(--template-palette-text-primary)',
-          fontFamily: 'Inter, sans-serif',
-          fontWeight: 400,
-          fontSize: '0.875rem',
-          lineHeight: 1.43,
-          outline: 'none',
-          height: '100%',
-          display: 'flex',
-          minWidth: 0,
-          minHeight: 0,
-          flexDirection: 'column',
-          overflowAnchor: 'none',
-          '--DataGrid-overlayHeight': '300px',
-          overflow: 'clip',
-          borderColor: 'var(--template-palette-divider)',
-          backgroundColor: 'var(--template-palette-background-default)',
-          
-          // Row and cell styling
           '& .even': { backgroundColor: '#fafafa' },
-          '& .odd': { backgroundColor: '#ffffff' },
-          '.MuiDataGrid-cell': {
-            lineHeight: 'normal !important',
-            display: 'flex',
-            alignItems: 'center',
-            border: 'none'
+          '& .odd': { backgroundColor: '#fff' },
+          '.MuiDataGrid-columnHeaders': {
+            backgroundColor: '#f5f6fa !important',
+            borderBottom: '1px solid #ddd',
           },
           '.MuiDataGrid-row': {
-            borderBottom: '1px solid var(--template-palette-TableCell-border)',
-            cursor: 'pointer'
-          },
-          '.MuiDataGrid-columnHeaders': {
-            backgroundColor: '#f5f6fa',
             borderBottom: '1px solid #ddd',
-            minHeight: '56px !important',
-            height: '56px !important',
-            maxHeight: '56px !important'
+            cursor: 'pointer',
           },
-          '.MuiDataGrid-main': { border: 'none' },
-          '.MuiDataGrid-columnHeader': { border: 'none' },
-          '.MuiDataGrid-footerContainer': { border: 'none' },
-          
-          // DataGrid variables
-          '--unstable_DataGrid-radius': '8px',
-          '--unstable_DataGrid-headWeight': '500',
-          '--unstable_DataGrid-overlayBackground': 'rgba(var(--template-palette-background-defaultChannel) / var(--template-palette-action-disabledOpacity))',
-          '--DataGrid-containerBackground': 'var(--template-palette-background-default)',
-          '--DataGrid-pinnedBackground': 'var(--template-palette-background-default)',
-          '--DataGrid-rowBorderColor': 'var(--template-palette-TableCell-border)',
-          '--DataGrid-cellOffsetMultiplier': '2',
-          '--DataGrid-width': '0px',
-          '--DataGrid-hasScrollX': '0',
-          '--DataGrid-hasScrollY': '0',
-          '--DataGrid-scrollbarSize': '10px',
-          '--DataGrid-rowWidth': '0px',
-          '--DataGrid-columnsTotalWidth': '0px',
-          '--DataGrid-leftPinnedWidth': '0px',
-          '--DataGrid-rightPinnedWidth': '0px',
-          '--DataGrid-headerHeight': '56px',
-          '--DataGrid-headersTotalHeight': '56px',
-          '--DataGrid-topContainerHeight': '56px',
-          '--DataGrid-bottomContainerHeight': '0px'
+          borderRadius: 1,
+          border: '1px solid #ddd',
         }}
       />
+
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={6000} 
+        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={() => setSnackbar(prev => ({ ...prev, open: false }))} 
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

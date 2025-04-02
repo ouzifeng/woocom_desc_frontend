@@ -611,6 +611,7 @@ export default function KeywordResearchPage(props) {
                         savedKeywords={savedKeywords}
                         onSaveKeyword={handleSaveKeyword}
                         onRemoveKeyword={handleRemoveKeyword}
+                        isSavedWordsTab={false}
                       />
                     </Box>
                   </TabPanel>
@@ -624,6 +625,7 @@ export default function KeywordResearchPage(props) {
                     savedKeywords={savedKeywords}
                     onSaveKeyword={handleSaveKeyword}
                     onRemoveKeyword={handleRemoveKeyword}
+                    isSavedWordsTab={true}
                   />
                 </TabPanel>
               </Grid>
