@@ -30,7 +30,7 @@ const mainListItems = [
 
 const secondaryListItems = [
   { text: 'Brand Strategy', icon: <PeopleRoundedIcon />, link: '/brand-strategy' },
-  { text: 'Brand Settings', icon: <PeopleRoundedIcon />, link: '/brandsettings' },
+  { text: 'Brand Settings', icon: <PeopleRoundedIcon />, link: '/brand-settings' },
   { text: 'Integrations', icon: <SettingsRoundedIcon />, link: '/settings' },
   { text: 'About', icon: <InfoRoundedIcon /> },
   { text: 'Feedback', icon: <HelpRoundedIcon /> },

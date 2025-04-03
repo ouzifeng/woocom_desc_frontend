@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../../firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -35,7 +35,7 @@ const LoadingFallback = () => (
 );
 
 export default function ContentPage() {
-  const { contentId } = useParams();
+  const { id } = useParams();
   const [user] = useAuthState(auth);
   const [content, setContent] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -50,16 +50,37 @@ export default function ContentPage() {
 
   useEffect(() => {
     const fetchContent = async () => {
-      if (user && contentId) {
+      if (user && id) {
         try {
-          const contentDocRef = doc(db, 'users', user.uid, 'content', contentId);
+          // First try to get from content collection
+          const contentDocRef = doc(db, 'users', user.uid, 'content', id);
           const contentDoc = await getDoc(contentDocRef);
+          
           if (contentDoc.exists()) {
             const contentData = contentDoc.data();
             setContent(contentData);
             setEditorContent(contentData.content || '');
           } else {
-            setError('Content not found');
+            // If not found in content collection, try to get from contentStrategy
+            const strategyDoc = await getDoc(doc(db, 'users', user.uid, 'contentStrategy', 'current'));
+            if (strategyDoc.exists()) {
+              const strategyData = strategyDoc.data();
+              const contentItem = strategyData.strategy.find(item => item.id === id);
+              if (contentItem) {
+                setContent(contentItem);
+                setEditorContent(contentItem.content || '');
+                // Create the content document
+                await setDoc(contentDocRef, {
+                  ...contentItem,
+                  content: contentItem.content || '',
+                  lastUpdated: new Date().toISOString()
+                });
+              } else {
+                setError('Content not found');
+              }
+            } else {
+              setError('Content not found');
+            }
           }
         } catch (err) {
           console.error('Error fetching content:', err);
@@ -70,14 +91,14 @@ export default function ContentPage() {
       }
     };
     fetchContent();
-  }, [user, contentId]);
+  }, [user, id]);
 
   const handleSave = async () => {
-    if (!user || !contentId) return;
+    if (!user || !id) return;
     
     setSaving(true);
     try {
-      const contentDocRef = doc(db, 'users', user.uid, 'content', contentId);
+      const contentDocRef = doc(db, 'users', user.uid, 'content', id);
       console.log('Saving content to:', contentDocRef.path);
       console.log('Content to save:', editorContent);
       
@@ -101,7 +122,7 @@ export default function ContentPage() {
   };
 
   const handleGenerateOutline = async () => {
-    if (!user || !contentId) return;
+    if (!user || !id) return;
     
     setGenerating(true);
     try {
@@ -134,7 +155,7 @@ export default function ContentPage() {
   };
 
   const handleGenerateContent = async () => {
-    if (!user || !contentId || !outlineGenerated) return;
+    if (!user || !id || !outlineGenerated) return;
     
     setGenerating(true);
     try {
