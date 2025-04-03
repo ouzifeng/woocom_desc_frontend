@@ -101,7 +101,7 @@ export default function SideMenu({ user = null }) {
                 fontWeight: 'bold' 
               }}
             >
-              YourApp
+              Ecommander
             </Typography>
           )}
         </Box>

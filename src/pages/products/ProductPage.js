@@ -64,53 +64,66 @@ export default function ProductPage() {
 
   useEffect(() => {
     // Check if productId contains language suffix
-    const [baseId, lang] = productId.split('_');
-    if (lang) {
-      setLanguageCode(lang);
-    }
+    if (productId) {
+      const [baseId, lang] = productId.split('_');
+      if (lang) {
+        setLanguageCode(lang);
+      }
 
-    const fetchProduct = async () => {
-      if (user && baseId) {
-        try {
-          const productDocRef = doc(db, 'users', user.uid, 'products', baseId);
-          const productDoc = await getDoc(productDocRef);
-          if (productDoc.exists()) {
-            const productData = productDoc.data();
-            // If language code exists, use translated content
-            if (lang) {
-              const translatedProduct = {
-                ...productData,
-                name: productData[`${lang}_name`] || productData.name,
-                description: productData[`${lang}_description`] || productData.description
-              };
-              setProduct(translatedProduct);
-              // Set the translated description for the editor
-              setDescription(productData[`${lang}_description`] || productData.description);
+      const fetchProduct = async () => {
+        if (user) {
+          try {
+            console.log('Fetching product with ID:', baseId || productId);
+            const productDocRef = doc(db, 'users', user.uid, 'products', baseId || productId);
+            const productDoc = await getDoc(productDocRef);
+            if (productDoc.exists()) {
+              const productData = productDoc.data();
+              console.log('Product data:', productData);
+              // If language code exists, use translated content
+              if (lang) {
+                const translatedProduct = {
+                  ...productData,
+                  name: productData[`${lang}_name`] || productData.name,
+                  description: productData[`${lang}_description`] || productData.description
+                };
+                setProduct(translatedProduct);
+                // Set the translated description for the editor
+                setDescription(productData[`${lang}_description`] || productData.description);
+              } else {
+                setProduct(productData);
+                setDescription(productData.description || '');
+              }
             } else {
-              setProduct(productData);
-              setDescription(productData.description || '');
+              console.log('Product not found');
+              setError('Product not found');
             }
-          } else {
-            setError('Product not found');
-          }
 
-          const userDocRef = doc(db, 'users', user.uid);
-          const userDoc = await getDoc(userDocRef);
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            setStoreUrl(userData.wc_url || '');
-            setApiId(userData.wc_key || '');
-            setSecretKey(userData.wc_secret || '');
+            const userDocRef = doc(db, 'users', user.uid);
+            const userDoc = await getDoc(userDocRef);
+            if (userDoc.exists()) {
+              const userData = userDoc.data();
+              setStoreUrl(userData.wc_url || '');
+              setApiId(userData.wc_key || '');
+              setSecretKey(userData.wc_secret || '');
+            }
+          } catch (err) {
+            console.error('Error fetching product:', err);
+            setError('Error fetching product');
+          } finally {
+            setLoading(false);
           }
-        } catch (err) {
-          console.error('Error fetching product:', err);
-          setError('Error fetching product');
-        } finally {
+        } else {
+          console.log('No user found');
+          setError('Please log in to view this product');
           setLoading(false);
         }
-      }
-    };
-    fetchProduct();
+      };
+      fetchProduct();
+    } else {
+      console.log('No productId found');
+      setError('Invalid product URL');
+      setLoading(false);
+    }
   }, [user, productId]);
 
   const toggleDrawer = (open) => (event) => {

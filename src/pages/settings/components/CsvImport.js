@@ -1,11 +1,12 @@
 import * as React from 'react';
 import { useState } from 'react';
-import { Box, Typography, Button, Card, Alert } from '@mui/material';
+import { Box, Typography, Button, Card } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../../../firebase';
 import { collection, doc, setDoc } from 'firebase/firestore';
 import Papa from 'papaparse';
+import { useToast } from '../../../components/ToasterAlert';
 
 const SettingsCard = styled(Card)(({ theme }) => ({
   display: 'flex',
@@ -24,8 +25,8 @@ const SettingsCard = styled(Card)(({ theme }) => ({
 
 export default function CsvImport() {
   const [user] = useAuthState(auth);
-  const [message, setMessage] = useState('');
   const [importStatus, setImportStatus] = useState('');
+  const { showToast } = useToast();
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
@@ -53,16 +54,19 @@ export default function CsvImport() {
                   setImportStatus(`Importing ${importedCount} of ${data.length}...`);
                 }
               }
-              setMessage(`CSV import successful. Imported ${importedCount} of ${data.length} rows.`);
+              showToast(`CSV import successful. Imported ${importedCount} of ${data.length} rows.`, 'success');
+              setImportStatus('');
             } catch (error) {
               console.error('Error importing CSV:', error);
-              setMessage('Failed to import CSV');
+              showToast('Failed to import CSV', 'error');
+              setImportStatus('');
             }
           }
         },
         error: (error) => {
           console.error('Error parsing CSV:', error);
-          setMessage('Failed to parse CSV');
+          showToast('Failed to parse CSV file', 'error');
+          setImportStatus('');
         },
       });
     }
@@ -107,14 +111,9 @@ export default function CsvImport() {
           Download Sample CSV
         </Button>
         {importStatus && (
-          <Alert severity="info">
+          <Typography variant="body2" color="textSecondary">
             {importStatus}
-          </Alert>
-        )}
-        {message && (
-          <Alert severity={message.includes('successful') ? 'success' : 'error'}>
-            {message}
-          </Alert>
+          </Typography>
         )}
       </Box>
     </SettingsCard>

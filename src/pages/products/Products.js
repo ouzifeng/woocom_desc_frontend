@@ -27,6 +27,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import DownloadCSVButton from './components/DownloadCSVButton';
 import Tooltip from '@mui/material/Tooltip';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import { useToast } from '../../components/ToasterAlert';
 
 // Lazy load components
 const ImportProductsButton = React.lazy(() => import('./components/ImportProductsButton'));
@@ -53,6 +54,7 @@ const xThemeComponents = {
 };
 
 export default function Products(props) {
+  const { showToast } = useToast();
   const [user] = useAuthState(auth);
   const navigate = useNavigate();
   const [storeUrl, setStoreUrl] = useState('');
@@ -102,7 +104,7 @@ export default function Products(props) {
   };
 
   const handleDisabledButtonClick = () => {
-    setNotificationMessage('Please connect your WooCommerce store in Settings first.');
+    showToast('Please connect your WooCommerce store in Settings first.', 'warning');
     setTimeout(() => {
       navigate('/settings');
     }, 2000);
@@ -151,14 +153,14 @@ export default function Products(props) {
                     >
                       <Box sx={{ display: 'flex', gap: 2 }}>
                         <React.Suspense fallback={<CircularProgress size={24} />}>
-                          <Tooltip title={!hasWooCommerceCredentials ? "Connect WooCommerce on the integrations pagefirst" : ""}>
+                          <Tooltip title={!hasWooCommerceCredentials ? "Connect WooCommerce on the integrations page first" : ""}>
                             <span>
                               <ImportProductsButton
                                 storeUrl={storeUrl}
                                 apiId={apiId}
                                 secretKey={secretKey}
                                 setRefresh={setRefresh}
-                                setNotificationMessage={setNotificationMessage}
+                                setNotificationMessage={(msg) => showToast(msg)}
                                 disabled={!hasWooCommerceCredentials}
                                 onClick={!hasWooCommerceCredentials ? handleDisabledButtonClick : undefined}
                               />
@@ -173,7 +175,7 @@ export default function Products(props) {
                                 apiId={apiId}
                                 secretKey={secretKey}
                                 setRefresh={setRefresh}
-                                setNotificationMessage={setNotificationMessage}
+                                setNotificationMessage={(msg) => showToast(msg)}
                                 disabled={!hasWooCommerceCredentials}
                                 onClick={!hasWooCommerceCredentials ? handleDisabledButtonClick : undefined}
                               />
@@ -188,7 +190,7 @@ export default function Products(props) {
                                 apiId={apiId}
                                 secretKey={secretKey}
                                 setRefresh={setRefresh}
-                                setNotificationMessage={setNotificationMessage}
+                                setNotificationMessage={(msg) => showToast(msg)}
                                 disabled={!hasWooCommerceCredentials}
                                 onClick={!hasWooCommerceCredentials ? handleDisabledButtonClick : undefined}
                               />
@@ -200,7 +202,7 @@ export default function Products(props) {
                       <Box sx={{ display: 'flex', gap: 2 }}>
                         <DownloadCSVButton
                           selectedRows={selectedRows}
-                          setNotificationMessage={setNotificationMessage}
+                          setNotificationMessage={(msg) => showToast(msg)}
                         />
                         <Button size="small" variant="outlined" onClick={toggleDrawer(true)}>
                           Instructions
@@ -209,6 +211,7 @@ export default function Products(props) {
                           <DeleteProductsButton
                             setRefresh={setRefresh}
                             selectedRows={selectedRows}
+                            setNotificationMessage={(msg) => showToast(msg)}
                           />
                         </React.Suspense>
                       </Box>
@@ -225,31 +228,7 @@ export default function Products(props) {
                 </Grid>
 
                 <Grid item xs={12} md={12}>
-                  <Outlet />
-                </Grid>
-                <Grid item xs={12} md={12}>
-                  <Routes>
-                    <Route
-                      path="*"
-                      element={
-                        <React.Suspense fallback={<LoadingFallback />}>
-                          <ProductsTable
-                            refresh={refresh}
-                            setRefresh={setRefresh}
-                            setSelectedRows={setSelectedRows}
-                          />
-                        </React.Suspense>
-                      }
-                    />
-                    <Route 
-                      path=":productId" 
-                      element={
-                        <React.Suspense fallback={<LoadingFallback />}>
-                          <ProductPage />
-                        </React.Suspense>
-                      } 
-                    />
-                  </Routes>
+                  <Outlet context={{ refresh, setRefresh, setSelectedRows }} />
                 </Grid>
               </Grid>
             </Stack>

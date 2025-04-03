@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import { DataGrid } from '@mui/x-data-grid';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../../../firebase';
@@ -37,7 +38,8 @@ function decodeHtmlEntities(text) {
   return textarea.value;
 }
 
-export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) {
+export default function ProductsTable() {
+  const { refresh, setRefresh, setSelectedRows } = useOutletContext();
   const [user] = useAuthState(auth);
   const [rows, setRows] = useState([]);
   const [filteredRows, setFilteredRows] = useState([]);
@@ -48,6 +50,8 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
     pageSize: 10,
     page: 0,
   });
+
+  const navigate = useNavigate();
 
   // Load filters from localStorage or use default values
   const loadInitialFilters = () => {
@@ -233,8 +237,8 @@ export default function ProductsTable({ refresh, setRefresh, setSelectedRows }) 
   ];
 
   const handleRowClick = (params) => {
-    // Open the product details in the same tab
-    window.location.href = `/products/${params.id}`;
+    // Use React Router navigation
+    navigate(`/products/${params.id}`);
   };
 
   return (
