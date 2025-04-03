@@ -11,8 +11,8 @@ import { TextField } from '@mui/material';
 import dayjs from 'dayjs';
 
 const API_BASE_URL = process.env.NODE_ENV === 'production'
-  ? 'https://app.ecommander.io'
-  : 'http://localhost:5000';
+  ? 'https://woocomdescbackend-451f66b3eb02.herokuapp.com'
+  : 'http://localhost:5000'
 
 const dummyChart = (title) => (
   <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
