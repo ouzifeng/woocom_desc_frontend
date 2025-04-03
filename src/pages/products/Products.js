@@ -26,6 +26,7 @@ import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import DownloadCSVButton from './components/DownloadCSVButton';
 import Tooltip from '@mui/material/Tooltip';
+import LoadingSpinner from '../../components/LoadingSpinner';
 
 // Lazy load components
 const ImportProductsButton = React.lazy(() => import('./components/ImportProductsButton'));
@@ -63,23 +64,32 @@ export default function Products(props) {
   const [notificationMessage, setNotificationMessage] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [hasWooCommerceCredentials, setHasWooCommerceCredentials] = useState(false);
+  const [loading, setLoading] = React.useState(true);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (user) {
-        const userDocRef = doc(db, 'users', user.uid);
-        const docSnap = await getDoc(userDocRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setStoreUrl(data.wc_url || '');
-          setApiId(data.wc_key || '');
-          setSecretKey(data.wc_secret || '');
-          // Check if all WooCommerce credentials are present
-          setHasWooCommerceCredentials(!!(data.wc_url && data.wc_key && data.wc_secret));
+  React.useEffect(() => {
+    const fetchProducts = async () => {
+      setLoading(true);
+      try {
+        if (user) {
+          const userDocRef = doc(db, 'users', user.uid);
+          const docSnap = await getDoc(userDocRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            setStoreUrl(data.wc_url || '');
+            setApiId(data.wc_key || '');
+            setSecretKey(data.wc_secret || '');
+            // Check if all WooCommerce credentials are present
+            setHasWooCommerceCredentials(!!(data.wc_url && data.wc_key && data.wc_secret));
+          }
         }
+      } catch (error) {
+        console.error('Error fetching products:', error);
+      } finally {
+        setLoading(false);
       }
     };
-    fetchData();
+
+    fetchProducts();
   }, [user]);
 
   const isProductPage = location.pathname.includes('/products/');
@@ -97,6 +107,10 @@ export default function Products(props) {
       navigate('/settings');
     }, 2000);
   };
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
 
   return (
     <AppTheme {...props} themeComponents={xThemeComponents}>

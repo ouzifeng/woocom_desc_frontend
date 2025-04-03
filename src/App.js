@@ -1,127 +1,69 @@
-import React from 'react';
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
-import SignUp from './pages/sign-up/SignUp';
-import SignIn from './pages/sign-in/SignIn';
-import Dashboard from './pages/dashboard/Dashboard';
-import Home from './pages/dashboard/Home';
-import Settings from './pages/dashboard/Settings';
-import PrivateRoute from './components/PrivateRoute';
-import SettingsPage from './pages/settings/SettingsPage';
-import Products from './pages/products/Products';
-import BrandSettings from './pages/brandSettings/BrandSettings';
-import ProductTranslations from './pages/translations/ProductTranslations';
-import ContentStrategy from './pages/strategy/ContentStrategy';
-import ContentPage from './pages/strategy/ContentPage';
-import ImageCreation from './pages/image-creation/ImageCreation';
-import TranslationProductPage from './pages/translations/components/TranslationProductPage';
-import BrandStrategyPage from './pages/brand-strategy/BrandStrategyPage';
-import KeywordResearchPage from './pages/keyword-research/KeywordResearchPage';
-import './App.css';
+import * as React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from './firebase';
+import LoadingSpinner from './components/LoadingSpinner';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 
+// Eagerly loaded components (keep authentication and core components)
+import SignIn from './pages/sign-in/SignIn';
+import SignUp from './pages/sign-up/SignUp';
+
+// Lazy load everything including Dashboard for better performance
+const Dashboard = React.lazy(() => import('./pages/dashboard/Dashboard'));
+const Products = React.lazy(() => import('./pages/products/Products'));
+const ProductPage = React.lazy(() => import('./pages/products/ProductPage'));
+const ContentStrategy = React.lazy(() => import('./pages/strategy/ContentStrategy'));
+const ContentPage = React.lazy(() => import('./pages/strategy/ContentPage'));
+const KeywordResearch = React.lazy(() => import('./pages/keyword-research/KeywordResearchPage'));
+const ImageCreation = React.lazy(() => import('./pages/image-creation/ImageCreation'));
+const ProductTranslations = React.lazy(() => import('./pages/translations/ProductTranslations'));
+const BrandStrategy = React.lazy(() => import('./pages/brand-strategy/BrandStrategyPage'));
+const Settings = React.lazy(() => import('./pages/settings/SettingsPage'));
+const BrandSettings = React.lazy(() => import('./pages/brandSettings/BrandSettings'));
+const TranslationProductPage = React.lazy(() => import('./pages/translations/components/TranslationProductPage'));
 
 function App() {
+  const [user, loading] = useAuthState(auth);
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+
   return (
-      <Router>
-        <div className="App">
+    <Router>
+      <ThemeProvider theme={createTheme()}>
+        <React.Suspense fallback={<LoadingSpinner />}>
           <Routes>
-            <Route path="/signup" element={<SignUp />} />
-            <Route path="/signin" element={<SignIn />} />
-            <Route
-              path="/dashboard/*"
-              element={
-                <PrivateRoute>
-                  <Dashboard />
-                </PrivateRoute>
-              }
-            >
-              <Route path="home" element={<Home />} />
-              <Route path="settings" element={<Settings />} />
-            </Route>
-            <Route
-              path="/settings/*"
-              element={
-                <PrivateRoute>
-                  <SettingsPage />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/products/*"
-              element={
-                <PrivateRoute>
-                  <Products />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/brandsettings"
-              element={
-                <PrivateRoute>
-                  <BrandSettings />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/translations"
-              element={
-                <PrivateRoute>
-                  <ProductTranslations />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/translations/:productId"
-              element={
-                <PrivateRoute>
-                  <TranslationProductPage />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/strategy"
-              element={
-                <PrivateRoute>
-                  <ContentStrategy />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/strategy/:contentId"
-              element={
-                <PrivateRoute>
-                  <ContentPage />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/image-creation"
-              element={
-                <PrivateRoute>
-                  <ImageCreation />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/brand-strategy"
-              element={
-                <PrivateRoute>
-                  <BrandStrategyPage />
-                </PrivateRoute>
-              }
-            />          
-            <Route
-              path="/keyword-research"
-              element={
-                <PrivateRoute>
-                  <KeywordResearchPage />
-                </PrivateRoute>
-              }
-            /> 
-            <Route path="/" element={<SignIn />} />
+            <Route path="/sign-in" element={!user ? <SignIn /> : <Navigate to="/dashboard" />} />
+            <Route path="/sign-up" element={!user ? <SignUp /> : <Navigate to="/dashboard" />} />
+            
+            {/* Redirect root to dashboard */}
+            <Route path="/" element={<Navigate to="/dashboard" />} />
+            
+            {/* Protected Routes with Lazy Loading */}
+            {user ? (
+              <>
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/products" element={<Products />} />
+                <Route path="/products/:id" element={<ProductPage />} />
+                <Route path="/strategy" element={<ContentStrategy />} />
+                <Route path="/strategy/:id" element={<ContentPage />} />
+                <Route path="/keyword-research" element={<KeywordResearch />} />
+                <Route path="/image-creation" element={<ImageCreation />} />
+                <Route path="/translations" element={<ProductTranslations />} />
+                <Route path="/translations/:productId" element={<TranslationProductPage />} />
+                <Route path="/brand-strategy" element={<BrandStrategy />} />
+                <Route path="/brand-settings" element={<BrandSettings />} />
+                <Route path="/settings" element={<Settings />} />
+              </>
+            ) : (
+              <Route path="*" element={<Navigate to="/sign-in" />} />
+            )}
           </Routes>
-        </div>
-      </Router>
+        </React.Suspense>
+      </ThemeProvider>
+    </Router>
   );
 }
 

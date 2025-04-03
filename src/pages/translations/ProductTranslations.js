@@ -27,6 +27,7 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import Button from '@mui/material/Button';
+import LoadingSpinner from '../../components/LoadingSpinner';
 
 function TabPanel(props) {
   const { children, value, index, ...other } = props;
@@ -50,6 +51,7 @@ function TabPanel(props) {
 
 export default function ProductTranslations(props) {
   const [user] = useAuthState(auth);
+  const [loading, setLoading] = React.useState(true);
   const [tabValue, setTabValue] = React.useState(0);
   const [refresh, setRefresh] = React.useState(false);
   const [selectedRows, setSelectedRows] = React.useState([]);
@@ -65,6 +67,7 @@ export default function ProductTranslations(props) {
     const loadLanguagePreferences = async () => {
       if (!user) return;
 
+      setLoading(true);
       try {
         const userPrefsRef = doc(db, 'users', user.uid, 'settings', 'translations');
         const prefsDoc = await getDoc(userPrefsRef);
@@ -78,6 +81,8 @@ export default function ProductTranslations(props) {
         }
       } catch (error) {
         console.error('Error loading language preferences:', error);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -185,6 +190,10 @@ export default function ProductTranslations(props) {
       setTabToDelete(null);
     }
   };
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
 
   return (
     <AppTheme {...props}>

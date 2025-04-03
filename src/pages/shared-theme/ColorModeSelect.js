@@ -5,9 +5,18 @@ import Select from '@mui/material/Select';
 
 export default function ColorModeSelect(props) {
   const { mode, setMode } = useColorScheme();
+
+  // Set light mode as default when component mounts
+  React.useEffect(() => {
+    if (mode === 'system') {
+      setMode('light');
+    }
+  }, []);
+
   if (!mode) {
     return null;
   }
+
   return (
     <Select
       value={mode}
@@ -17,9 +26,9 @@ export default function ColorModeSelect(props) {
       }}
       {...props}
     >
-      <MenuItem value="system">System</MenuItem>
       <MenuItem value="light">Light</MenuItem>
       <MenuItem value="dark">Dark</MenuItem>
+      <MenuItem value="system">System</MenuItem>
     </Select>
   );
 }

@@ -16,6 +16,7 @@ import AppTheme from '../shared-theme/AppTheme';
 import { auth } from '../../firebase';
 import WooCommerceSettingsCard from './components/WooCommerceSettingsCard';
 import CsvImport from './components/CsvImport';
+import GoogleAnalyticsCard from './components/GoogleAnalyticsCard';
 import {
   chartsCustomizations,
   dataGridCustomizations,
@@ -64,7 +65,10 @@ export default function SettingsPage(props) {
                 <Grid item xs={12} md={3}>
                   <CsvImport />
                 </Grid>
-                <Grid item xs={12} md={6}>
+                <Grid item xs={12} md={3}>
+                  <GoogleAnalyticsCard />
+                </Grid>
+                <Grid item xs={12} md={3}>
                   <Outlet />
                 </Grid>
               </Grid>
