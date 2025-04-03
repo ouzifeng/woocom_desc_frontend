@@ -9,6 +9,32 @@ import TextField from '@mui/material/TextField';
 import Chip from '@mui/material/Chip';
 import Card from '@mui/material/Card';
 import CardMedia from '@mui/material/CardMedia';
+import { styled } from '@mui/material/styles';
+
+const StyledTextField = styled(TextField)(({ theme }) => ({
+  '& .MuiInputBase-root': {
+    padding: '12px 16px',
+    height: 'auto'
+  },
+  '& .MuiInputBase-input': {
+    padding: '0',
+    height: 'auto !important',
+    minHeight: '120px'
+  },
+  '& .MuiOutlinedInput-root': {
+    height: 'auto'
+  },
+  '& .MuiInputBase-multiline': {
+    padding: '0'
+  },
+  '& textarea': {
+    overflow: 'hidden !important',
+    resize: 'none',
+    height: 'auto !important',
+    boxSizing: 'border-box',
+    padding: '16px !important'
+  }
+}));
 
 export default function AiSettings({
   useBrandGuidelines,
@@ -29,12 +55,9 @@ export default function AiSettings({
   additionalRequests,
   setAdditionalRequests
 }) {
-  // State to toggle whether SEO terms should be used
   const [useSeoTerms, setUseSeoTerms] = React.useState(false);
-  // Add state for additional requests
   const [useAdditionalRequests, setUseAdditionalRequests] = React.useState(false);
 
-  // Set default values for the checkboxes
   React.useEffect(() => {
     setUseBrandGuidelines(true);
     setUseProductImage(true);
@@ -56,7 +79,6 @@ export default function AiSettings({
         AI Settings
       </Typography>
 
-      {/* All checkboxes in one FormGroup */}
       <FormGroup>
         <FormControlLabel
           control={<Checkbox checked={useBrandGuidelines} onChange={() => setUseBrandGuidelines((prev) => !prev)} />}
@@ -90,7 +112,6 @@ export default function AiSettings({
           }
           label="Add SEO Terms"
         />
-        {/* Only show the Autocomplete if "SEO Terms" is checked */}
         {useSeoTerms && (
           <Box>
             <Autocomplete
@@ -128,7 +149,6 @@ export default function AiSettings({
           }
           label="Specify Word Count"
         />
-        {/* Only show the TextField if "Specify Word Count" is checked */}
         {useWordCount && (
           <Box>
             <TextField
@@ -160,70 +180,34 @@ export default function AiSettings({
         />
       </FormGroup>
 
-      {/* Updated styling for Additional Requests input */}
       {useAdditionalRequests && (
         <Box sx={{ mt: 1, mb: 2 }}>
-        <Autocomplete
-          multiple
-          freeSolo
-          options={[]}
-          value={additionalRequests || []}
-          onChange={(event, newValue) => setAdditionalRequests(newValue)}
-          renderTags={(value, getTagProps) =>
-            value.map((option, index) => (
-              <Chip
-                variant="outlined"
-                label={option}
-                {...getTagProps({ index })}
-                sx={{
-                  maxWidth: '100%',
-                  whiteSpace: 'normal',
-                  wordBreak: 'break-word',
-                  height: 'auto',
-                }}
-              />
-            ))
-          }
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              variant="outlined"
-              placeholder="Add custom requests and press enter"
-              size="small"
-              fullWidth
-              InputProps={{
-                ...params.InputProps,
-                sx: {
-                  alignItems: 'flex-start',
-                  minHeight: '150px',
-                  overflowY: 'auto',
-                  p: 1,
-                  flexWrap: 'wrap',
-                },
-              }}
-              inputProps={{
-                ...params.inputProps,
-                style: {
-                  width: '100%',
-                  marginTop: '8px',
-                },
-              }}
-            />
-          )}
-          sx={{
-            width: '100%',
-            '& .MuiAutocomplete-tag': {
-              m: 0.5,
-              height: 'auto',
-            },
-            '& .MuiChip-label': {
-              whiteSpace: 'normal',
-              wordBreak: 'break-word',
-              lineHeight: '1.2',
-            },
-          }}
-        />
-
+          <TextField
+            fullWidth
+            multiline
+            variant="outlined"
+            placeholder="Add custom requests"
+            value={additionalRequests}
+            onChange={(e) => setAdditionalRequests(e.target.value)}
+            sx={{
+              '& .MuiInputBase-root': {
+                padding: '12px 16px',
+                height: 'auto'
+              },
+              '& .MuiInputBase-input': {
+                padding: '0',
+                height: 'auto !important',
+                minHeight: '120px'
+              },
+              '& textarea': {
+                overflow: 'hidden !important',
+                resize: 'none',
+                height: 'auto !important',
+                boxSizing: 'border-box',
+                padding: '16px !important'
+              }
+            }}
+          />
         </Box>
       )}
     </Box>

@@ -26,6 +26,13 @@ import Chip from '@mui/material/Chip';
 import Card from '@mui/material/Card';
 import { useNavigate } from 'react-router-dom';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import IconButton from '@mui/material/IconButton';
+import DeleteIcon from '@mui/icons-material/Delete';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogTitle from '@mui/material/DialogTitle';
 
 export default function ContentStrategy(props) {
   const [user] = useAuthState(auth);
@@ -40,6 +47,9 @@ export default function ContentStrategy(props) {
   });
   const [expandedPillars, setExpandedPillars] = React.useState(new Set());
   const navigate = useNavigate();
+  const [selectedRows, setSelectedRows] = React.useState([]);
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+  const [rowSelectionModel, setRowSelectionModel] = React.useState([]);
 
   // Initial state for the DataGrid
   const initialState = {
@@ -458,6 +468,58 @@ export default function ContentStrategy(props) {
     }
   };
 
+  // Add delete handler
+  const handleDelete = async () => {
+    if (!user || selectedRows.length === 0) return;
+
+    try {
+      setLoading(true);
+      
+      // Get all content to be deleted (including children of pillars)
+      const contentToDelete = new Set();
+      
+      // First add directly selected items
+      selectedRows.forEach(id => contentToDelete.add(id));
+      
+      // For each selected pillar, add all its children
+      selectedRows.forEach(id => {
+        const row = rows.find(r => r.id === id);
+        if (row?.type === 'Pillar') {
+          rows.forEach(r => {
+            if (r.hierarchy && r.hierarchy[0] === id) {
+              contentToDelete.add(r.id);
+            }
+          });
+        }
+      });
+
+      // Delete all content
+      for (const id of contentToDelete) {
+        // Delete from content collection
+        await deleteDoc(doc(db, 'users', user.uid, 'content', id.toString()));
+      }
+
+      // Update local state
+      const remainingRows = rows.filter(row => !contentToDelete.has(row.id));
+      setValidatedRows(remainingRows);
+      setSelectedRows([]);
+      setRowSelectionModel([]);
+
+      // Update cache
+      localStorage.setItem('contentStrategy', JSON.stringify({
+        timestamp: Date.now(),
+        data: remainingRows
+      }));
+
+      setDeleteDialogOpen(false);
+    } catch (error) {
+      console.error('Error deleting content:', error);
+      setError('Failed to delete content');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <AppTheme {...props}>
       <CssBaseline enableColorScheme />
@@ -520,6 +582,17 @@ export default function ContentStrategy(props) {
                     {loading ? 'Generating...' : 'Generate New Content Strategy'}
                   </Button>
                   
+                  {selectedRows.length > 0 && (
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      onClick={() => setDeleteDialogOpen(true)}
+                      startIcon={<DeleteIcon />}
+                    >
+                      Delete Selected ({selectedRows.length})
+                    </Button>
+                  )}
+                  
                   {error && (
                     <Alert severity="error" sx={{ flex: 1 }}>
                       {error}
@@ -533,9 +606,13 @@ export default function ContentStrategy(props) {
                     rows={sortedRows}
                     columns={columns}
                     loading={loading}
-                    treeData
-                    getTreeDataPath={(row) => row.path}
-                    defaultGroupingExpansionDepth={0}
+                    checkboxSelection
+                    disableRowSelectionOnClick
+                    rowSelectionModel={rowSelectionModel}
+                    onRowSelectionModelChange={(newSelection) => {
+                      setRowSelectionModel(newSelection);
+                      setSelectedRows(newSelection);
+                    }}
                     pagination
                     paginationModel={paginationModel}
                     onPaginationModelChange={setPaginationModel}
@@ -546,13 +623,23 @@ export default function ContentStrategy(props) {
                       },
                     }}
                     rowHeight={60}
-                    disableRowSelectionOnClick
                     onRowClick={handleRowClick}
                     sx={{
-                      '& .MuiDataGrid-cell': { cursor: 'pointer' },
-                      '& .MuiDataGrid-row:hover': {
-                        backgroundColor: 'rgba(0, 0, 0, 0.04)',
+                      '& .MuiDataGrid-row:nth-of-type(odd)': {
+                        backgroundColor: '#fff',
                       },
+                      '& .MuiDataGrid-row:nth-of-type(even)': {
+                        backgroundColor: '#fafafa',
+                      },
+                      '& .MuiDataGrid-columnHeader': {
+                        backgroundColor: '#f5f6fa',
+                      },
+                      '.MuiDataGrid-row': {
+                        borderBottom: '1px solid #ddd',
+                        cursor: 'pointer',
+                      },
+                      borderRadius: 1,
+                      border: '1px solid #ddd',
                     }}
                   />
                 </Box>
@@ -561,6 +648,30 @@ export default function ContentStrategy(props) {
           </Stack>
         </Box>
       </Box>
+
+      {/* Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+      >
+        <DialogTitle>Confirm Deletion</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete the selected content?
+            {selectedRows.some(id => rows.find(r => r.id === id)?.type === 'Pillar') && (
+              <Typography color="error" sx={{ mt: 1 }}>
+                Warning: Deleting a pillar will also delete all its associated clusters and articles.
+              </Typography>
+            )}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleDelete} color="error" variant="contained">
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </AppTheme>
   );
 } 

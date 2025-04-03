@@ -275,15 +275,26 @@ export default function LanguageProductTable({
           headerName: 'Image',
           width: 100,
           renderCell: (params) => (
-            <img
-              src={params.value}
-              alt=""
-              style={{
-                width: '40px',
-                height: '40px',
-                objectFit: 'cover',
+            <Box
+              sx={{
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
               }}
-            />
+            >
+              <img
+                src={params.value}
+                alt=""
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  objectFit: 'contain',
+                  display: 'block'
+                }}
+              />
+            </Box>
           ),
         },
         {
@@ -296,7 +307,25 @@ export default function LanguageProductTable({
           field: 'description',
           headerName: 'Description',
           flex: 2,
-          renderCell: (params) => decodeHtmlEntities(params.value),
+          renderCell: (params) => {
+            // Create a temporary div to get plain text for display
+            const div = document.createElement('div');
+            div.innerHTML = params.value || '';
+            const plainText = div.textContent || div.innerText;
+            return (
+              <Box
+                sx={{
+                  width: '100%',
+                  height: '100%',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {decodeHtmlEntities(plainText)}
+              </Box>
+            );
+          },
         }
       ];
     } else {
@@ -308,15 +337,26 @@ export default function LanguageProductTable({
           headerName: 'Image',
           width: 100,
           renderCell: (params) => (
-            <img
-              src={params.value}
-              alt=""
-              style={{
-                width: '40px',
-                height: '40px',
-                objectFit: 'cover',
+            <Box
+              sx={{
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
               }}
-            />
+            >
+              <img
+                src={params.value}
+                alt=""
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  objectFit: 'contain',
+                  display: 'block'
+                }}
+              />
+            </Box>
           ),
         },
         {
@@ -329,7 +369,25 @@ export default function LanguageProductTable({
           field: 'description',
           headerName: 'Description',
           flex: 2,
-          renderCell: (params) => decodeHtmlEntities(params.value),
+          renderCell: (params) => {
+            // Create a temporary div to get plain text for display
+            const div = document.createElement('div');
+            div.innerHTML = params.value || '';
+            const plainText = div.textContent || div.innerText;
+            return (
+              <Box
+                sx={{
+                  width: '100%',
+                  height: '100%',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {decodeHtmlEntities(plainText)}
+              </Box>
+            );
+          },
         },
         {
           field: 'translated',
@@ -407,11 +465,7 @@ export default function LanguageProductTable({
               setTranslatingProductId(id);
               const languageName = languages.find(lang => lang.code === languageCode)?.name || languageCode;
 
-              // Clean HTML before sending
-              const tempDiv = document.createElement('div');
-              tempDiv.innerHTML = row.original_description;
-              const cleanDescription = tempDiv.textContent || tempDiv.innerText;
-
+              // Remove HTML stripping - send original content
               const response = await fetch(`${process.env.REACT_APP_API_URL}/translations/translate-content`, {
                 method: 'POST',
                 headers: {
@@ -420,7 +474,7 @@ export default function LanguageProductTable({
                 body: JSON.stringify({
                   content: {
                     name: row.original_name,
-                    description: cleanDescription // Send clean text
+                    description: row.original_description // Send original HTML
                   },
                   targetLanguage: languageName,
                   languageCode: languageCode
@@ -430,13 +484,10 @@ export default function LanguageProductTable({
               const data = await response.json();
               
               if (data.result === 'Success') {
-                // Reconstruct HTML structure
-                const translatedDescription = `<p>${data.translatedContent.description}</p>`;
-                
                 const productRef = doc(db, 'users', user.uid, 'products', id);
                 await updateDoc(productRef, {
                   [`${languageCode}_name`]: data.translatedContent.name,
-                  [`${languageCode}_description`]: translatedDescription,
+                  [`${languageCode}_description`]: data.translatedContent.description, // Use HTML as-is
                   translated: true
                 });
               }
@@ -615,14 +666,21 @@ export default function LanguageProductTable({
               params.indexRelativeToCurrentPage % 2 === 0 ? 'even' : 'odd'
             }
             sx={{
-              '& .even': { backgroundColor: '#fafafa' },
-              '& .odd': { backgroundColor: '#ffffff' },
-              '.MuiDataGrid-row': { cursor: 'pointer' },
-              '.MuiDataGrid-cell': {
-                lineHeight: 'normal !important',
-                display: 'flex',
-                alignItems: 'center',
+              '& .MuiDataGrid-row:nth-of-type(odd)': {
+                backgroundColor: '#fff',
               },
+              '& .MuiDataGrid-row:nth-of-type(even)': {
+                backgroundColor: '#fafafa',
+              },
+              '& .MuiDataGrid-columnHeader': {
+                backgroundColor: '#f5f6fa',
+              },
+              '.MuiDataGrid-row': {
+                borderBottom: '1px solid #ddd',
+                cursor: 'pointer',
+              },
+              borderRadius: 1,
+              border: '1px solid #ddd',
             }}
             onCellEditCommit={handleCellEdit}
             slots={{

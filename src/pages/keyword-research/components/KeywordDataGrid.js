@@ -503,12 +503,11 @@ export default function KeywordDataGrid({
           params.indexRelativeToCurrentPage % 2 === 0 ? 'even' : 'odd'
         }
         sx={{
-          '& .even': { backgroundColor: '#fafafa' },
-          '& .odd': { backgroundColor: '#fff' },
-          '.MuiDataGrid-columnHeaders': {
-            backgroundColor: '#f5f6fa !important',
-            borderBottom: '1px solid #ddd',
-          },
+          '& .even': { backgroundColor: '#fff' },
+          '& .odd': { backgroundColor: '#fafafa' },
+                      '& .MuiDataGrid-columnHeader': {
+                        backgroundColor: '#f5f6fa',
+                      },
           '.MuiDataGrid-row': {
             borderBottom: '1px solid #ddd',
             cursor: 'pointer',

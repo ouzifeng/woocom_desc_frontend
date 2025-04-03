@@ -59,7 +59,7 @@ export default function ProductPage() {
   const [loadingDots, setLoadingDots] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiNameLoading, setAiNameLoading] = useState(false);
-  const [additionalRequests, setAdditionalRequests] = useState([]);
+  const [additionalRequests, setAdditionalRequests] = useState('');
   const [languageCode, setLanguageCode] = useState(null);
 
   useEffect(() => {
@@ -191,8 +191,8 @@ export default function ProductPage() {
         } else {
           messageContent += ` Do not include any specifications section in the product description.`;
         }
-        if (additionalRequests && additionalRequests.length > 0) {
-          messageContent += ` Additional instructions: ${additionalRequests.join('. ')}.`;
+        if (additionalRequests && additionalRequests.trim()) {
+          messageContent += ` Additional instructions: ${additionalRequests}.`;
         }
 
         messageContent += ` Product name: ${decodeHtmlEntities(product?.name || '')}. Product description: ${description}.`;

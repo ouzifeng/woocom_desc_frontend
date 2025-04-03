@@ -21,6 +21,12 @@ import CloseIcon from '@mui/icons-material/Close';
 import { doc, deleteField, updateDoc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { collection, getDocs, writeBatch } from 'firebase/firestore';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogTitle from '@mui/material/DialogTitle';
+import Button from '@mui/material/Button';
 
 function TabPanel(props) {
   const { children, value, index, ...other } = props;
@@ -51,6 +57,8 @@ export default function ProductTranslations(props) {
     { code: 'main', name: 'Main', isDeletable: false }
   ]);
   const [anchorEl, setAnchorEl] = React.useState(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+  const [tabToDelete, setTabToDelete] = React.useState(null);
 
   // Load user's language preferences from Firestore
   React.useEffect(() => {
@@ -126,8 +134,13 @@ export default function ProductTranslations(props) {
     }
   };
 
-  const handleDeleteTab = async (tabCode, tabIndex) => {
-    if (!user) return;
+  const handleDeleteTabClick = (tabCode, tabIndex) => {
+    setTabToDelete({ code: tabCode, index: tabIndex });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!user || !tabToDelete) return;
 
     try {
       // Start a batch write
@@ -140,14 +153,14 @@ export default function ProductTranslations(props) {
       productsSnapshot.docs.forEach((productDoc) => {
         const productRef = doc(db, 'users', user.uid, 'products', productDoc.id);
         batch.update(productRef, {
-          [`${tabCode}_name`]: deleteField(),
-          [`${tabCode}_description`]: deleteField()
+          [`${tabToDelete.code}_name`]: deleteField(),
+          [`${tabToDelete.code}_description`]: deleteField()
         });
       });
 
       // 2. Remove language from user preferences
       const userPrefsRef = doc(db, 'users', user.uid, 'settings', 'translations');
-      const newTabs = tabs.filter((_, index) => index !== tabIndex);
+      const newTabs = tabs.filter((_, index) => index !== tabToDelete.index);
       
       batch.set(userPrefsRef, {
         languages: newTabs.filter(tab => tab.code !== 'main')
@@ -159,14 +172,17 @@ export default function ProductTranslations(props) {
       // Update UI
       setTabs(newTabs);
       
-      if (tabValue === tabIndex) {
+      if (tabValue === tabToDelete.index) {
         setTabValue(0);
-      } else if (tabValue > tabIndex) {
+      } else if (tabValue > tabToDelete.index) {
         setTabValue(tabValue - 1);
       }
 
     } catch (error) {
       console.error('Error deleting translations:', error);
+    } finally {
+      setDeleteDialogOpen(false);
+      setTabToDelete(null);
     }
   };
 
@@ -215,14 +231,14 @@ export default function ProductTranslations(props) {
                       <Tab 
                         key={tab.code}
                         label={
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', paddingLeft: '10px', paddingRight: '10px' }}>
                             {tab.name}
                             {tab.isDeletable && (
                               <IconButton
                                 size="small"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleDeleteTab(tab.code, index);
+                                  handleDeleteTabClick(tab.code, index);
                                 }}
                                 sx={{ ml: 1 }}
                               >
@@ -266,6 +282,41 @@ export default function ProductTranslations(props) {
           </Stack>
         </Box>
       </Box>
+
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => {
+          setDeleteDialogOpen(false);
+          setTabToDelete(null);
+        }}
+      >
+        <DialogTitle>Confirm Language Removal</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to remove this language? This will delete all translations in this language for all products.
+            <Typography color="error" sx={{ mt: 1 }}>
+              Warning: This action cannot be undone.
+            </Typography>
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => {
+              setDeleteDialogOpen(false);
+              setTabToDelete(null);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleDeleteConfirm} 
+            color="error" 
+            variant="contained"
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </AppTheme>
   );
 } 
