@@ -51,6 +51,7 @@ export default function MainGrid() {
   }, [startDate, endDate]);
 
   const formatTrend = (trend) => {
+    if (trend == null || isNaN(trend)) return '0%';
     const value = Math.abs(trend).toFixed(1);
     return trend > 0 ? `▲ ${value}%` : trend < 0 ? `▼ ${value}%` : '0%';
   };
