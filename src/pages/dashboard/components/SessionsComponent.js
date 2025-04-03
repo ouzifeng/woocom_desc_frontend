@@ -1,97 +1,119 @@
 import * as React from 'react';
-import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
-import TextField from '@mui/material/TextField';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import dayjs from 'dayjs';
-import { getAuth } from 'firebase/auth';
-import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import PropTypes from 'prop-types';
+import { useTheme } from '@mui/material/styles';
+import { Card, CardContent, Typography, Stack, Chip } from '@mui/material';
+import { LineChart } from '@mui/x-charts/LineChart';
+import { auth } from '../../../firebase'; // assuming Firebase auth for token management
 
-const auth = getAuth();
-const db = getFirestore();
+function AreaGradient({ color, id }) {
+  return (
+    <defs>
+      <linearGradient id={id} x1="50%" y1="0%" x2="50%" y2="100%">
+        <stop offset="0%" stopColor={color} stopOpacity={0.5} />
+        <stop offset="100%" stopColor={color} stopOpacity={0} />
+      </linearGradient>
+    </defs>
+  );
+}
 
-const fetchGoogleAnalyticsSessions = async (selectedProperty, startDate, endDate, setSessions) => {
-  const user = auth.currentUser;
-  if (!user) {
-    console.error('No authenticated user');
-    return;
-  }
-
-  const userDoc = await getDoc(doc(db, 'users', user.uid));
-  if (!userDoc.exists()) {
-    console.error('No user document found');
-    return;
-  }
-
-  const { googleAnalytics } = userDoc.data();
-  if (!googleAnalytics || !googleAnalytics.accessToken) {
-    console.error('No Google Analytics access token found');
-    return;
-  }
-
-  const accessToken = googleAnalytics.accessToken;
-
-  try {
-    const reportUrl = `https://analyticsdata.googleapis.com/v1beta/${selectedProperty}:runReport`;
-
-    const reportRequestBody = {
-      dateRanges: [{ startDate, endDate }],
-      metrics: [{ name: 'sessions' }],
-    };
-
-    const response = await fetch(reportUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify(reportRequestBody),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Error fetching GA4 report: ${response.statusText}`);
-    }
-
-    const reportData = await response.json();
-    const sessions = reportData.rows?.[0]?.metricValues?.[0]?.value || '0';
-    setSessions(sessions);
-  } catch (error) {
-    console.error('Error fetching Google Analytics data:', error);
-  }
+AreaGradient.propTypes = {
+  color: PropTypes.string.isRequired,
+  id: PropTypes.string.isRequired,
 };
 
-export default function SessionsComponent() {
-  const [selectedProperty, setSelectedProperty] = React.useState('');
-  const [startDate, setStartDate] = React.useState(dayjs().subtract(7, 'day'));
-  const [endDate, setEndDate] = React.useState(dayjs());
-  const [sessions, setSessions] = React.useState('');
+export default function SessionsChart() {
+  const theme = useTheme();
+  const [sessionsData, setSessionsData] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState(null);
+
+  const getAuthHeader = async () => {
+    const user = auth.currentUser;
+    if (!user) return null;
+    const token = await user.getIdToken();
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    };
+  };
+
+  // Dynamically set the API base URL based on environment
+  const API_BASE_URL = process.env.NODE_ENV === 'production'
+    ? 'https://woocomdescbackend-451f66b3eb02.herokuapp.com'
+    : 'http://localhost:5000';
+
+  // Fetch sessions data
+  const fetchSessionsData = async () => {
+    try {
+      setLoading(true);
+      const headers = await getAuthHeader();
+      const response = await fetch(`${API_BASE_URL}/analytics/dashboard/trends`, { headers });
+      const data = await response.json();
+
+      if (!response.ok) throw new Error(data.error || 'Failed to fetch session data');
+
+      // Transform the data into a format that works for the chart
+      const sessions = data.trends || [];
+      setSessionsData(sessions);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   React.useEffect(() => {
-    if (selectedProperty) {
-      fetchGoogleAnalyticsSessions(selectedProperty, startDate.format('YYYY-MM-DD'), endDate.format('YYYY-MM-DD'), setSessions);
-    }
-  }, [selectedProperty, startDate, endDate]);
+    fetchSessionsData();
+  }, []);
+
+  const data = sessionsData.map(row => row.date); // Get the date labels
+  const activeUsersData = sessionsData.map(row => parseInt(row.users, 10)); // Get the session counts (active users)
+
+  const colorPalette = [
+    theme.palette.primary.main,
+    theme.palette.secondary.main,
+    theme.palette.error.main,
+  ];
+
+  if (loading) return <Typography>Loading...</Typography>;
+  if (error) return <Typography color="error">{error}</Typography>;
 
   return (
-    <Box sx={{ width: '100%', maxWidth: { sm: '100%', md: '1700px' }, p: 2 }}>
-      <Typography component="h2" variant="h6" sx={{ mb: 2 }}>
-        Google Analytics Sessions
-      </Typography>
-      <DatePicker
-        label="Start Date"
-        value={startDate}
-        onChange={(newValue) => setStartDate(newValue)}
-        renderInput={(params) => <TextField {...params} fullWidth />}
-      />
-      <DatePicker
-        label="End Date"
-        value={endDate}
-        onChange={(newValue) => setEndDate(newValue)}
-        renderInput={(params) => <TextField {...params} fullWidth />}
-      />
-      <Typography variant="body1" sx={{ mt: 2 }}>
-        Sessions: {sessions}
-      </Typography>
-    </Box>
+    <Card variant="outlined" sx={{ width: '100%' }}>
+      <CardContent>
+        <Typography component="h2" variant="subtitle2" gutterBottom>
+          Sessions
+        </Typography>
+        <Stack sx={{ justifyContent: 'space-between' }}>
+          <Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}>
+            <Typography variant="h4" component="p">
+              {activeUsersData.reduce((acc, val) => acc + val, 0)} {/* Total Sessions */}
+            </Typography>
+            <Chip size="small" color="success" label="+35%" />
+          </Stack>
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+            Active users for the last 30 days
+          </Typography>
+        </Stack>
+
+        <LineChart
+          colors={colorPalette}
+          xAxis={[{ scaleType: 'point', data, tickInterval: 5 }]}
+          series={[
+            {
+              id: 'sessions',
+              label: 'Sessions',
+              data: activeUsersData,
+              curve: 'linear',
+            },
+          ]}
+          height={250}
+          margin={{ left: 50, right: 20, top: 20, bottom: 20 }}
+          grid={{ horizontal: true }}
+        >
+          <AreaGradient color={theme.palette.primary.main} id="sessions" />
+        </LineChart>
+      </CardContent>
+    </Card>
   );
 }

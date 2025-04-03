@@ -9,6 +9,10 @@ import Copyright from '../internals/components/Copyright';
 import { auth } from '../../../firebase';
 import { TextField } from '@mui/material';
 import dayjs from 'dayjs';
+import SessionsChart from './SessionsComponent';
+import PageViewsBarChart from './PageViewsBarChart';
+import TopProductsChart from './TopProductsChart';
+import RevenueTrendChart from './RevenueTrendChart';
 
 const API_BASE_URL = process.env.NODE_ENV === 'production'
   ? 'https://woocomdescbackend-451f66b3eb02.herokuapp.com'
@@ -34,9 +38,15 @@ export default function MainGrid() {
       setLoading(true);
       const user = auth.currentUser;
       const token = await user.getIdToken();
+
+      console.log("NODE_ENV:", process.env.NODE_ENV); // Check if it's 'development'
+      console.log("API URL:", API_BASE_URL); // Check if it points to the correct local API
+
+
       const res = await fetch(`${API_BASE_URL}/analytics/dashboard/overview?startDate=${startDate}&endDate=${endDate}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+
       const data = await res.json();
       setOverview(data);
     } catch (err) {
@@ -44,7 +54,8 @@ export default function MainGrid() {
     } finally {
       setLoading(false);
     }
-  };
+};
+
 
   React.useEffect(() => {
     fetchOverview();
@@ -129,11 +140,12 @@ export default function MainGrid() {
               <StatCard {...card} />
             </Grid>
           ))}
+          <Grid item xs={12}><RevenueTrendChart /></Grid>
 
-          <Grid item xs={12} md={6}>{dummyChart('Sessions')}</Grid>
-          <Grid item xs={12} md={6}>{dummyChart('Page Views')}</Grid>
+          <Grid item xs={12} md={6}><SessionsChart /></Grid>
+          <Grid item xs={12} md={6}><PageViewsBarChart /></Grid>
 
-          <Grid item xs={12} md={4}>{dummyChart('Top Products')}</Grid>
+          <Grid item xs={12} md={4}><TopProductsChart /></Grid>
           <Grid item xs={12} md={4}>{dummyChart('Conversion Funnel')}</Grid>
           <Grid item xs={12} md={4}>{dummyChart('Traffic Channels')}</Grid>
 
@@ -144,7 +156,6 @@ export default function MainGrid() {
           <Grid item xs={12} md={6}>{dummyChart('Bounce Rate')}</Grid>
           <Grid item xs={12} md={6}>{dummyChart('Cart Abandonment')}</Grid>
 
-          <Grid item xs={12}>{dummyChart('Revenue Trend')}</Grid>
         </Grid>
       )}
 

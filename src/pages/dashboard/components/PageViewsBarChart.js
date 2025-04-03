@@ -1,76 +1,86 @@
 import * as React from 'react';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import Chip from '@mui/material/Chip';
-import Typography from '@mui/material/Typography';
-import Stack from '@mui/material/Stack';
-import { BarChart } from '@mui/x-charts/BarChart';
 import { useTheme } from '@mui/material/styles';
+import { Card, CardContent, Typography, Stack, Chip } from '@mui/material';
+import { BarChart } from '@mui/x-charts/BarChart';
+import { auth } from '../../../firebase';
 
 export default function PageViewsBarChart() {
   const theme = useTheme();
+  const [labels, setLabels] = React.useState([]);
+  const [views, setViews] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+
+  const getAuthHeader = async () => {
+    const user = auth.currentUser;
+    if (!user) return null;
+    const token = await user.getIdToken();
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    };
+  };
+
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const headers = await getAuthHeader();
+        const res = await fetch(`${process.env.NODE_ENV === 'production' 
+          ? 'https://woocomdescbackend-451f66b3eb02.herokuapp.com' 
+          : 'http://localhost:5000'}/analytics/dashboard/trends`, { headers });
+
+        const data = await res.json();
+        const trends = data.trends || [];
+
+        setLabels(trends.map(t => t.date));
+        setViews(trends.map(t => parseInt(t.pageViews || 0, 10)));
+      } catch (err) {
+        console.error('Error loading page views:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
   const colorPalette = [
-    (theme.vars || theme).palette.primary.dark,
-    (theme.vars || theme).palette.primary.main,
-    (theme.vars || theme).palette.primary.light,
+    theme.palette.primary.dark,
+    theme.palette.primary.main,
+    theme.palette.primary.light,
   ];
+
+  const totalViews = views.reduce((sum, val) => sum + val, 0);
 
   return (
     <Card variant="outlined" sx={{ width: '100%' }}>
       <CardContent>
         <Typography component="h2" variant="subtitle2" gutterBottom>
-          Page views and downloads
+          Page Views
         </Typography>
         <Stack sx={{ justifyContent: 'space-between' }}>
-          <Stack
-            direction="row"
-            sx={{
-              alignContent: { xs: 'center', sm: 'flex-start' },
-              alignItems: 'center',
-              gap: 1,
-            }}
-          >
+          <Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}>
             <Typography variant="h4" component="p">
-              1.3M
+              {totalViews.toLocaleString()}
             </Typography>
-            <Chip size="small" color="error" label="-8%" />
+            <Chip size="small" color="primary" label="30 days" />
           </Stack>
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            Page views and downloads for the last 6 months
+            Page views in the last 30 days
           </Typography>
         </Stack>
+
         <BarChart
-          borderRadius={8}
           colors={colorPalette}
-          xAxis={[
-            {
-              scaleType: 'band',
-              categoryGapRatio: 0.5,
-              data: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],
-            },
-          ]}
+          xAxis={[{ scaleType: 'band', data: labels }]}
           series={[
             {
               id: 'page-views',
-              label: 'Page views',
-              data: [2234, 3872, 2998, 4125, 3357, 2789, 2998],
-              stack: 'A',
-            },
-            {
-              id: 'downloads',
-              label: 'Downloads',
-              data: [3098, 4215, 2384, 2101, 4752, 3593, 2384],
-              stack: 'A',
-            },
-            {
-              id: 'conversions',
-              label: 'Conversions',
-              data: [4051, 2275, 3129, 4693, 3904, 2038, 2275],
-              stack: 'A',
-            },
+              label: 'Page Views',
+              data: views,
+            }
           ]}
           height={250}
-          margin={{ left: 50, right: 0, top: 20, bottom: 20 }}
+          margin={{ left: 50, right: 20, top: 20, bottom: 20 }}
           grid={{ horizontal: true }}
           slotProps={{
             legend: {
