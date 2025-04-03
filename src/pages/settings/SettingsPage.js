@@ -31,6 +31,8 @@ const xThemeComponents = {
   ...treeViewCustomizations,
 };
 
+const CARD_HEIGHT = 550; // Fixed height for all cards
+
 export default function SettingsPage(props) {
   const [user] = useAuthState(auth);
 
@@ -59,17 +61,25 @@ export default function SettingsPage(props) {
               </Typography>
 
               <Grid container spacing={3}>
-                <Grid item xs={12} md={3}>
-                  <WooCommerceSettingsCard />
+                <Grid item xs={12} md={3} sx={{ height: CARD_HEIGHT }}>
+                  <Box sx={{ height: '100%' }}>
+                    <WooCommerceSettingsCard />
+                  </Box>
                 </Grid>
-                <Grid item xs={12} md={3}>
-                  <CsvImport />
+                <Grid item xs={12} md={3} sx={{ height: CARD_HEIGHT }}>
+                  <Box sx={{ height: '100%' }}>
+                    <CsvImport />
+                  </Box>
                 </Grid>
-                <Grid item xs={12} md={3}>
-                  <GoogleAnalyticsCard />
+                <Grid item xs={12} md={3} sx={{ height: CARD_HEIGHT }}>
+                  <Box sx={{ height: '100%' }}>
+                    <GoogleAnalyticsCard />
+                  </Box>
                 </Grid>
-                <Grid item xs={12} md={3}>
-                  <Outlet />
+                <Grid item xs={12} md={3} sx={{ height: CARD_HEIGHT }}>
+                  <Box sx={{ height: '100%' }}>
+                    <Outlet />
+                  </Box>
                 </Grid>
               </Grid>
             </Box>

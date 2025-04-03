@@ -1,41 +1,44 @@
-// GoogleAnalyticsCard.jsx
 import * as React from 'react';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
-import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogContentText from '@mui/material/DialogContentText';
-import DialogTitle from '@mui/material/DialogTitle';
-import Box from '@mui/material/Box';
-import GoogleIcon from '@mui/icons-material/Google';
-import AnalyticsIcon from '@mui/icons-material/Analytics';
+import {
+  Card,
+  Typography,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  Box,
+  MenuItem,
+  Select,
+  InputLabel,
+  FormControl,
+  CircularProgress,
+  Alert,
+  Snackbar
+} from '@mui/material';
+import { Google as GoogleIcon, Analytics as AnalyticsIcon, CheckCircle } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
-import MenuItem from '@mui/material/MenuItem';
-import Select from '@mui/material/Select';
-import InputLabel from '@mui/material/InputLabel';
-import FormControl from '@mui/material/FormControl';
+import { auth } from '../../../firebase';
 
 const SettingsCard = styled(Card)(({ theme }) => ({
   display: 'flex',
   flexDirection: 'column',
-  alignSelf: 'center',
   width: '100%',
+  height: '100%',
   padding: theme.spacing(4),
   gap: theme.spacing(2),
   margin: 'auto',
   [theme.breakpoints.up('sm')]: {
     maxWidth: '450px',
   },
-  boxShadow:
-    'hsla(220, 30%, 5%, 0.05) 0px 5px 15px 0px, hsla(220, 25%, 10%, 0.05) 0px 15px 35px -5px',
-  ...theme.applyStyles?.('dark', {
-    boxShadow:
-      'hsla(220, 30%, 5%, 0.5) 0px 5px 15px 0px, hsla(220, 25%, 10%, 0.08) 0px 15px 35px -5px',
-  }),
+  boxShadow: '0px 4px 10px rgba(0,0,0,0.08)',
+  overflow: 'auto'
 }));
+
+const API_BASE_URL = process.env.NODE_ENV === 'production'
+  ? 'https://app.ecommander.io'
+  : 'http://localhost:5000';
 
 export default function GoogleAnalyticsCard() {
   const [open, setOpen] = React.useState(false);
@@ -44,145 +47,232 @@ export default function GoogleAnalyticsCard() {
   const [properties, setProperties] = React.useState([]);
   const [selectedAccount, setSelectedAccount] = React.useState('');
   const [selectedProperty, setSelectedProperty] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [testing, setTesting] = React.useState(false);
+  const [error, setError] = React.useState(null);
+  const [visitors, setVisitors] = React.useState(null);
+  const [snackbar, setSnackbar] = React.useState({ open: false, message: '', severity: 'success' });
 
-  const handleClickOpen = () => {
-    setOpen(true);
+  const getAuthHeader = async () => {
+    const user = auth.currentUser;
+    if (!user) return null;
+    const token = await user.getIdToken();
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
   };
 
-  const handleClose = () => {
-    setOpen(false);
+  React.useEffect(() => {
+    checkConnectionStatus();
+  }, []);
+
+    const checkConnectionStatus = async () => {
+    try {
+        setLoading(true);
+        const headers = await getAuthHeader();
+        const res = await fetch(`${API_BASE_URL}/analytics/accounts`, { headers });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to fetch accounts');
+
+        setAccounts(data.accounts || []);
+        setIsConnected(data.connected);
+
+        // ✅ Pull saved selections from Firestore and auto-fill
+        if (data.accountId) {
+        setSelectedAccount(data.accountId);
+
+        // Fetch and set properties
+        const propRes = await fetch(`${API_BASE_URL}/analytics/properties?account=${data.accountId}`, { headers });
+        const propData = await propRes.json();
+        if (!propRes.ok) throw new Error(propData.error || 'Failed to fetch properties');
+        setProperties(propData.properties || []);
+        if (data.propertyId) {
+            setSelectedProperty(data.propertyId);
+        }
+        }
+    } catch (err) {
+        setError(err.message);
+        setSnackbar({ open: true, message: err.message, severity: 'error' });
+    } finally {
+        setLoading(false);
+    }
+    };
+
+  const handleAccountChange = async (accountId) => {
+    try {
+      setLoading(true);
+      const headers = await getAuthHeader();
+      const res = await fetch(`${API_BASE_URL}/analytics/properties?account=${accountId}`, { headers });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to fetch properties');
+      setSelectedAccount(accountId);
+      setProperties(data.properties || []);
+      setSelectedProperty('');
+    } catch (err) {
+      setError(err.message);
+      setSnackbar({ open: true, message: err.message, severity: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePropertyChange = (event) => {
+    setSelectedProperty(event.target.value);
   };
 
   const handleConnect = async () => {
-    // Call backend to get Google OAuth URL
-    const res = await fetch('/api/analytics/auth/url');
-    const data = await res.json();
-    window.location.href = data.url;
+    try {
+      setLoading(true);
+      const user = auth.currentUser;
+      const idToken = await user.getIdToken();
+      const redirectUri = process.env.NODE_ENV === 'production'
+        ? 'https://app.ecommander.io/analytics/auth/callback'
+        : 'http://localhost:5000/analytics/auth/callback';
+      const url = `${API_BASE_URL}/analytics/auth/url?redirect_uri=${encodeURIComponent(redirectUri)}&token=${encodeURIComponent(idToken)}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to get Auth URL');
+      window.location.href = data.url;
+    } catch (err) {
+      setError(err.message);
+      setSnackbar({ open: true, message: err.message, severity: 'error' });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDisconnect = () => {
-    // Clear connection state
-    setIsConnected(false);
-    setAccounts([]);
-    setProperties([]);
-    setSelectedAccount('');
-    setSelectedProperty('');
+  const handleDisconnect = async () => {
+    try {
+      setLoading(true);
+      const headers = await getAuthHeader();
+      await fetch(`${API_BASE_URL}/analytics/disconnect`, { method: 'POST', headers });
+      setIsConnected(false);
+      setAccounts([]);
+      setProperties([]);
+      setSelectedAccount('');
+      setSelectedProperty('');
+    } catch (err) {
+      setError(err.message);
+      setSnackbar({ open: true, message: err.message, severity: 'error' });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const fetchAccounts = async () => {
-    const res = await fetch('/api/analytics/accounts');
-    const data = await res.json();
-    setAccounts(data.accounts);
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      const headers = await getAuthHeader();
+      const res = await fetch(`${API_BASE_URL}/analytics/save-selection`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ accountId: selectedAccount, propertyId: selectedProperty })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to save selection');
+      setSnackbar({ open: true, message: 'Saved successfully!', severity: 'success' });
+    } catch (err) {
+      setSnackbar({ open: true, message: err.message, severity: 'error' });
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const fetchProperties = async (accountId) => {
-    const res = await fetch(`/api/analytics/properties?account=${accountId}`);
-    const data = await res.json();
-    setProperties(data.properties);
+  const handleTest = async () => {
+    try {
+      setTesting(true);
+      const headers = await getAuthHeader();
+      const res = await fetch(`${API_BASE_URL}/analytics/test`, { headers });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Test failed');
+      setVisitors(data.visitors);
+      setSnackbar({ open: true, message: `Visitors yesterday: ${data.visitors}`, severity: 'info' });
+    } catch (err) {
+      setSnackbar({ open: true, message: err.message, severity: 'error' });
+    } finally {
+      setTesting(false);
+    }
   };
-
-  React.useEffect(() => {
-    if (isConnected) fetchAccounts();
-  }, [isConnected]);
-
-  React.useEffect(() => {
-    if (selectedAccount) fetchProperties(selectedAccount);
-  }, [selectedAccount]);
 
   return (
     <>
       <SettingsCard variant="outlined">
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, marginBottom: 4 }}>
           <AnalyticsIcon color="primary" />
           <Typography variant="h6">Google Analytics</Typography>
         </Box>
 
-        <Typography variant="body2" color="text.secondary">
-          Connect your Google Analytics account to track performance and insights.
-        </Typography>
+        {loading && <Box sx={{ display: 'flex', justifyContent: 'center' }}><CircularProgress size={24} /></Box>}
+        {error && <Alert severity="error">{error}</Alert>}
 
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {isConnected ? (
-            <>
-              <FormControl fullWidth size="small">
-                <InputLabel id="account-select-label">Account</InputLabel>
-                <Select
-                  labelId="account-select-label"
-                  value={selectedAccount}
-                  label="Account"
-                  onChange={(e) => setSelectedAccount(e.target.value)}
-                >
-                  {accounts.map((acc) => (
-                    <MenuItem key={acc.id} value={acc.id}>{acc.name}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+        {isConnected ? (
+          <>
+            <FormControl fullWidth size="small">
+              <InputLabel id="account-select-label">Account</InputLabel>
+              <Select
+                labelId="account-select-label"
+                value={selectedAccount}
+                onChange={(e) => handleAccountChange(e.target.value)}
+              >
+                {accounts.map((acc) => (
+                  <MenuItem key={acc.id} value={acc.id}>{acc.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            {selectedAccount && (
               <FormControl fullWidth size="small">
                 <InputLabel id="property-select-label">Property</InputLabel>
                 <Select
                   labelId="property-select-label"
                   value={selectedProperty}
-                  label="Property"
-                  onChange={(e) => setSelectedProperty(e.target.value)}
+                  onChange={handlePropertyChange}
                 >
                   {properties.map((prop) => (
                     <MenuItem key={prop.id} value={prop.id}>{prop.name}</MenuItem>
                   ))}
                 </Select>
               </FormControl>
+            )}
+
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1 }}>
               <Button
-                variant="outlined"
-                color="error"
-                onClick={handleDisconnect}
-                size="small"
+                variant="contained"
+                color="primary"
+                onClick={handleSave}
+                disabled={!selectedAccount || !selectedProperty || saving}
+                startIcon={saving && <CircularProgress size={16} />}
               >
-                Disconnect
+                Save Selection
               </Button>
-            </>
-          ) : (
-            <Button
-              variant="contained"
-              onClick={handleClickOpen}
-              startIcon={<GoogleIcon />}
-              size="small"
-            >
-              Connect Google Analytics
-            </Button>
-          )}
-        </Box>
+              <Button onClick={handleTest} variant="outlined" disabled={testing} startIcon={testing && <CircularProgress size={16} />}>Test</Button>
+              <Button onClick={handleDisconnect} color="error">Disconnect</Button>
+            </Box>
+
+            {visitors !== null && (
+              <Alert severity="info">Visitors yesterday: {visitors}</Alert>
+            )}
+          </>
+        ) : (
+          <Button variant="contained" onClick={() => setOpen(true)} startIcon={<GoogleIcon />}>Connect Google Analytics</Button>
+        )}
       </SettingsCard>
 
-      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <GoogleIcon color="primary" /> Connect Google Analytics
-          </Box>
-        </DialogTitle>
+      <Dialog open={open} onClose={() => setOpen(false)}>
+        <DialogTitle>Connect Google Analytics</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Connect your Google Analytics account to:
+            You'll be redirected to Google to authorize your account.
           </DialogContentText>
-          <Box component="ul" sx={{ mt: 2 }}>
-            <Typography component="li">Track performance</Typography>
-            <Typography component="li">Get customer insights</Typography>
-            <Typography component="li">Monitor traffic</Typography>
-            <Typography component="li">Analyze behavior</Typography>
-          </Box>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-            You will be redirected to Google to authorize access.
-          </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleClose}>Cancel</Button>
-          <Button 
-            onClick={handleConnect}
-            variant="contained"
-            startIcon={<GoogleIcon />}
-          >
-            Connect with Google
-          </Button>
+          <Button onClick={() => setOpen(false)}>Cancel</Button>
+          <Button onClick={handleConnect} variant="contained" startIcon={<GoogleIcon />}>Connect</Button>
         </DialogActions>
       </Dialog>
+
     </>
   );
 }
