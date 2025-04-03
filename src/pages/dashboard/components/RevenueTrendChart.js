@@ -8,7 +8,7 @@ const API_BASE_URL = process.env.NODE_ENV === 'production'
   ? 'https://woocomdescbackend-451f66b3eb02.herokuapp.com'
   : 'http://localhost:5000';
 
-export default function RevenueTrendChart() {
+export default function RevenueTrendChart({ startDate, endDate, selectedCurrency }) {
   const theme = useTheme();
   const [data, setData] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
@@ -16,14 +16,18 @@ export default function RevenueTrendChart() {
 
   const getTrends = async () => {
     try {
+      setLoading(true);
       const user = auth.currentUser;
       const token = await user.getIdToken();
-      const res = await fetch(`${API_BASE_URL}/analytics/dashboard/trends`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const res = await fetch(
+        `${API_BASE_URL}/analytics/dashboard/trends?startDate=${startDate}&endDate=${endDate}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
       const json = await res.json();
 
       const chartData = json.trends.map(row => ({
@@ -34,7 +38,7 @@ export default function RevenueTrendChart() {
       const totalRevenue = chartData.reduce((sum, d) => sum + d.value, 0);
 
       setData(chartData);
-      setTotal(totalRevenue.toFixed(2));
+      setTotal(totalRevenue);
     } catch (err) {
       console.error('Error loading revenue data:', err);
     } finally {
@@ -44,7 +48,7 @@ export default function RevenueTrendChart() {
 
   React.useEffect(() => {
     getTrends();
-  }, []);
+  }, [startDate, endDate]);
 
   if (loading) return <Typography>Loading...</Typography>;
 
@@ -56,8 +60,13 @@ export default function RevenueTrendChart() {
         </Typography>
         <Stack sx={{ justifyContent: 'space-between' }}>
           <Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}>
-            <Typography variant="h4">${total}</Typography>
-            <Chip size="small" color="primary" label="Last 30 Days" />
+            <Typography variant="h4">
+              {new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: selectedCurrency,
+              }).format(total)}
+            </Typography>
+            <Chip size="small" color="primary" label={`${startDate} → ${endDate}`} />
           </Stack>
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
             Based on daily purchase revenue

@@ -4,7 +4,7 @@ import { Card, CardContent, Typography, Stack, Chip } from '@mui/material';
 import { BarChart } from '@mui/x-charts/BarChart';
 import { auth } from '../../../firebase';
 
-export default function PageViewsBarChart() {
+export default function PageViewsBarChart({ startDate, endDate }) {
   const theme = useTheme();
   const [labels, setLabels] = React.useState([]);
   const [views, setViews] = React.useState([]);
@@ -26,7 +26,7 @@ export default function PageViewsBarChart() {
         const headers = await getAuthHeader();
         const res = await fetch(`${process.env.NODE_ENV === 'production' 
           ? 'https://woocomdescbackend-451f66b3eb02.herokuapp.com' 
-          : 'http://localhost:5000'}/analytics/dashboard/trends`, { headers });
+          : 'http://localhost:5000'}/analytics/dashboard/trends?startDate=${startDate}&endDate=${endDate}`, { headers });
 
         const data = await res.json();
         const trends = data.trends || [];
@@ -41,7 +41,7 @@ export default function PageViewsBarChart() {
     };
 
     fetchData();
-  }, []);
+  }, [startDate, endDate]);
 
   const colorPalette = [
     theme.palette.primary.dark,
@@ -62,10 +62,10 @@ export default function PageViewsBarChart() {
             <Typography variant="h4" component="p">
               {totalViews.toLocaleString()}
             </Typography>
-            <Chip size="small" color="primary" label="30 days" />
+            <Chip size="small" color="primary" label={`${startDate} → ${endDate}`} />
           </Stack>
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            Page views in the last 30 days
+            Page views during selected range
           </Typography>
         </Stack>
 

@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { useTheme } from '@mui/material/styles';
 import { Card, CardContent, Typography, Stack, Chip } from '@mui/material';
 import { LineChart } from '@mui/x-charts/LineChart';
-import { auth } from '../../../firebase'; // assuming Firebase auth for token management
+import { auth } from '../../../firebase';
 
 function AreaGradient({ color, id }) {
   return (
@@ -21,11 +21,15 @@ AreaGradient.propTypes = {
   id: PropTypes.string.isRequired,
 };
 
-export default function SessionsChart() {
+export default function SessionsChart({ startDate, endDate }) {
   const theme = useTheme();
   const [sessionsData, setSessionsData] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState(null);
+
+  const API_BASE_URL = process.env.NODE_ENV === 'production'
+    ? 'https://woocomdescbackend-451f66b3eb02.herokuapp.com'
+    : 'http://localhost:5000';
 
   const getAuthHeader = async () => {
     const user = auth.currentUser;
@@ -37,22 +41,15 @@ export default function SessionsChart() {
     };
   };
 
-  // Dynamically set the API base URL based on environment
-  const API_BASE_URL = process.env.NODE_ENV === 'production'
-    ? 'https://woocomdescbackend-451f66b3eb02.herokuapp.com'
-    : 'http://localhost:5000';
-
-  // Fetch sessions data
   const fetchSessionsData = async () => {
     try {
       setLoading(true);
       const headers = await getAuthHeader();
-      const response = await fetch(`${API_BASE_URL}/analytics/dashboard/trends`, { headers });
+      const response = await fetch(`${API_BASE_URL}/analytics/dashboard/trends?startDate=${startDate}&endDate=${endDate}`, { headers });
       const data = await response.json();
 
       if (!response.ok) throw new Error(data.error || 'Failed to fetch session data');
 
-      // Transform the data into a format that works for the chart
       const sessions = data.trends || [];
       setSessionsData(sessions);
     } catch (err) {
@@ -64,10 +61,11 @@ export default function SessionsChart() {
 
   React.useEffect(() => {
     fetchSessionsData();
-  }, []);
+  }, [startDate, endDate]);
 
-  const data = sessionsData.map(row => row.date); // Get the date labels
-  const activeUsersData = sessionsData.map(row => parseInt(row.users, 10)); // Get the session counts (active users)
+  const data = sessionsData.map(row => row.date);
+  const activeUsersData = sessionsData.map(row => parseInt(row.users, 10));
+  const totalSessions = activeUsersData.reduce((acc, val) => acc + val, 0);
 
   const colorPalette = [
     theme.palette.primary.main,
@@ -87,29 +85,28 @@ export default function SessionsChart() {
         <Stack sx={{ justifyContent: 'space-between' }}>
           <Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}>
             <Typography variant="h4" component="p">
-              {activeUsersData.reduce((acc, val) => acc + val, 0)} {/* Total Sessions */}
+              {totalSessions}
             </Typography>
-            <Chip size="small" color="success" label="+35%" />
+            <Chip size="small" color="primary" label={`${startDate} → ${endDate}`} />
           </Stack>
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            Active users for the last 30 days
+            Active users during selected range
           </Typography>
         </Stack>
 
         <LineChart
           colors={colorPalette}
-          xAxis={[{ scaleType: 'point', data, tickInterval: 5 }]}
-          series={[
-            {
-              id: 'sessions',
-              label: 'Sessions',
-              data: activeUsersData,
-              curve: 'linear',
-            },
-          ]}
+          xAxis={[{ scaleType: 'point', data }]}
+          series={[{
+            id: 'sessions',
+            label: 'Sessions',
+            data: activeUsersData,
+            curve: 'linear',
+          }]}
           height={250}
           margin={{ left: 50, right: 20, top: 20, bottom: 20 }}
           grid={{ horizontal: true }}
+          slotProps={{ legend: { hidden: true } }}
         >
           <AreaGradient color={theme.palette.primary.main} id="sessions" />
         </LineChart>

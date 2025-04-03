@@ -1,79 +1,100 @@
 import * as React from 'react';
+import { useTheme } from '@mui/material/styles';
 import { Card, CardContent, Typography, Stack, Chip } from '@mui/material';
 import { BarChart } from '@mui/x-charts/BarChart';
-import { useTheme } from '@mui/material/styles';
 import { auth } from '../../../firebase';
 
-export default function TopProductsChart() {
+const API_BASE_URL = process.env.NODE_ENV === 'production'
+  ? 'https://woocomdescbackend-451f66b3eb02.herokuapp.com'
+  : 'http://localhost:5000';
+
+export default function TopProductsChart({ startDate, endDate, selectedCurrency }) {
   const theme = useTheme();
   const [data, setData] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState(null);
+  const [total, setTotal] = React.useState(0);
+
+  const getTrends = async () => {
+    try {
+      setLoading(true);
+      const user = auth.currentUser;
+      const token = await user.getIdToken();
+      const res = await fetch(`${API_BASE_URL}/analytics/dashboard/top-products?startDate=${startDate}&endDate=${endDate}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      const json = await res.json();
+
+      if (!json.products || !Array.isArray(json.products)) {
+        console.error('Invalid response format:', json);
+        setData([]);
+        setTotal(0);
+        return;
+      }
+
+      const chartData = json.products.map(product => ({
+        name: product.path.split('/').pop().replace(/-/g, ' '),
+        value: parseFloat(product.revenue || 0),
+      }));
+
+      const totalRevenue = chartData.reduce((sum, d) => sum + d.value, 0);
+
+      setData(chartData);
+      setTotal(totalRevenue);
+    } catch (err) {
+      console.error('Error loading top products data:', err);
+      setData([]);
+      setTotal(0);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   React.useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const user = auth.currentUser;
-        const token = await user.getIdToken();
-
-        const res = await fetch(
-          `${process.env.NODE_ENV === 'production'
-            ? 'https://woocomdescbackend-451f66b3eb02.herokuapp.com'
-            : 'http://localhost:5000'}/analytics/dashboard/top-products`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || 'Failed to fetch');
-        setData(json.products);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
-
-  const colorPalette = [
-    theme.palette.primary.main,
-    theme.palette.primary.light,
-    theme.palette.primary.dark,
-  ];
-
-  const xData = data.map(item => item.path);
-  const seriesData = data.map(item => parseInt(item.views, 10));
+    getTrends();
+  }, [startDate, endDate]);
 
   if (loading) return <Typography>Loading...</Typography>;
-  if (error) return <Typography color="error">{error}</Typography>;
+  if (data.length === 0) return <Typography>No data available</Typography>;
 
   return (
     <Card variant="outlined" sx={{ width: '100%' }}>
       <CardContent>
         <Typography component="h2" variant="subtitle2" gutterBottom>
-          Top Products
+          Top Products by Revenue
         </Typography>
-        <Stack sx={{ justifyContent: 'space-between', mb: 1 }}>
-          <Stack direction="row" alignItems="center" gap={1}>
+        <Stack sx={{ justifyContent: 'space-between' }}>
+          <Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}>
             <Typography variant="h4">
-              {seriesData.reduce((sum, val) => sum + val, 0)}
+              {new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: selectedCurrency,
+              }).format(total)}
             </Typography>
-            <Chip size="small" color="primary" label="Last 30 Days" />
+            <Chip size="small" color="primary" label={`${startDate} → ${endDate}`} />
           </Stack>
-          <Typography variant="caption" color="text.secondary">
-            Based on screen page views
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+            Revenue by product for the selected period
           </Typography>
         </Stack>
+
         <BarChart
-          xAxis={[{ scaleType: 'band', data: xData }]}
-          series={[{ data: seriesData }]}
-          colors={colorPalette}
-          height={300}
+          colors={[theme.palette.primary.main]}
+          xAxis={[{
+            scaleType: 'band',
+            data: data.map(d => d.name),
+          }]}
+          series={[{
+            id: 'revenue',
+            label: 'Revenue',
+            data: data.map(d => d.value),
+          }]}
+          height={250}
           margin={{ left: 50, right: 20, top: 20, bottom: 60 }}
           grid={{ horizontal: true }}
+          slotProps={{ legend: { hidden: true } }}
         />
       </CardContent>
     </Card>

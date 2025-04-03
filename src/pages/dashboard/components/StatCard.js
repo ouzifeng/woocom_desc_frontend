@@ -41,7 +41,7 @@ AreaGradient.propTypes = {
   id: PropTypes.string.isRequired,
 };
 
-function StatCard({ title, value, interval, trend, data }) {
+function StatCard({ title, value, interval, trend, trendLabel, data }) {
   const theme = useTheme();
   const daysInWeek = getDaysInMonth(4, 2024);
 
@@ -68,7 +68,6 @@ function StatCard({ title, value, interval, trend, data }) {
 
   const color = labelColors[trend];
   const chartColor = trendColors[trend];
-  const trendValues = { up: '+25%', down: '-25%', neutral: '+5%' };
 
   return (
     <Card variant="outlined" sx={{ height: '100%', flexGrow: 1 }}>
@@ -88,7 +87,7 @@ function StatCard({ title, value, interval, trend, data }) {
               <Typography variant="h4" component="p">
                 {value}
               </Typography>
-              <Chip size="small" color={color} label={trendValues[trend]} />
+              <Chip size="small" color={color} label={trendLabel} />
             </Stack>
             <Typography variant="caption" sx={{ color: 'text.secondary' }}>
               {interval}
@@ -103,7 +102,7 @@ function StatCard({ title, value, interval, trend, data }) {
               showTooltip
               xAxis={{
                 scaleType: 'band',
-                data: daysInWeek, // Use the correct property 'data' for xAxis
+                data: daysInWeek,
               }}
               sx={{
                 [`& .${areaElementClasses.root}`]: {
@@ -125,6 +124,7 @@ StatCard.propTypes = {
   interval: PropTypes.string.isRequired,
   title: PropTypes.string.isRequired,
   trend: PropTypes.oneOf(['down', 'neutral', 'up']).isRequired,
+  trendLabel: PropTypes.string.isRequired,
   value: PropTypes.string.isRequired,
 };
 
