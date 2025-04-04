@@ -83,6 +83,7 @@ export default function Checkout() {
   );
 
   const creditPackages = [
+    { price: 1, credits: 10 },
     { price: 5, credits: 50 },
     { price: 20, credits: 200 },
     { price: 50, credits: 500 },

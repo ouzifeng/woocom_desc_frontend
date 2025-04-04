@@ -18,10 +18,6 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../../../firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
-import Typography from '@mui/material/Typography';
-
-// Import version directly from package.json
-const version = '1.3.4';
 
 const mainListItems = [
   { text: 'Home', icon: <HomeRoundedIcon />, link: '/dashboard' },
@@ -90,29 +86,20 @@ export default function MenuContent() {
           </ListItem>
         ))}
         <ListItem sx={{ display: 'block', py: 1 }}>
-          <Stack spacing={0.5} alignItems="center">
-            <Chip
-              icon={<AutoAwesomeIcon />}
-              label={`${credits} credits left`}
-              color="primary"
-              variant="outlined"
-              size="large"
-              sx={{ 
-                width: '100%',
-                borderColor: 'primary.main',
-                '& .MuiChip-label': {
-                  px: 1,
-                }
-              }}
-            />
-            <Typography 
-              variant="caption" 
-              color="text.secondary"
-              sx={{ opacity: 0.7 }}
-            >
-              v{version}
-            </Typography>
-          </Stack>
+          <Chip
+            icon={<AutoAwesomeIcon />}
+            label={`${credits} credits left`}
+            color="primary"
+            variant="outlined"
+            size="large"
+            sx={{ 
+              width: '100%',
+              borderColor: 'primary.main',
+              '& .MuiChip-label': {
+                px: 1,
+              }
+            }}
+          />
         </ListItem>        
       </List>
     </Stack>
