@@ -40,7 +40,7 @@ function App() {
           <React.Suspense fallback={<LoadingSpinner />}>
             <Routes>
               <Route path="/sign-in" element={!user ? <SignIn /> : <Navigate to="/dashboard" />} />
-              <Route path="/sign-up" element={!user ? <SignUp /> : <Navigate to="/dashboard" />} />
+              <Route path="/sign-up" element={!user ? <SignUp /> : <Navigate to="/settings" />} />
               
               {/* Redirect root to dashboard */}
               <Route path="/" element={<Navigate to="/dashboard" />} />

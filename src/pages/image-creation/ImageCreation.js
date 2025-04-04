@@ -21,14 +21,23 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import LinkIcon from '@mui/icons-material/Link';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import CircularProgress from '@mui/material/CircularProgress';
+import Alert from '@mui/material/Alert';
 import { styled } from '@mui/material/styles';
+import DownloadIcon from '@mui/icons-material/Download';
+import { collection, query, where, getDocs, doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { auth, db, storage } from '../../firebase';
+import { useToast } from '../../components/ToasterAlert';
+import LoadingSpinner from '../../components/LoadingSpinner';
 
 import AppNavbar from '../dashboard/components/AppNavbar';
 import Header from '../dashboard/components/Header';
 import SideMenu from '../dashboard/components/SideMenu';
 import AppTheme from '../shared-theme/AppTheme';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth } from '../../firebase';
+
+const API_URL = process.env.REACT_APP_API_URL;
 
 const VisuallyHiddenInput = styled('input')`
   clip: rect(0 0 0 0);
@@ -44,65 +53,274 @@ const VisuallyHiddenInput = styled('input')`
 
 export default function ImageCreation(props) {
   const [user] = useAuthState(auth);
+  const { showToast } = useToast();
   const [imageType, setImageType] = React.useState('product');
   const [productUrl, setProductUrl] = React.useState('');
   const [productImageLinks, setProductImageLinks] = React.useState('');
   const [uploadedImages, setUploadedImages] = React.useState([]);
   const [referenceImages, setReferenceImages] = React.useState([]);
   const [description, setDescription] = React.useState('');
+  const [isLoading, setIsLoading] = React.useState({
+    productUpload: false,
+    referenceUpload: false,
+    generation: false
+  });
+  const [error, setError] = React.useState(null);
+  const [generatedImages, setGeneratedImages] = React.useState([]);
+  const [previousImages, setPreviousImages] = React.useState([]);
 
-  const handleImageUpload = (event, isReference = false) => {
-    const files = Array.from(event.target.files);
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (isReference) {
-          setReferenceImages(prev => [...prev, { url: reader.result, name: file.name }]);
-        } else {
-          setUploadedImages(prev => [...prev, { url: reader.result, name: file.name }]);
-        }
+  // Function to upload an image to Firebase Storage
+  const uploadImageToFirebase = async (file, isReference = false) => {
+    if (!user) return null;
+    
+    try {
+      const timestamp = Date.now();
+      const fileName = `${isReference ? 'reference' : 'product'}_${timestamp}_${file.name}`;
+      const storageRef = ref(storage, `temp/${user.uid}/${fileName}`);
+      
+      await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(storageRef);
+      
+      return {
+        url: downloadURL,
+        name: file.name,
+        path: `temp/${user.uid}/${fileName}`
       };
-      reader.readAsDataURL(file);
-    });
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      showToast('Failed to upload image', 'error');
+      return null;
+    }
   };
 
-  const handleRemoveImage = (index, isReference = false) => {
+  const handleImageUpload = async (event, isReference = false) => {
+    const files = Array.from(event.target.files);
+    
+    // Set loading state for the specific upload type
+    setIsLoading(prev => ({
+      ...prev,
+      [isReference ? 'referenceUpload' : 'productUpload']: true
+    }));
+    setError(null);
+    
+    try {
+      const uploadPromises = files.map(file => uploadImageToFirebase(file, isReference));
+      const uploadedFiles = await Promise.all(uploadPromises);
+      const successfulUploads = uploadedFiles.filter(file => file !== null);
+      
+        if (isReference) {
+        setReferenceImages(prev => [...prev, ...successfulUploads]);
+        } else {
+        setUploadedImages(prev => [...prev, ...successfulUploads]);
+      }
+      
+      showToast(`Successfully uploaded ${successfulUploads.length} images`, 'success');
+    } catch (error) {
+      console.error('Error handling image upload:', error);
+      setError('Failed to upload images. Please try again.');
+      showToast('Failed to upload images', 'error');
+    } finally {
+      // Clear loading state for the specific upload type
+      setIsLoading(prev => ({
+        ...prev,
+        [isReference ? 'referenceUpload' : 'productUpload']: false
+      }));
+    }
+  };
+
+  const handleRemoveImage = async (index, isReference = false) => {
+    try {
+      // Get the image to be deleted
+      const imageToDelete = isReference ? referenceImages[index] : uploadedImages[index];
+      
+      // Create a reference to the file in Firebase Storage
+      const imageRef = ref(storage, imageToDelete.path);
+      
+      // Delete the file from Firebase Storage
+      await deleteObject(imageRef);
+      
+      // Remove from state after successful deletion
     if (isReference) {
       setReferenceImages(prev => prev.filter((_, i) => i !== index));
     } else {
       setUploadedImages(prev => prev.filter((_, i) => i !== index));
+      }
+      
+      showToast('Image deleted successfully', 'success');
+    } catch (error) {
+      console.error('Error deleting image:', error);
+      showToast('Failed to delete image', 'error');
     }
   };
 
-  const StyledTextField = styled(TextField)(({ theme }) => ({
-    '& .MuiInputBase-root': {
-      padding: '12px 16px',
-      height: 'auto'
-    },
-    '& .MuiInputBase-input': {
-      padding: '0',
-      height: 'auto !important',
-      minHeight: '120px'
-    },
-    '& .MuiOutlinedInput-root': {
-      height: 'auto'
-    },
-    '& .MuiInputBase-multiline': {
-      padding: '0'
-    },
-    '& textarea': {
-      overflow: 'hidden !important',
-      resize: 'none',
-      height: 'auto !important',
-      boxSizing: 'border-box',
-      padding: '16px !important'
-    }
-  }));
+  // Function to save generated image to permanent storage
+  const saveGeneratedImage = async (imageUrl, prompt) => {
+    if (!user) return null;
+    
+    try {
+      // Send the OpenAI image URL to our backend to handle the download and storage
+      const response = await fetch(`${API_URL}/openai/save-generated-image`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await user.getIdToken()}`
+        },
+        body: JSON.stringify({
+          imageUrl,
+          prompt,
+          imageType,
+          description
+        })
+      });
 
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to save image');
+      }
+
+      const data = await response.json();
+      return data.permanentUrl;
+    } catch (error) {
+      console.error('Error saving generated image:', error);
+      showToast('Failed to save generated image', 'error');
+      return null;
+    }
+  };
+
+  const handleGenerateImage = async () => {
+    if (!user) {
+      showToast('You must be logged in to generate images', 'error');
+      return;
+    }
+    
+    if (!description.trim()) {
+      showToast('Please provide an image description', 'error');
+      return;
+    }
+    
+    setIsLoading(prev => ({
+      ...prev,
+      generation: true
+    }));
+    setError(null);
+    
+    try {
+      const payload = {
+        imageType,
+        productUrl,
+        productImages: uploadedImages.map(img => img.url),
+        referenceImages: referenceImages.map(img => img.url),
+        description
+      };
+      
+      console.log('Sending request with payload:', payload);
+      
+      const response = await fetch(`${API_URL}/openai/image-generation`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await user.getIdToken()}`
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      console.log('Response status:', response.status);
+      const data = await response.json();
+      console.log('Response data:', data);
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to generate image');
+      }
+      
+      if (data.result === 'Success' && data.imageUrl) {
+        console.log('Saving generated image from URL:', data.imageUrl);
+        // Save the generated image permanently
+        const permanentUrl = await saveGeneratedImage(data.imageUrl, data.prompt);
+        console.log('Saved image with permanent URL:', permanentUrl);
+        
+        if (permanentUrl) {
+          setGeneratedImages([permanentUrl]);
+          showToast('Image generated and saved successfully!', 'success');
+        } else {
+          throw new Error('Failed to save generated image');
+        }
+      } else {
+        throw new Error('Failed to generate image');
+      }
+    } catch (error) {
+      console.error('Error generating image:', error);
+      setError(error.message || 'Failed to generate image. Please try again.');
+      showToast(error.message || 'Failed to generate image', 'error');
+    } finally {
+      setIsLoading(prev => ({
+        ...prev,
+        generation: false
+      }));
+    }
+  };
+
+  // Function to fetch previously generated images
+  const fetchPreviousImages = React.useCallback(async () => {
+    if (!user) return;
+    
+    try {
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+      
+      if (userDocSnap.exists()) {
+        const userData = userDocSnap.data();
+        if (userData?.generatedImages) {
+          // Sort by timestamp descending (newest first)
+          const sortedImages = [...userData.generatedImages].sort((a, b) => b.timestamp - a.timestamp);
+          setPreviousImages(sortedImages);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching previous images:', error);
+      showToast('Failed to load previous images', 'error');
+    }
+  }, [user, showToast]);
+
+  // Fetch previous images on component mount and after new generation
+  React.useEffect(() => {
+    fetchPreviousImages();
+  }, [fetchPreviousImages, generatedImages]);
+
+  // Function to download image
+  const handleDownload = async (imageUrl, timestamp) => {
+    if (!user) return;
+    
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch(`${API_URL}/openai/download-image?imageUrl=${encodeURIComponent(imageUrl)}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) throw new Error('Failed to download image');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `generated_image_${timestamp}.png`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      showToast('Image downloaded successfully', 'success');
+    } catch (error) {
+      console.error('Error downloading image:', error);
+      showToast('Failed to download image', 'error');
+    }
+  };
 
   return (
     <AppTheme {...props}>
       <CssBaseline enableColorScheme />
+      {isLoading.generation && <LoadingSpinner />}
       <Box sx={{ display: 'flex' }}>
         <SideMenu user={user} />
         <AppNavbar />
@@ -134,6 +352,12 @@ export default function ImageCreation(props) {
                 <Typography variant="body1" color="text.secondary" sx={{ mt: 1, mb: 4 }}>
                   Generate professional images using AI
                 </Typography>
+
+                {error && (
+                  <Alert severity="error" sx={{ mb: 3 }}>
+                    {error}
+                  </Alert>
+                )}
 
                 <Grid container spacing={3}>
                   {/* Left Column: All Input Controls */}
@@ -172,8 +396,6 @@ export default function ImageCreation(props) {
                               }}
                             />
                           </Grid>
-                          
-
 
                           <Grid item xs={12}>
                             <Box sx={{ mb: 2 }}>
@@ -182,6 +404,7 @@ export default function ImageCreation(props) {
                                 variant="outlined"
                                 startIcon={<CloudUploadIcon />}
                                 sx={{ mr: 2 }}
+                                disabled={isLoading.productUpload}
                               >
                                 Upload Product Images
                                 <VisuallyHiddenInput 
@@ -191,17 +414,30 @@ export default function ImageCreation(props) {
                                   onChange={(e) => handleImageUpload(e, false)}
                                 />
                               </Button>
+                              {isLoading.productUpload && <CircularProgress size={24} sx={{ ml: 2 }} />}
                             </Box>
 
                             {uploadedImages.length > 0 && (
-                              <ImageList sx={{ width: '100%', height: 200 }} cols={3} rowHeight={164}>
+                              <ImageList sx={{ width: '100%', height: 'auto', maxHeight: 400 }} cols={3} rowHeight="auto">
                                 {uploadedImages.map((image, index) => (
-                                  <ImageListItem key={index} sx={{ position: 'relative' }}>
+                                  <ImageListItem 
+                                    key={index} 
+                                    sx={{ 
+                                      height: '200px !important',
+                                      overflow: 'hidden',
+                                      position: 'relative'
+                                    }}
+                                  >
                                     <img
                                       src={image.url}
                                       alt={image.name}
                                       loading="lazy"
-                                      style={{ height: '150px', objectFit: 'cover' }}
+                                      style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        objectFit: 'contain',
+                                        backgroundColor: '#f5f5f5'
+                                      }}
                                     />
                                     <IconButton
                                       sx={{
@@ -212,6 +448,7 @@ export default function ImageCreation(props) {
                                       }}
                                       size="small"
                                       onClick={() => handleRemoveImage(index, false)}
+                                      disabled={isLoading.productUpload}
                                     >
                                       <DeleteIcon />
                                     </IconButton>
@@ -237,6 +474,7 @@ export default function ImageCreation(props) {
                             component="label"
                             variant="outlined"
                             startIcon={<CloudUploadIcon />}
+                            disabled={isLoading.referenceUpload}
                           >
                             Upload Reference Images
                             <VisuallyHiddenInput 
@@ -246,17 +484,30 @@ export default function ImageCreation(props) {
                               onChange={(e) => handleImageUpload(e, true)}
                             />
                           </Button>
+                          {isLoading.referenceUpload && <CircularProgress size={24} sx={{ ml: 2 }} />}
                         </Box>
 
                         {referenceImages.length > 0 && (
-                          <ImageList sx={{ width: '100%', height: 200 }} cols={3} rowHeight={164}>
+                          <ImageList sx={{ width: '100%', height: 'auto', maxHeight: 400 }} cols={3} rowHeight="auto">
                             {referenceImages.map((image, index) => (
-                              <ImageListItem key={index} sx={{ position: 'relative' }}>
+                              <ImageListItem 
+                                key={index} 
+                                sx={{ 
+                                  height: '200px !important',
+                                  overflow: 'hidden',
+                                  position: 'relative'
+                                }}
+                              >
                                 <img
                                   src={image.url}
                                   alt={image.name}
                                   loading="lazy"
-                                  style={{ height: '150px', objectFit: 'cover' }}
+                                  style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'contain',
+                                    backgroundColor: '#f5f5f5'
+                                  }}
                                 />
                                 <IconButton
                                   sx={{
@@ -267,6 +518,7 @@ export default function ImageCreation(props) {
                                   }}
                                   size="small"
                                   onClick={() => handleRemoveImage(index, true)}
+                                  disabled={isLoading.referenceUpload}
                                 >
                                   <DeleteIcon />
                                 </IconButton>
@@ -290,20 +542,43 @@ export default function ImageCreation(props) {
                           Describe in detail what kind of image you want to generate
                         </Typography>
 
-                          <StyledTextField
+                        <TextField
+                          fullWidth
+                          multiline
                             variant="outlined"
-                            multiline
-                            fullWidth
                             placeholder="Example: 'To empower busy parents by delivering healthy, convenient meal options, while minimizing environmental impact.'"
+                          value={description}
+                          onChange={(e) => setDescription(e.target.value)}
+                          disabled={isLoading.generation}
+                          sx={{
+                            '& .MuiInputBase-root': {
+                              padding: '12px 16px',
+                              height: 'auto'
+                            },
+                            '& .MuiInputBase-input': {
+                              padding: '0',
+                              height: 'auto !important',
+                              minHeight: '120px'
+                            },
+                            '& textarea': {
+                              overflow: 'hidden !important',
+                              resize: 'none',
+                              height: 'auto !important',
+                              boxSizing: 'border-box',
+                              padding: '16px !important'
+                            }
+                          }}
                           />
 
                         <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
                           <Button
                             variant="contained"
                             size="large"
-                            disabled={!description.trim()}
+                            onClick={handleGenerateImage}
+                            disabled={isLoading.generation || !description.trim()}
+                            startIcon={isLoading.generation ? <CircularProgress size={20} color="inherit" /> : null}
                           >
-                            Generate Image
+                            {isLoading.generation ? 'Generating...' : 'Generate Image'}
                           </Button>
                         </Box>
                       </Paper>
@@ -316,7 +591,41 @@ export default function ImageCreation(props) {
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                           Your generated images will appear here
                         </Typography>
-                        {/* Placeholder for generated images */}
+                        
+                        {generatedImages.length > 0 ? (
+                          <Box sx={{ width: '100%' }}>
+                            {generatedImages.map((imageUrl, index) => (
+                              <Box key={index} sx={{ position: 'relative', mb: 2 }}>
+                                <img
+                                  src={imageUrl}
+                                  alt={`Generated image ${index + 1}`}
+                                  style={{
+                                    width: '100%',
+                                    height: 'auto',
+                                    maxHeight: '600px',
+                                    objectFit: 'contain',
+                                    backgroundColor: '#f5f5f5',
+                                    borderRadius: '4px'
+                                  }}
+                                />
+                                <IconButton
+                                  onClick={() => handleDownload(imageUrl, Date.now())}
+                                  sx={{
+                                    position: 'absolute',
+                                    right: 8,
+                                    top: 8,
+                                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                                    '&:hover': {
+                                      backgroundColor: 'rgba(255, 255, 255, 1)',
+                                    }
+                                  }}
+                                >
+                                  <DownloadIcon />
+                                </IconButton>
+                              </Box>
+                            ))}
+                          </Box>
+                        ) : (
                         <Box sx={{ 
                           display: 'flex', 
                           justifyContent: 'center', 
@@ -326,9 +635,84 @@ export default function ImageCreation(props) {
                           borderRadius: 1
                         }}>
                           <Typography variant="body1" color="text.secondary">
-                            Generated images will be displayed here
+                              {isLoading.generation ? 'Generating image...' : 'Generated images will be displayed here'}
+                            </Typography>
+                          </Box>
+                        )}
+                      </Paper>
+
+                      {/* Previously Generated Images Section */}
+                      <Paper sx={{ p: 3, mt: 3 }}>
+                        <Typography variant="h6" gutterBottom>
+                          Previously Generated Images
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                          Your previously generated images
+                        </Typography>
+
+                        <Grid container spacing={2}>
+                          {previousImages.map((image, index) => (
+                            <Grid item xs={12} sm={6} md={4} key={index}>
+                              <Paper 
+                                elevation={2}
+                                sx={{ 
+                                  p: 1,
+                                  position: 'relative',
+                                  '&:hover .download-button': {
+                                    opacity: 1
+                                  }
+                                }}
+                              >
+                                <Box sx={{ position: 'relative' }}>
+                                  <img
+                                    src={image.url}
+                                    alt={`Previous generated image ${index + 1}`}
+                                    style={{
+                                      width: '100%',
+                                      height: '150px',
+                                      objectFit: 'contain',
+                                      backgroundColor: '#f5f5f5',
+                                      borderRadius: '4px'
+                                    }}
+                                  />
+                                  <IconButton
+                                    className="download-button"
+                                    onClick={() => handleDownload(image.url, image.timestamp)}
+                                    sx={{
+                                      position: 'absolute',
+                                      right: 8,
+                                      top: 8,
+                                      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                                      opacity: 0,
+                                      transition: 'opacity 0.2s',
+                                      '&:hover': {
+                                        backgroundColor: 'rgba(255, 255, 255, 1)',
+                                      }
+                                    }}
+                                  >
+                                    <DownloadIcon />
+                                  </IconButton>
+                                </Box>
+
+                              </Paper>
+                            </Grid>
+                          ))}
+                        </Grid>
+
+                        {previousImages.length === 0 && (
+                          <Box sx={{ 
+                            display: 'flex', 
+                            justifyContent: 'center', 
+                            alignItems: 'center',
+                            height: '100px',
+                            border: '2px dashed #ccc',
+                            borderRadius: 1
+                          }}>
+                            <Typography variant="body1" color="text.secondary">
+                              No previously generated images
                           </Typography>
                         </Box>
+                        )}
                       </Paper>
                     </Stack>
                   </Grid>

@@ -40,6 +40,7 @@ export function ToastProvider({ children }) {
         TransitionComponent={GrowTransition}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
         autoHideDuration={toast.duration}
+        ClickAwayListenerProps={{ mouseEvent: false }}
       >
         <Alert 
           onClose={handleClose} 

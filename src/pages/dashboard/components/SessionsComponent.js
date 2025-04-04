@@ -5,6 +5,60 @@ import { Card, CardContent, Typography, Stack, Chip } from '@mui/material';
 import { LineChart } from '@mui/x-charts/LineChart';
 import { auth } from '../../../firebase';
 
+// Helper function to parse dates safely
+const parseDate = (dateStr) => {
+  try {
+    // Handle YYYYMMDD format
+    if (/^\d{8}$/.test(dateStr)) {
+      const year = dateStr.substring(0, 4);
+      const month = dateStr.substring(4, 6);
+      const day = dateStr.substring(6, 8);
+      return new Date(year, parseInt(month, 10) - 1, day);
+    }
+    
+    // Try parsing the date directly
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) {
+      throw new Error('Invalid date');
+    }
+    return date;
+  } catch (error) {
+    console.warn(`Error parsing date: ${dateStr}`, error);
+    return null;
+  }
+};
+
+// Helper function to format dates
+const formatDate = (dateStr) => {
+  const date = parseDate(dateStr);
+  if (!date) return dateStr; // Return original string if parsing fails
+  
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+  }).format(date);
+};
+
+// Helper function to format date range
+const formatDateRange = (startDate, endDate) => {
+  const start = parseDate(startDate);
+  const end = parseDate(endDate);
+  
+  if (!start || !end) {
+    return `${startDate} → ${endDate}`;
+  }
+  
+  return `${new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  }).format(start)} → ${new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  }).format(end)}`;
+};
+
 function AreaGradient({ color, id }) {
   return (
     <defs>
@@ -63,7 +117,7 @@ export default function SessionsChart({ startDate, endDate }) {
     fetchSessionsData();
   }, [startDate, endDate]);
 
-  const data = sessionsData.map(row => row.date);
+  const data = sessionsData.map(row => formatDate(row.date));
   const activeUsersData = sessionsData.map(row => parseInt(row.users, 10));
   const totalSessions = activeUsersData.reduce((acc, val) => acc + val, 0);
 
@@ -87,7 +141,7 @@ export default function SessionsChart({ startDate, endDate }) {
             <Typography variant="h4" component="p">
               {totalSessions}
             </Typography>
-            <Chip size="small" color="primary" label={`${startDate} → ${endDate}`} />
+            <Chip size="small" color="primary" label={formatDateRange(startDate, endDate)} />
           </Stack>
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
             Active users during selected range
@@ -96,7 +150,15 @@ export default function SessionsChart({ startDate, endDate }) {
 
         <LineChart
           colors={colorPalette}
-          xAxis={[{ scaleType: 'point', data }]}
+          xAxis={[{ 
+            scaleType: 'point', 
+            data,
+            tickLabelStyle: {
+              angle: 45,
+              textAnchor: 'start',
+              fontSize: 12
+            }
+          }]}
           series={[{
             id: 'sessions',
             label: 'Sessions',
@@ -104,7 +166,7 @@ export default function SessionsChart({ startDate, endDate }) {
             curve: 'linear',
           }]}
           height={250}
-          margin={{ left: 50, right: 20, top: 20, bottom: 20 }}
+          margin={{ left: 50, right: 20, top: 20, bottom: 50 }}
           grid={{ horizontal: true }}
           slotProps={{ legend: { hidden: true } }}
         >
