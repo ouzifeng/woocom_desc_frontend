@@ -8,7 +8,7 @@ import {
   Stack,
   Alert,
 } from '@mui/material';
-import { auth } from '../../firebase';
+import { auth } from '../../../firebase';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
