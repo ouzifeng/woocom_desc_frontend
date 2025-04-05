@@ -5,10 +5,13 @@ import { auth } from './firebase';
 import LoadingSpinner from './components/LoadingSpinner';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { ToastProvider } from './components/ToasterAlert';
+import WooCommerceConnectRoute from './pages/settings/WooCommerceConnectRoute';
+
 
 // Eagerly loaded components (keep authentication and core components)
 import SignIn from './pages/sign-in/SignIn';
 import SignUp from './pages/sign-up/SignUp';
+
 
 // Lazy load everything including Dashboard for better performance
 const Dashboard = React.lazy(() => import('./pages/dashboard/Dashboard'));
@@ -41,6 +44,8 @@ function App() {
             <Routes>
               <Route path="/sign-in" element={!user ? <SignIn /> : <Navigate to="/dashboard" />} />
               <Route path="/sign-up" element={!user ? <SignUp /> : <Navigate to="/settings" />} />
+
+              <Route path="/wc-connect" element={<WooCommerceConnectRoute />} />
               
               {/* Redirect root to dashboard */}
               <Route path="/" element={<Navigate to="/dashboard" />} />
