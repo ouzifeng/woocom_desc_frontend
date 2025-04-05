@@ -5,7 +5,7 @@ import { auth } from '../../firebase';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
-export default function WooConnectReceiver() {
+export default function WooCommerceConnectRoute() {
   const [user, loading] = useAuthState(auth);
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -18,35 +18,47 @@ export default function WooConnectReceiver() {
       const apiId = params.get('key');
       const secretKey = params.get('secret');
 
-      if (!storeUrl || !apiId || !secretKey) return;
+      if (!storeUrl || !apiId || !secretKey) {
+        alert('Missing required parameters.');
+        return;
+      }
 
-      const idToken = await user.getIdToken();
+      try {
+        const idToken = await user.getIdToken();
 
-      const res = await fetch(`${API_URL}/woocommerce/connect`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          storeUrl,
-          apiId,
-          secretKey,
-          userId: user.uid
-        })
-      });
+        const res = await fetch(`${API_URL}/woocommerce/connect`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            storeUrl,
+            apiId,
+            secretKey,
+            userId: user.uid
+          })
+        });
 
-      const data = await res.json();
+        const data = await res.json();
 
-      if (data.result === 'Success') {
-        alert('WooCommerce connected!');
-        navigate('/settings');
-      } else {
-        alert('Failed to connect: ' + data.message);
+        if (data.result === 'Success') {
+          alert('WooCommerce connected!');
+          navigate('/settings');
+        } else {
+          alert('Failed to connect: ' + (data.message || 'Unknown error'));
+        }
+      } catch (err) {
+        console.error('Connection error:', err);
+        alert('There was a problem connecting to your WooCommerce store.');
       }
     };
 
     if (!loading) connect();
-  }, [loading, user, params]);
+  }, [loading, user, params, navigate]);
 
-  return <p style={{ textAlign: 'center' }}>Connecting your WooCommerce store…</p>;
+  return (
+    <p style={{ textAlign: 'center', marginTop: '2rem' }}>
+      Connecting your WooCommerce store…
+    </p>
+  );
 }

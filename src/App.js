@@ -5,7 +5,6 @@ import { auth } from './firebase';
 import LoadingSpinner from './components/LoadingSpinner';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { ToastProvider } from './components/ToasterAlert';
-import WooCommerceConnectRoute from './pages/settings/WooCommerceConnectRoute';
 
 
 // Eagerly loaded components (keep authentication and core components)
@@ -28,6 +27,8 @@ const Settings = React.lazy(() => import('./pages/settings/SettingsPage'));
 const BrandSettings = React.lazy(() => import('./pages/brandSettings/BrandSettings'));
 const TranslationProductPage = React.lazy(() => import('./pages/translations/components/TranslationProductPage'));
 const Checkout = React.lazy(() => import('./pages/checkout/Checkout'));
+const WooCommerceConnectRoute = React.lazy(() => import('./pages/settings/WooCommerceConnectRoute'));
+
 
 function App() {
   const [user, loading] = useAuthState(auth);
@@ -45,7 +46,7 @@ function App() {
               <Route path="/sign-in" element={!user ? <SignIn /> : <Navigate to="/dashboard" />} />
               <Route path="/sign-up" element={!user ? <SignUp /> : <Navigate to="/settings" />} />
 
-              <Route path="/wc-connect" element={<WooCommerceConnectRoute />} />
+              <Route path="/woocommerce/receive" element={<WooCommerceConnectRoute />} />
               
               {/* Redirect root to dashboard */}
               <Route path="/" element={<Navigate to="/dashboard" />} />
