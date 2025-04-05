@@ -1,12 +1,22 @@
 import * as React from 'react';
-import { useState, useEffect } from 'react';
-import { TextField, Button, Typography, Alert, Card, Box, FormControl, FormLabel } from '@mui/material';
+import { useState } from 'react';
+import {
+  TextField,
+  Button,
+  Typography,
+  Alert,
+  Card,
+  Box,
+  FormControl,
+  FormLabel
+} from '@mui/material';
 import { styled } from '@mui/material/styles';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../../../firebase';
+import { doc, setDoc } from 'firebase/firestore';
 
 const API_URL = process.env.REACT_APP_API_URL;
+const PLUGIN_URL = 'https://app.ecommander.io/public/plugins/ecommander_woocommerce.zip';
 
 const SettingsCard = styled(Card)(({ theme }) => ({
   display: 'flex',
@@ -17,175 +27,105 @@ const SettingsCard = styled(Card)(({ theme }) => ({
   gap: theme.spacing(2),
   margin: 'auto',
   [theme.breakpoints.up('sm')]: {
-    maxWidth: '450px',
+    maxWidth: '450px'
   },
   boxShadow: '0px 4px 10px rgba(0,0,0,0.08)',
   overflow: 'auto'
 }));
 
-export default function WooCommerceSettingsCard() {
+export default function WooCommerceConnectCard() {
   const [user] = useAuthState(auth);
   const [storeUrl, setStoreUrl] = useState('');
-  const [apiId, setApiId] = useState('');
-  const [secretKey, setSecretKey] = useState('');
-  const [testResult, setTestResult] = useState(null);
-  const [loading, setLoading] = useState(false);
   const [urlError, setUrlError] = useState('');
+  const [connecting, setConnecting] = useState(false);
+  const [message, setMessage] = useState(null);
 
-  const validateUrl = (url) => {
-    const pattern = /^(http:\/\/|https:\/\/)/;
-    if (!pattern.test(url)) {
-      return 'URL must start with http:// or https://';
+  const validateAndFormatUrl = (url) => {
+    let trimmed = url.trim();
+
+    if (!/^https:\/\//.test(trimmed)) {
+      return { valid: false, error: 'URL must start with https://' };
     }
-    return '';
+
+    if (/\s/.test(trimmed)) {
+      return { valid: false, error: 'URL cannot contain spaces' };
+    }
+
+    if (trimmed.endsWith('/')) {
+      trimmed = trimmed.slice(0, -1);
+    }
+
+    try {
+      new URL(trimmed);
+    } catch (err) {
+      return { valid: false, error: 'Invalid URL format' };
+    }
+
+    return { valid: true, url: trimmed };
   };
 
-  const handleTest = async () => {
-    const error = validateUrl(storeUrl);
-    if (error) {
-      setUrlError(error);
+  const handleConnect = async () => {
+    setMessage(null);
+    const result = validateAndFormatUrl(storeUrl);
+
+    if (!result.valid) {
+      setUrlError(result.error);
       return;
     }
+
     setUrlError('');
-    setLoading(true);
+    setConnecting(true);
+
     try {
-      const formattedUrl = storeUrl.endsWith('/') ? storeUrl.slice(0, -1) : storeUrl;
-      console.log('Sending request to backend server');
-      const response = await fetch(`${API_URL}/woocommerce/test`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ storeUrl: formattedUrl, apiId, secretKey }),
-      });
-      const result = await response.json();
-      console.log('Received response from backend server:', result);
-      setTestResult(result.result === 'Success' ? 'Success' : 'Failed');
-    } catch (error) {
-      console.error('Error sending request to backend server:', error);
-      setTestResult('Failed');
-    }
-    setLoading(false);
-  };
+      const store = result.url;
 
-  const handleSave = async () => {
-    if (user) {
-      const userDoc = doc(db, 'users', user.uid);
-      await setDoc(userDoc, {
-        wc_key: apiId,
-        wc_secret: secretKey,
-        wc_url: storeUrl,
-      }, { merge: true });
-      setSecretKey('******');
-    }
-  };
-
-  useEffect(() => {
-    const fetchData = async () => {
       if (user) {
-        const userDocRef = doc(db, 'users', user.uid);
-        const docSnap = await getDoc(userDocRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setStoreUrl(data.wc_url || '');
-          setApiId(data.wc_key || '');
-          setSecretKey(data.wc_secret ? '**************************' : '');
-        }
+        const userDoc = doc(db, 'users', user.uid);
+        await setDoc(userDoc, { wc_url: store }, { merge: true });
+
+        const pluginInstallUrl = `${store}/wp-admin/plugin-install.php?plugin_url=${encodeURIComponent(PLUGIN_URL)}&user_id=${user.uid}`;
+        window.open(pluginInstallUrl, '_blank', 'width=600,height=800');
       }
-    };
-    fetchData();
-  }, [user]);
+    } catch (error) {
+      console.error('Connection error:', error);
+      setMessage('Something went wrong. Please try again.');
+    } finally {
+      setConnecting(false);
+    }
+  };
 
   return (
     <SettingsCard variant="outlined">
       <Typography variant="h6" gutterBottom align="center">
-        WooCommerce Credentials
+        Connect Your WooCommerce Store
       </Typography>
-      <Box
-        component="form"
-        sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 2,
-        }}
+      <FormControl>
+        <FormLabel htmlFor="storeUrl">Your Store URL</FormLabel>
+        <TextField
+          id="storeUrl"
+          type="url"
+          name="storeUrl"
+          placeholder="https://yourstore.com"
+          fullWidth
+          variant="outlined"
+          value={storeUrl}
+          onChange={(e) => setStoreUrl(e.target.value)}
+          error={!!urlError}
+          helperText={urlError || 'Make sure the URL is correct and live'}
+        />
+      </FormControl>
+      <Button
+        variant="contained"
+        onClick={handleConnect}
+        disabled={!storeUrl || connecting}
       >
-        <FormControl>
-          <FormLabel htmlFor="storeUrl">Store URL</FormLabel>
-          <TextField
-            required
-            id="storeUrl"
-            type="url"
-            name="storeUrl"
-            placeholder="https://yourstore.com"
-            autoComplete="url"
-            fullWidth
-            variant="outlined"
-            value={storeUrl}
-            onChange={(e) => setStoreUrl(e.target.value)}
-            error={!!urlError}
-            helperText={urlError}
-          />
-        </FormControl>
-        <FormControl>
-          <FormLabel htmlFor="apiId">API ID</FormLabel>
-          <TextField
-            required
-            id="apiId"
-            type="text"
-            name="apiId"
-            placeholder="API ID"
-            autoComplete="api-id"
-            fullWidth
-            variant="outlined"
-            value={apiId}
-            onChange={(e) => setApiId(e.target.value)}
-          />
-        </FormControl>
-        <FormControl>
-          <FormLabel htmlFor="secretKey">Secret Key</FormLabel>
-          <TextField
-            required
-            id="secretKey"
-            type="password"
-            name="secretKey"
-            placeholder="••••••"
-            autoComplete="current-password"
-            fullWidth
-            variant="outlined"
-            value={secretKey}
-            onChange={(e) => setSecretKey(e.target.value)}
-          />
-        </FormControl>
-        <Box
-          sx={{
-            display: 'flex',
-            gap: 2,
-            justifyContent: 'center',
-            width: '100%',
-            mt: 2,
-          }}
-        >
-          <Button
-            variant="contained"
-            onClick={handleTest}
-            disabled={loading}
-            sx={{ flex: 1 }}
-          >
-            {loading ? 'Testing...' : 'Test'}
-          </Button>
-          <Button variant="contained" onClick={handleSave} sx={{ flex: 1 }}>
-            Save
-          </Button>
-        </Box>
-        {testResult && (
-          <Alert
-            severity={testResult === 'Success' ? 'success' : 'error'}
-            sx={{ width: '100%' }}
-          >
-            {testResult}
-          </Alert>
-        )}
-      </Box>
+        {connecting ? 'Redirecting...' : 'Connect Store'}
+      </Button>
+      {message && (
+        <Alert severity="error" sx={{ mt: 2 }}>
+          {message}
+        </Alert>
+      )}
     </SettingsCard>
   );
 }
