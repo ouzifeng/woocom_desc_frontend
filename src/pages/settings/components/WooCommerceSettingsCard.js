@@ -22,12 +22,11 @@ const SettingsCard = styled(Card)(({ theme }) => ({
   display: 'flex',
   flexDirection: 'column',
   width: '100%',
-  height: '100%',
   padding: theme.spacing(4),
-  gap: theme.spacing(2),
+  gap: theme.spacing(3),
   margin: 'auto',
   [theme.breakpoints.up('sm')]: {
-    maxWidth: '450px'
+    maxWidth: '500px'
   },
   boxShadow: '0px 4px 10px rgba(0,0,0,0.08)',
   overflow: 'auto'
@@ -79,13 +78,19 @@ export default function WooCommerceConnectCard() {
     try {
       const store = result.url;
 
+      // Save wc_url to Firestore now
       if (user) {
         const userDoc = doc(db, 'users', user.uid);
-        await setDoc(userDoc, { wc_url: store }, { merge: true });
-
-        const pluginInstallUrl = `${store}/wp-admin/plugin-install.php?plugin_url=${encodeURIComponent(PLUGIN_URL)}&user_id=${user.uid}`;
-        window.open(pluginInstallUrl, '_blank', 'width=600,height=800');
+        await setDoc(userDoc, {
+          wc_url: store
+        }, { merge: true });
       }
+
+      // Instruct user to activate plugin manually if needed
+      window.open(`${store}/wp-admin/plugins.php`, '_blank');
+
+      // Optional: show some message
+      setMessage('Once plugin is activated, you can start using the tools.');
     } catch (error) {
       console.error('Connection error:', error);
       setMessage('Something went wrong. Please try again.');
@@ -94,11 +99,29 @@ export default function WooCommerceConnectCard() {
     }
   };
 
+  const handleDownloadPlugin = () => {
+    const a = document.createElement('a');
+    a.href = PLUGIN_URL;
+    a.download = 'ecommander_woocommerce.zip';
+    a.click();
+  };
+
   return (
     <SettingsCard variant="outlined">
       <Typography variant="h6" gutterBottom align="center">
         Connect Your WooCommerce Store
       </Typography>
+
+      <Typography variant="body2">
+        1. Enter your store URL (must start with <strong>https://</strong>)
+        <br />
+        2. Download and install our plugin
+        <br />
+        3. Activate it inside your WooCommerce admin
+        <br />
+        4. Click “Connect Store” to finalize the connection
+      </Typography>
+
       <FormControl>
         <FormLabel htmlFor="storeUrl">Your Store URL</FormLabel>
         <TextField
@@ -114,15 +137,24 @@ export default function WooCommerceConnectCard() {
           helperText={urlError || 'Make sure the URL is correct and live'}
         />
       </FormControl>
+
+      <Button
+        variant="outlined"
+        onClick={handleDownloadPlugin}
+      >
+        Download Plugin
+      </Button>
+
       <Button
         variant="contained"
         onClick={handleConnect}
         disabled={!storeUrl || connecting}
       >
-        {connecting ? 'Redirecting...' : 'Connect Store'}
+        {connecting ? 'Connecting...' : 'Connect Store'}
       </Button>
+
       {message && (
-        <Alert severity="error" sx={{ mt: 2 }}>
+        <Alert severity="info" sx={{ mt: 2 }}>
           {message}
         </Alert>
       )}
