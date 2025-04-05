@@ -16,7 +16,8 @@ import { auth, db } from '../../../firebase';
 import { doc, setDoc } from 'firebase/firestore';
 
 const API_URL = process.env.REACT_APP_API_URL;
-const PLUGIN_URL = 'https://app.ecommander.io/public/plugins/ecommander_woocommerce.zip';
+const PLUGIN_URL = 'https://app.ecommander.io/plugins/ecommander_woocommerce.zip';
+
 
 const SettingsCard = styled(Card)(({ theme }) => ({
   display: 'flex',
