@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
-import { useAuthState } from 'react-firebase-hooks/auth';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '../../firebase';
+import { CircularProgress, Box, Typography } from '@mui/material';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -12,14 +13,11 @@ export default function WooCommerceConnectRoute() {
 
   useEffect(() => {
     const connect = async () => {
-      if (!user) return;
-
       const storeUrl = params.get('store');
       const apiId = params.get('key');
       const secretKey = params.get('secret');
 
-      if (!storeUrl || !apiId || !secretKey) {
-        alert('Missing required parameters.');
+      if (!storeUrl || !apiId || !secretKey || !user) {
         return;
       }
 
@@ -29,27 +27,27 @@ export default function WooCommerceConnectRoute() {
         const res = await fetch(`${API_URL}/woocommerce/connect`, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${idToken}`,
           },
           body: JSON.stringify({
             storeUrl,
             apiId,
             secretKey,
-            userId: user.uid
-          })
+          }),
         });
 
         const data = await res.json();
 
         if (data.result === 'Success') {
-          alert('WooCommerce connected!');
           navigate('/settings');
         } else {
-          alert('Failed to connect: ' + (data.message || 'Unknown error'));
+          console.error(data.message);
+          navigate('/settings?error=connect_failed');
         }
       } catch (err) {
         console.error('Connection error:', err);
-        alert('There was a problem connecting to your WooCommerce store.');
+        navigate('/settings?error=server');
       }
     };
 
@@ -57,8 +55,11 @@ export default function WooCommerceConnectRoute() {
   }, [loading, user, params, navigate]);
 
   return (
-    <p style={{ textAlign: 'center', marginTop: '2rem' }}>
-      Connecting your WooCommerce store…
-    </p>
+    <Box sx={{ textAlign: 'center', mt: 5 }}>
+      <CircularProgress />
+      <Typography variant="body2" sx={{ mt: 2 }}>
+        Connecting your WooCommerce store...
+      </Typography>
+    </Box>
   );
 }
