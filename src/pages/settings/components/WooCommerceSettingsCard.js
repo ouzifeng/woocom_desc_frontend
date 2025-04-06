@@ -12,6 +12,7 @@ import { auth } from '../../../firebase';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
+
 export default function WooCommerceSettingsCard() {
   const [status, setStatus] = useState('loading');
   const [error, setError] = useState('');
@@ -124,14 +125,15 @@ export default function WooCommerceSettingsCard() {
             >
               Connect Plugin
             </Button>
-            <Button
-              variant="outlined"
-              color="secondary"
-              href="https://ecommander.io/plugins/ecommander-woocommerce-plugin.zip"
-              target="_blank"
-            >
-              Download Plugin
-            </Button>
+          <Button
+            variant="outlined"
+            color="secondary"
+            component="a"
+            href="/plugins/ecommander_woocommerce_plugin.zip"
+            download
+          >
+            Download Plugin
+          </Button>
           </>
         )}
       </Stack>
