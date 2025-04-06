@@ -27,11 +27,7 @@ export default function WooCommerceSettingsCard() {
         },
       });
       const data = await res.json();
-      if (data.connected) {
-        setStatus('connected');
-      } else {
-        setStatus('disconnected');
-      }
+      setStatus(data.connected ? 'connected' : 'disconnected');
     } catch (err) {
       console.error('Status check failed:', err);
       setError('Failed to check WooCommerce status.');
@@ -53,6 +49,7 @@ export default function WooCommerceSettingsCard() {
       if (data.result === 'Success') {
         setStatus('disconnected');
         setError('');
+        setTestResult('');
       } else {
         setError(data.message || 'Disconnection failed.');
         setStatus('connected');
@@ -68,16 +65,13 @@ export default function WooCommerceSettingsCard() {
     try {
       setTestResult('testing');
       const token = await user.getIdToken();
-
       const res = await fetch(`${API_URL}/woocommerce/test`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-
       const data = await res.json();
-
       if (data.result === 'Success') {
         setTestResult('success');
       } else {
@@ -89,50 +83,58 @@ export default function WooCommerceSettingsCard() {
     }
   };
 
-
-
   useEffect(() => {
     if (user) fetchConnectionStatus();
   }, [user]);
 
-  const renderAction = () => {
+  const renderActionButtons = () => {
     if (status === 'loading') return <CircularProgress size={24} />;
 
-    if (status === 'connected') {
-      return (
-        <Stack direction="row" spacing={2}>
-          <Button variant="outlined" color="error" onClick={disconnect}>
-            Disconnect
-          </Button>
-          <Button
-            variant="outlined"
-            color="secondary"
-            onClick={testConnection}
-            disabled={testResult === 'testing'}
-          >
-            {testResult === 'testing' ? 'Testing…' : 'Test Connection'}
-          </Button>
-          <Button
-            variant="outlined"
-            color="primary"
-            href="https://shimeruknives.co.uk/wp-admin/admin.php?page=ecommander-settings"
-            target="_blank"
-          >
-            Open Plugin
-          </Button>
-        </Stack>
-      );
-    }
-
     return (
-      <Button
-        variant="contained"
-        color="primary"
-        href="https://shimeruknives.co.uk/wp-admin/admin.php?page=ecommander-settings"
-        target="_blank"
-      >
-        Connect Plugin
-      </Button>
+      <Stack spacing={1}>
+        {status === 'connected' ? (
+          <>
+            <Button variant="outlined" color="error" onClick={disconnect}>
+              Disconnect
+            </Button>
+            <Button
+              variant="outlined"
+              color="secondary"
+              onClick={testConnection}
+              disabled={testResult === 'testing'}
+            >
+              {testResult === 'testing' ? 'Testing…' : 'Test Connection'}
+            </Button>
+            <Button
+              variant="outlined"
+              color="primary"
+              href="https://shimeruknives.co.uk/wp-admin/admin.php?page=ecommander-settings"
+              target="_blank"
+            >
+              Open Plugin Settings
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button
+              variant="contained"
+              color="primary"
+              href="https://shimeruknives.co.uk/wp-admin/admin.php?page=ecommander-settings"
+              target="_blank"
+            >
+              Connect Plugin
+            </Button>
+            <Button
+              variant="outlined"
+              color="secondary"
+              href="https://ecommander.io/plugins/ecommander-woocommerce-plugin.zip"
+              target="_blank"
+            >
+              Download Plugin
+            </Button>
+          </>
+        )}
+      </Stack>
     );
   };
 
@@ -146,10 +148,12 @@ export default function WooCommerceSettingsCard() {
               ? 'Your store is connected to Ecommander.'
               : 'Not connected. Click below to install or reconnect the plugin.'}
           </Typography>
+
           {error && <Alert severity="error">{error}</Alert>}
           {testResult === 'success' && <Alert severity="success">Connection is valid.</Alert>}
           {testResult === 'fail' && <Alert severity="error">Connection test failed.</Alert>}
-          {renderAction()}
+
+          {renderActionButtons()}
         </Stack>
       </CardContent>
     </Card>
