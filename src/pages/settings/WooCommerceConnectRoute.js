@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { auth } from '../../firebase';
 import { CircularProgress, Box, Typography } from '@mui/material';
 
@@ -10,14 +10,18 @@ export default function WooCommerceConnectRoute() {
   const [user, loading] = useAuthState(auth);
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const connect = async () => {
+      if (!user) return;
+
       const storeUrl = params.get('store');
       const apiId = params.get('key');
       const secretKey = params.get('secret');
 
-      if (!storeUrl || !apiId || !secretKey || !user) {
+      if (!storeUrl || !apiId || !secretKey) {
+        setError('Missing required parameters.');
         return;
       }
 
@@ -28,12 +32,12 @@ export default function WooCommerceConnectRoute() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${idToken}`,
           },
           body: JSON.stringify({
             storeUrl,
             apiId,
             secretKey,
+            userId: user.uid,
           }),
         });
 
@@ -42,24 +46,29 @@ export default function WooCommerceConnectRoute() {
         if (data.result === 'Success') {
           navigate('/settings');
         } else {
-          console.error(data.message);
-          navigate('/settings?error=connect_failed');
+          setError(data.message || 'Connection failed.');
         }
       } catch (err) {
-        console.error('Connection error:', err);
-        navigate('/settings?error=server');
+        console.error('Error during connection:', err);
+        setError('Something went wrong while connecting.');
       }
     };
 
-    if (!loading) connect();
+    if (!loading && user) connect();
   }, [loading, user, params, navigate]);
 
   return (
-    <Box sx={{ textAlign: 'center', mt: 5 }}>
-      <CircularProgress />
-      <Typography variant="body2" sx={{ mt: 2 }}>
-        Connecting your WooCommerce store...
-      </Typography>
+    <Box sx={{ textAlign: 'center', mt: 10 }}>
+      {error ? (
+        <Typography color="error">{error}</Typography>
+      ) : (
+        <>
+          <CircularProgress />
+          <Typography variant="body2" mt={2}>
+            Connecting your WooCommerce store…
+          </Typography>
+        </>
+      )}
     </Box>
   );
 }
