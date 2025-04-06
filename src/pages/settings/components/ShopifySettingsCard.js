@@ -12,8 +12,7 @@ import { auth } from '../../../firebase';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
-
-export default function WooCommerceSettingsCard() {
+export default function ShopifySettingsCard() {
   const [status, setStatus] = useState('loading');
   const [error, setError] = useState('');
   const [testResult, setTestResult] = useState('');
@@ -22,16 +21,14 @@ export default function WooCommerceSettingsCard() {
   const fetchConnectionStatus = async () => {
     try {
       const token = await user.getIdToken();
-      const res = await fetch(`${API_URL}/woocommerce/status`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      const res = await fetch(`${API_URL}/shopify/status`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
       setStatus(data.connected ? 'connected' : 'disconnected');
     } catch (err) {
       console.error('Status check failed:', err);
-      setError('Failed to check WooCommerce status.');
+      setError('Failed to check Shopify status.');
       setStatus('error');
     }
   };
@@ -40,11 +37,9 @@ export default function WooCommerceSettingsCard() {
     try {
       setStatus('loading');
       const token = await user.getIdToken();
-      const res = await fetch(`${API_URL}/woocommerce/disconnect`, {
+      const res = await fetch(`${API_URL}/shopify/disconnect`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
       if (data.result === 'Success') {
@@ -66,18 +61,12 @@ export default function WooCommerceSettingsCard() {
     try {
       setTestResult('testing');
       const token = await user.getIdToken();
-      const res = await fetch(`${API_URL}/woocommerce/test`, {
+      const res = await fetch(`${API_URL}/shopify/test`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-      if (data.result === 'Success') {
-        setTestResult('success');
-      } else {
-        setTestResult('fail');
-      }
+      setTestResult(data.result === 'Success' ? 'success' : 'fail');
     } catch (err) {
       console.error('Test connection failed:', err);
       setTestResult('fail');
@@ -109,32 +98,23 @@ export default function WooCommerceSettingsCard() {
             <Button
               variant="outlined"
               color="primary"
-              href="https://shimeruknives.co.uk/wp-admin/admin.php?page=ecommander-settings"
+              href="https://admin.shopify.com/store/YOUR_STORE_NAME/apps"
               target="_blank"
             >
-              Open Plugin Settings
+              Open Shopify App
             </Button>
           </>
         ) : (
-          <>
-            <Button
-              variant="contained"
-              color="primary"
-              href="https://shimeruknives.co.uk/wp-admin/admin.php?page=ecommander-settings"
-              target="_blank"
-            >
-              Connect Plugin
-            </Button>
           <Button
-            variant="outlined"
-            color="secondary"
-            component="a"
-            href="/plugins/ecommander_woocommerce_plugin.zip"
-            download
+            variant="contained"
+            color="primary"
+            onClick={async () => {
+              const token = await user.getIdToken();
+              window.location.href = `${API_URL}/shopify/install?token=${token}`;
+            }}
           >
-            Download Plugin
+            Connect Shopify
           </Button>
-          </>
         )}
       </Stack>
     );
@@ -144,11 +124,11 @@ export default function WooCommerceSettingsCard() {
     <Card>
       <CardContent>
         <Stack spacing={2}>
-          <Typography variant="h6">WooCommerce</Typography>
+          <Typography variant="h6">Shopify</Typography>
           <Typography variant="body2">
             {status === 'connected'
               ? 'Your store is connected to Ecommander.'
-              : 'Not connected. To connect your store, download the plugin, install and activate it on your WordPress site.'}
+              : 'Not connected. Click below to authorize and install the Ecommander app.'}
           </Typography>
 
           {error && <Alert severity="error">{error}</Alert>}

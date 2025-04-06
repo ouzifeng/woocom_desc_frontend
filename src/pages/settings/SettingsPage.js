@@ -8,7 +8,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import Typography from '@mui/material/Typography';
 import { useAuthState } from 'react-firebase-hooks/auth';
-
+import ShopifySettingsCard from './components/ShopifySettingsCard';
 import AppNavbar from '../dashboard/components/AppNavbar';
 import Header from '../dashboard/components/Header';
 import SideMenu from '../dashboard/components/SideMenu';
@@ -81,6 +81,12 @@ export default function SettingsPage(props) {
                     <Outlet />
                   </Box>
                 </Grid>
+                <Grid item xs={12} md={3} sx={{ height: CARD_HEIGHT }}>
+                  <Box sx={{ height: '100%' }}>
+                    <ShopifySettingsCard />
+                  </Box>
+                </Grid>
+                
               </Grid>
             </Box>
           </LocalizationProvider>
