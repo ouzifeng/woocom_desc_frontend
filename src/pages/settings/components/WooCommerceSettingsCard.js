@@ -68,13 +68,16 @@ export default function WooCommerceSettingsCard() {
     try {
       setTestResult('testing');
       const token = await user.getIdToken();
+
       const res = await fetch(`${API_URL}/woocommerce/test`, {
-        method: 'GET',
+        method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
+
       const data = await res.json();
+
       if (data.result === 'Success') {
         setTestResult('success');
       } else {
@@ -85,6 +88,8 @@ export default function WooCommerceSettingsCard() {
       setTestResult('fail');
     }
   };
+
+
 
   useEffect(() => {
     if (user) fetchConnectionStatus();
