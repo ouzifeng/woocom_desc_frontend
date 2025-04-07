@@ -127,7 +127,9 @@ export default function GoogleAnalyticsCard() {
       setLoading(true);
       const user = auth.currentUser;
       const idToken = await user.getIdToken();
-      const redirectUri = `${API_BASE_URL}/analytics/auth/callback`;
+      const redirectUri = process.env.NODE_ENV === 'production'
+        ? 'https://app.ecommander.io/analytics/auth/callback'
+        : 'http://localhost:5000/analytics/auth/callback';
       const url = `${API_BASE_URL}/analytics/auth/url?redirect_uri=${encodeURIComponent(redirectUri)}&token=${encodeURIComponent(idToken)}`;
       const res = await fetch(url);
       const data = await res.json();
