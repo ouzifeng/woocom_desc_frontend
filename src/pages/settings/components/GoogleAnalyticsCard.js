@@ -128,7 +128,7 @@ export default function GoogleAnalyticsCard() {
       const user = auth.currentUser;
       const idToken = await user.getIdToken();
       const redirectUri = process.env.NODE_ENV === 'production'
-        ? 'https://woocomdescbackend-451f66b3eb02.herokuapp.com/analytics/auth/callback'
+        ? 'https://app.ecommander.io/analytics/auth/callback'
         : 'http://localhost:5000/analytics/auth/callback';
       const url = `${API_BASE_URL}/analytics/auth/url?redirect_uri=${encodeURIComponent(redirectUri)}&token=${encodeURIComponent(idToken)}`;
       const res = await fetch(url);
