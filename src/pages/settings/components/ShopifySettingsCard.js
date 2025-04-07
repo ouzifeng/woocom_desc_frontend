@@ -7,25 +7,91 @@ import {
   CircularProgress,
   Stack,
   Alert,
+  Tooltip,
+  Box,
+  TextField,
 } from '@mui/material';
+import { styled } from '@mui/material/styles';
 import { auth } from '../../../firebase';
+import { useStoreConnection } from '../../../contexts/StoreConnectionContext';
 
 const API_URL = process.env.REACT_APP_API_URL;
+
+const SettingsCard = styled(Card)(({ theme, disabled }) => ({
+  display: 'flex',
+  flexDirection: 'column',
+  width: '100%',
+  height: '100%',
+  padding: theme.spacing(4),
+  gap: theme.spacing(2),
+  margin: 'auto',
+  [theme.breakpoints.up('sm')]: {
+    maxWidth: '450px',
+  },
+  boxShadow: '0px 4px 10px rgba(0,0,0,0.08)',
+  overflow: 'auto',
+  backgroundColor: '#fff',
+  opacity: disabled ? 0.6 : 1,
+  transition: 'opacity 0.3s ease',
+  pointerEvents: disabled ? 'none' : 'auto',
+}));
 
 export default function ShopifySettingsCard() {
   const [status, setStatus] = useState('loading');
   const [error, setError] = useState('');
   const [testResult, setTestResult] = useState('');
+  const [storeUrl, setStoreUrl] = useState('');
+  const [isConnecting, setIsConnecting] = useState(false);
   const user = auth.currentUser;
+  const { connectedPlatform, setConnectedPlatform } = useStoreConnection();
+
+  const cleanUrl = (url) => {
+    // Remove protocol and www
+    let cleaned = url.replace(/^(https?:\/\/)?(www\.)?/, '');
+    // Remove trailing slash
+    cleaned = cleaned.replace(/\/$/, '');
+    // Remove any paths or query params
+    cleaned = cleaned.split('/')[0];
+    return cleaned.trim();
+  };
+
+  const validateUrl = (url) => {
+    if (!url) return 'Please enter your store URL';
+    
+    const cleaned = cleanUrl(url);
+    
+    // Don't allow direct myshopify.com URLs
+    if (cleaned.includes('.myshopify.com')) {
+      return 'Please enter your store\'s actual domain, not the myshopify.com URL';
+    }
+
+    // Basic domain validation
+    const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$/;
+    if (!domainRegex.test(cleaned)) {
+      return 'Please enter a valid domain (e.g., yourstore.com)';
+    }
+
+    return null;
+  };
 
   const fetchConnectionStatus = async () => {
     try {
       const token = await user.getIdToken();
       const res = await fetch(`${API_URL}/shopify/status`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
       const data = await res.json();
-      setStatus(data.connected ? 'connected' : 'disconnected');
+      const isConnected = data.connected;
+      setStatus(isConnected ? 'connected' : 'disconnected');
+      
+      // Update the global connection state
+      if (isConnected) {
+        setConnectedPlatform('shopify');
+      } else if (connectedPlatform === 'shopify') {
+        setConnectedPlatform(null);
+      }
     } catch (err) {
       console.error('Status check failed:', err);
       setError('Failed to check Shopify status.');
@@ -39,13 +105,16 @@ export default function ShopifySettingsCard() {
       const token = await user.getIdToken();
       const res = await fetch(`${API_URL}/shopify/disconnect`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
       const data = await res.json();
       if (data.result === 'Success') {
         setStatus('disconnected');
         setError('');
         setTestResult('');
+        setConnectedPlatform(null);
       } else {
         setError(data.message || 'Disconnection failed.');
         setStatus('connected');
@@ -63,13 +132,40 @@ export default function ShopifySettingsCard() {
       const token = await user.getIdToken();
       const res = await fetch(`${API_URL}/shopify/test`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
       const data = await res.json();
-      setTestResult(data.result === 'Success' ? 'success' : 'fail');
+      if (data.result === 'Success') {
+        setTestResult('success');
+      } else {
+        setTestResult('fail');
+      }
     } catch (err) {
       console.error('Test connection failed:', err);
       setTestResult('fail');
+    }
+  };
+
+  const handleConnect = async () => {
+    const cleaned = cleanUrl(storeUrl);
+    const error = validateUrl(storeUrl);
+    
+    if (error) {
+      setError(error);
+      return;
+    }
+
+    try {
+      setIsConnecting(true);
+      setError('');
+      const token = await user.getIdToken();
+      window.location.href = `${API_URL}/shopify/install?token=${token}&shop=${encodeURIComponent(cleaned)}`;
+    } catch (err) {
+      console.error('Failed to start connection:', err);
+      setError('Failed to start Shopify connection');
+      setIsConnecting(false);
     }
   };
 
@@ -81,10 +177,10 @@ export default function ShopifySettingsCard() {
     if (status === 'loading') return <CircularProgress size={24} />;
 
     return (
-      <Stack spacing={1}>
+      <Stack spacing={1} width="100%">
         {status === 'connected' ? (
           <>
-            <Button variant="outlined" color="error" onClick={disconnect}>
+            <Button variant="outlined" color="error" onClick={disconnect} fullWidth>
               Disconnect
             </Button>
             <Button
@@ -92,6 +188,7 @@ export default function ShopifySettingsCard() {
               color="secondary"
               onClick={testConnection}
               disabled={testResult === 'testing'}
+              fullWidth
             >
               {testResult === 'testing' ? 'Testing…' : 'Test Connection'}
             </Button>
@@ -100,44 +197,69 @@ export default function ShopifySettingsCard() {
               color="primary"
               href="https://admin.shopify.com/store/YOUR_STORE_NAME/apps"
               target="_blank"
+              fullWidth
             >
               Open Shopify App
             </Button>
           </>
         ) : (
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={async () => {
-              const token = await user.getIdToken();
-              window.location.href = `${API_URL}/shopify/install?token=${token}`;
-            }}
-          >
-            Connect Shopify
-          </Button>
+          <>
+            <TextField
+              label="Your Store URL"
+              placeholder="yourstore.com"
+              value={storeUrl}
+              onChange={(e) => {
+                setStoreUrl(e.target.value);
+                setError(''); // Clear error when user types
+              }}
+              fullWidth
+              disabled={connectedPlatform === 'woocommerce'}
+              error={!!error}
+              helperText={error || "Enter your store's domain (e.g., yourstore.com)"}
+            />
+            <Tooltip 
+              title={connectedPlatform === 'woocommerce' ? "Disconnect WooCommerce first to connect Shopify" : ""}
+              placement="top"
+              arrow
+            >
+              <span style={{ width: '100%' }}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={handleConnect}
+                  disabled={connectedPlatform === 'woocommerce' || isConnecting}
+                  fullWidth
+                >
+                  {isConnecting ? 'Connecting...' : 'Connect Shopify'}
+                </Button>
+              </span>
+            </Tooltip>
+          </>
         )}
       </Stack>
     );
   };
 
+  const isDisabled = connectedPlatform === 'woocommerce';
+
   return (
-    <Card>
-      <CardContent>
-        <Stack spacing={2}>
-          <Typography variant="h6">Shopify</Typography>
-          <Typography variant="body2">
-            {status === 'connected'
-              ? 'Your store is connected to Ecommander.'
-              : 'Not connected. Click below to authorize and install the Ecommander app.'}
-          </Typography>
+    <SettingsCard variant="outlined" disabled={isDisabled}>
+      <Stack spacing={2}>
+        <Typography variant="h6">Shopify</Typography>
+        <Typography variant="body2">
+          {status === 'connected'
+            ? 'Your store is connected to Ecommander.'
+            : connectedPlatform === 'woocommerce'
+              ? 'WooCommerce is already connected. Disconnect it first to connect Shopify.'
+              : 'Not connected. Enter your store\'s domain below (e.g., yourstore.com) to connect your Shopify store.'}
+        </Typography>
 
-          {error && <Alert severity="error">{error}</Alert>}
-          {testResult === 'success' && <Alert severity="success">Connection is valid.</Alert>}
-          {testResult === 'fail' && <Alert severity="error">Connection test failed.</Alert>}
+        {error && <Alert severity="error">{error}</Alert>}
+        {testResult === 'success' && <Alert severity="success">Connection is valid.</Alert>}
+        {testResult === 'fail' && <Alert severity="error">Connection test failed.</Alert>}
 
-          {renderActionButtons()}
-        </Stack>
-      </CardContent>
-    </Card>
+        {renderActionButtons()}
+      </Stack>
+    </SettingsCard>
   );
 }

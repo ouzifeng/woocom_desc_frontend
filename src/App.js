@@ -5,6 +5,7 @@ import { auth } from './firebase';
 import LoadingSpinner from './components/LoadingSpinner';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { ToastProvider } from './components/ToasterAlert';
+import { StoreConnectionProvider } from './contexts/StoreConnectionContext';
 
 
 // Eagerly loaded components (keep authentication and core components)
@@ -41,41 +42,43 @@ function App() {
     <Router>
       <ThemeProvider theme={createTheme()}>
         <ToastProvider>
-          <React.Suspense fallback={<LoadingSpinner />}>
-            <Routes>
-              <Route path="/sign-in" element={!user ? <SignIn /> : <Navigate to="/dashboard" />} />
-              <Route path="/sign-up" element={!user ? <SignUp /> : <Navigate to="/settings" />} />
+          <StoreConnectionProvider>
+            <React.Suspense fallback={<LoadingSpinner />}>
+              <Routes>
+                <Route path="/sign-in" element={!user ? <SignIn /> : <Navigate to="/dashboard" />} />
+                <Route path="/sign-up" element={!user ? <SignUp /> : <Navigate to="/settings" />} />
 
-              <Route path="/woocommerce/receive" element={<WooCommerceConnectRoute />} />
-              
-              {/* Redirect root to dashboard */}
-              <Route path="/" element={<Navigate to="/dashboard" />} />
-              
-              {/* Protected Routes with Lazy Loading */}
-              {user ? (
-                <>
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/products" element={<Products />}>
-                    <Route index element={<ProductsTable />} />
-                    <Route path=":productId" element={<ProductPage />} />
-                    <Route path=":productId_:lang" element={<ProductPage />} />
-                  </Route>
-                  <Route path="/strategy" element={<ContentStrategy />} />
-                  <Route path="/strategy/:id" element={<ContentPage />} />
-                  <Route path="/keyword-research" element={<KeywordResearch />} />
-                  <Route path="/image-creation" element={<ImageCreation />} />
-                  <Route path="/translations" element={<ProductTranslations />} />
-                  <Route path="/translations/:productId" element={<TranslationProductPage />} />
-                  <Route path="/brand-strategy" element={<BrandStrategy />} />
-                  <Route path="/brand-settings" element={<BrandSettings />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="/checkout" element={<Checkout />} />
-                </>
-              ) : (
-                <Route path="*" element={<Navigate to="/sign-in" />} />
-              )}
-            </Routes>
-          </React.Suspense>
+                <Route path="/woocommerce/receive" element={<WooCommerceConnectRoute />} />
+                
+                {/* Redirect root to dashboard */}
+                <Route path="/" element={<Navigate to="/dashboard" />} />
+                
+                {/* Protected Routes with Lazy Loading */}
+                {user ? (
+                  <>
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/products" element={<Products />}>
+                      <Route index element={<ProductsTable />} />
+                      <Route path=":productId" element={<ProductPage />} />
+                      <Route path=":productId_:lang" element={<ProductPage />} />
+                    </Route>
+                    <Route path="/strategy" element={<ContentStrategy />} />
+                    <Route path="/strategy/:id" element={<ContentPage />} />
+                    <Route path="/keyword-research" element={<KeywordResearch />} />
+                    <Route path="/image-creation" element={<ImageCreation />} />
+                    <Route path="/translations" element={<ProductTranslations />} />
+                    <Route path="/translations/:productId" element={<TranslationProductPage />} />
+                    <Route path="/brand-strategy" element={<BrandStrategy />} />
+                    <Route path="/brand-settings" element={<BrandSettings />} />
+                    <Route path="/settings" element={<Settings />} />
+                    <Route path="/checkout" element={<Checkout />} />
+                  </>
+                ) : (
+                  <Route path="*" element={<Navigate to="/sign-in" />} />
+                )}
+              </Routes>
+            </React.Suspense>
+          </StoreConnectionProvider>
         </ToastProvider>
       </ThemeProvider>
     </Router>
