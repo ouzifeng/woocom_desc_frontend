@@ -60,15 +60,10 @@ export default function ShopifySettingsCard() {
     
     const cleaned = cleanUrl(url);
     
-    // Don't allow direct myshopify.com URLs
-    if (cleaned.includes('.myshopify.com')) {
-      return 'Please enter your store\'s actual domain, not the myshopify.com URL';
-    }
-
     // Basic domain validation
-    const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$/;
+    const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9](?:\.[a-zA-Z]{2,})+$/;
     if (!domainRegex.test(cleaned)) {
-      return 'Please enter a valid domain (e.g., yourstore.com)';
+      return 'Please enter a valid domain (e.g., yourstore.com or yourstore.myshopify.com)';
     }
 
     return null;
