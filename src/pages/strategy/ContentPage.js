@@ -140,11 +140,9 @@ export default function ContentPage() {
 
       const outlineData = await outlineResponse.json();
       if (outlineData.result === 'Success') {
-        // Combine intro and outline with clear separation
-        const combinedContent = `${outlineData.intro}\n\n${outlineData.outline}`;
-        setEditorContent(combinedContent);
+        setEditorContent(outlineData.outline);
         setOutlineGenerated(true);
-        setNotificationMessage('Outline and intro generated successfully!');
+        setNotificationMessage('Outline generated successfully!');
       } else {
         setError('Failed to generate outline');
       }
@@ -161,35 +159,17 @@ export default function ContentPage() {
     
     setGenerating(true);
     try {
-      // Extract intro and outline sections
-      const introMatch = editorContent.match(/<section>([\s\S]*?)<\/section>/);
-      const outlineMatch = editorContent.match(/<h2>([\s\S]*?)<\/h2>/);
-      
-      if (!introMatch || !outlineMatch) {
-        setError('Invalid content format - missing intro or outline sections');
-        return;
-      }
-
-      const intro = introMatch[0];
-      const outline = editorContent.substring(introMatch[0].length).trim();
-      
-      // Prepare the request payload
-      const payload = {
-        title: content.title,
-        keywords: content.outline.split(',').map(k => k.trim()).filter(k => k),
-        type: content.type,
-        outline: outline,
-        intro: intro
-      };
-
-      console.log('Sending payload:', payload);
-
       const contentResponse = await fetch(`${process.env.REACT_APP_API_URL}/deepseek/generate-content`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          title: content.title,
+          keywords: content.outline.split(','),
+          type: content.type,
+          outline: editorContent // Use the current outline in the editor
+        }),
       });
 
       const contentData = await contentResponse.json();
@@ -197,7 +177,7 @@ export default function ContentPage() {
         setEditorContent(contentData.content);
         setNotificationMessage('Content generated successfully!');
       } else {
-        setError(contentData.message || 'Failed to generate content');
+        setError('Failed to generate content');
       }
     } catch (err) {
       console.error('Error generating content:', err);
