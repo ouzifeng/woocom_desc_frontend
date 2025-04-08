@@ -26,7 +26,6 @@ import TableBody from '@mui/material/TableBody';
 import TableRow from '@mui/material/TableRow';
 import TableCell from '@mui/material/TableCell';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
-import { io } from 'socket.io-client';
 
 // Loading component
 const LoadingFallback = () => (
@@ -48,8 +47,6 @@ export default function ContentPage() {
   const [outlineGenerated, setOutlineGenerated] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisResults, setAnalysisResults] = useState(null);
-  const [socket, setSocket] = useState(null);
-  const [generationStatus, setGenerationStatus] = useState('');
 
   useEffect(() => {
     const fetchContent = async () => {
@@ -95,41 +92,6 @@ export default function ContentPage() {
     };
     fetchContent();
   }, [user, id]);
-
-  useEffect(() => {
-    // Initialize socket connection
-    const newSocket = io(process.env.REACT_APP_API_URL, {
-      withCredentials: true
-    });
-
-    newSocket.on('connect', () => {
-      console.log('Connected to WebSocket server');
-    });
-
-    newSocket.on('status', (data) => {
-      setGenerationStatus(data.message);
-    });
-
-    newSocket.on('content_complete', (data) => {
-      setEditorContent(data.content);
-      setGenerating(false);
-      setGenerationStatus('');
-      setNotificationMessage('Content generated successfully!');
-      setTimeout(() => setNotificationMessage(''), 3000);
-    });
-
-    newSocket.on('error', (data) => {
-      setError(data.message);
-      setGenerating(false);
-      setGenerationStatus('');
-    });
-
-    setSocket(newSocket);
-
-    return () => {
-      newSocket.disconnect();
-    };
-  }, []);
 
   const handleSave = async () => {
     if (!user || !id) return;
@@ -178,9 +140,11 @@ export default function ContentPage() {
 
       const outlineData = await outlineResponse.json();
       if (outlineData.result === 'Success') {
-        setEditorContent(outlineData.outline);
+        // Combine intro and outline with clear separation
+        const combinedContent = `${outlineData.intro}\n\n${outlineData.outline}`;
+        setEditorContent(combinedContent);
         setOutlineGenerated(true);
-        setNotificationMessage('Outline generated successfully!');
+        setNotificationMessage('Outline and intro generated successfully!');
       } else {
         setError('Failed to generate outline');
       }
@@ -193,24 +157,53 @@ export default function ContentPage() {
   };
 
   const handleGenerateContent = async () => {
-    if (!user || !id || !outlineGenerated || !socket) return;
+    if (!user || !id || !outlineGenerated) return;
     
     setGenerating(true);
-    setError(null);
-    setGenerationStatus('Starting content generation...');
-
     try {
-      socket.emit('generate_content', {
+      // Extract intro and outline sections
+      const introMatch = editorContent.match(/<section>([\s\S]*?)<\/section>/);
+      const outlineMatch = editorContent.match(/<h2>([\s\S]*?)<\/h2>/);
+      
+      if (!introMatch || !outlineMatch) {
+        setError('Invalid content format - missing intro or outline sections');
+        return;
+      }
+
+      const intro = introMatch[0];
+      const outline = editorContent.substring(introMatch[0].length).trim();
+      
+      // Prepare the request payload
+      const payload = {
         title: content.title,
-        keywords: content.outline.split(','),
+        keywords: content.outline.split(',').map(k => k.trim()).filter(k => k),
         type: content.type,
-        outline: editorContent
+        outline: outline,
+        intro: intro
+      };
+
+      console.log('Sending payload:', payload);
+
+      const contentResponse = await fetch(`${process.env.REACT_APP_API_URL}/deepseek/generate-content`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
       });
+
+      const contentData = await contentResponse.json();
+      if (contentData.result === 'Success') {
+        setEditorContent(contentData.content);
+        setNotificationMessage('Content generated successfully!');
+      } else {
+        setError(contentData.message || 'Failed to generate content');
+      }
     } catch (err) {
       console.error('Error generating content:', err);
       setError('Failed to generate content');
+    } finally {
       setGenerating(false);
-      setGenerationStatus('');
     }
   };
 
@@ -258,7 +251,7 @@ export default function ContentPage() {
                     >
                       <CircularProgress size={60} />
                       <Typography variant="h6" sx={{ mt: 2 }}>
-                        {generationStatus || 'Generating Content...'}
+                        {outlineGenerated ? 'Generating Content...' : 'Generating Outline...'}
                       </Typography>
                     </Box>
                   )}
