@@ -158,9 +158,6 @@ export default function ContentPage() {
     if (!user || !id || !outlineGenerated) return;
     
     setGenerating(true);
-    setError(null);
-    let accumulatedContent = '';
-    
     try {
       const contentResponse = await fetch(`${process.env.REACT_APP_API_URL}/deepseek/generate-content`, {
         method: 'POST',
@@ -171,51 +168,20 @@ export default function ContentPage() {
           title: content.title,
           keywords: content.outline.split(','),
           type: content.type,
-          outline: editorContent
+          outline: editorContent // Use the current outline in the editor
         }),
       });
 
-      if (!contentResponse.ok) {
-        throw new Error('Failed to start content generation');
-      }
-
-      const reader = contentResponse.body.getReader();
-      const decoder = new TextDecoder();
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              
-              if (data.error) {
-                throw new Error(data.error);
-              }
-              
-              if (data.content) {
-                accumulatedContent += data.content;
-                setEditorContent(accumulatedContent);
-              }
-              
-              if (data.result === 'Success') {
-                setNotificationMessage('Content generated successfully!');
-                setEditorContent(data.content);
-              }
-            } catch (e) {
-              console.error('Error parsing chunk:', e);
-            }
-          }
-        }
+      const contentData = await contentResponse.json();
+      if (contentData.result === 'Success') {
+        setEditorContent(contentData.content);
+        setNotificationMessage('Content generated successfully!');
+      } else {
+        setError('Failed to generate content');
       }
     } catch (err) {
       console.error('Error generating content:', err);
-      setError(err.message || 'Failed to generate content');
+      setError('Failed to generate content');
     } finally {
       setGenerating(false);
     }
