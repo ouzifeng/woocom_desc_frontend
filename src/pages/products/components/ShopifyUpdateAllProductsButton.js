@@ -35,8 +35,8 @@ export default function ShopifyUpdateAllProductsButton({
 
     try {
       const token = await user.getIdToken();
-      const response = await fetch(`${API_URL}/shopify/products/update-all`, {
-        method: 'POST',
+      const response = await fetch(`${API_URL}/shopifyProducts/update-all`, {
+        method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -71,7 +71,7 @@ export default function ShopifyUpdateAllProductsButton({
         }
       }
     } catch (error) {
-      console.error('Error updating all Shopify products:', error);
+      console.error('Error updating Shopify products:', error);
       setNotificationMessage('Failed to update products.');
       setLoading(false);
     }

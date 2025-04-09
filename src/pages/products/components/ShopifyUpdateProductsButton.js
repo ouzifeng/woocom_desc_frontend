@@ -2,7 +2,8 @@ import * as React from 'react';
 import { useState } from 'react';
 import { Button, Box } from '@mui/material';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth } from '../../../firebase';
+import { auth, db } from '../../../firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -34,12 +35,29 @@ export default function ShopifyUpdateProductsButton({
     setNotificationMessage('Starting update...');
 
     try {
+      // Get lastImport timestamp from Firestore
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userDocRef);
+      if (!userDoc.exists()) {
+        throw new Error('User document not found');
+      }
+      const userData = userDoc.data();
+      const lastImport = userData.lastImport;
+
+      if (!lastImport) {
+        setNotificationMessage('No previous import found. Please use Import All Products first.');
+        setLoading(false);
+        return;
+      }
+
       const token = await user.getIdToken();
-      const response = await fetch(`${API_URL}/shopify/products/update`, {
+      const response = await fetch(`${API_URL}/shopifyProducts/update`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ lastImport }),
       });
 
       const reader = response.body.getReader();
@@ -91,7 +109,7 @@ export default function ShopifyUpdateProductsButton({
           {updatedCount > 0 && `${updatedCount}/${totalProducts}`}
         </Box>
       ) : (
-        'Update Products'
+        'Import New Products'
       )}
     </Button>
   );
