@@ -33,6 +33,9 @@ import { useToast } from '../../components/ToasterAlert';
 const ImportProductsButton = React.lazy(() => import('./components/ImportProductsButton'));
 const UpdateProductsButton = React.lazy(() => import('./components/UpdateProductsButton'));
 const UpdateAllProductsButton = React.lazy(() => import('./components/UpdateAllProductsButton'));
+const ShopifyImportProductsButton = React.lazy(() => import('./components/ShopifyImportProductsButton'));
+const ShopifyUpdateProductsButton = React.lazy(() => import('./components/ShopifyUpdateProductsButton'));
+const ShopifyUpdateAllProductsButton = React.lazy(() => import('./components/ShopifyUpdateAllProductsButton'));
 const ProductsTable = React.lazy(() => import('./components/ProductsTable'));
 const ProductPage = React.lazy(() => import('./ProductPage'));
 const DeleteProductsButton = React.lazy(() => import('./components/DeleteProductsButton'));
@@ -157,51 +160,98 @@ export default function Products(props) {
                       }}
                     >
                       <Box sx={{ display: 'flex', gap: 2 }}>
-                        <React.Suspense fallback={<CircularProgress size={24} />}>
-                          <Tooltip title={!isAnyStoreConnected ? "Connect either WooCommerce or Shopify on the integrations page first" : ""}>
-                            <span>
-                              <ImportProductsButton
-                                storeUrl={storeUrl}
-                                apiId={apiId}
-                                secretKey={secretKey}
-                                setRefresh={setRefresh}
-                                setNotificationMessage={(msg) => showToast(msg)}
-                                disabled={!isAnyStoreConnected}
-                                onClick={!isAnyStoreConnected ? handleDisabledButtonClick : undefined}
-                              />
-                            </span>
-                          </Tooltip>
-                        </React.Suspense>
-                        <React.Suspense fallback={<CircularProgress size={24} />}>
-                          <Tooltip title={!isAnyStoreConnected ? "Connect either WooCommerce or Shopify on the integrations page first" : ""}>
-                            <span>
-                              <UpdateProductsButton
-                                storeUrl={storeUrl}
-                                apiId={apiId}
-                                secretKey={secretKey}
-                                setRefresh={setRefresh}
-                                setNotificationMessage={(msg) => showToast(msg)}
-                                disabled={!isAnyStoreConnected}
-                                onClick={!isAnyStoreConnected ? handleDisabledButtonClick : undefined}
-                              />
-                            </span>
-                          </Tooltip>
-                        </React.Suspense>
-                        <React.Suspense fallback={<CircularProgress size={24} />}>
-                          <Tooltip title={!isAnyStoreConnected ? "Connect either WooCommerce or Shopify on the integrations page first" : ""}>
-                            <span>
-                              <UpdateAllProductsButton
-                                storeUrl={storeUrl}
-                                apiId={apiId}
-                                secretKey={secretKey}
-                                setRefresh={setRefresh}
-                                setNotificationMessage={(msg) => showToast(msg)}
-                                disabled={!isAnyStoreConnected}
-                                onClick={!isAnyStoreConnected ? handleDisabledButtonClick : undefined}
-                              />
-                            </span>
-                          </Tooltip>
-                        </React.Suspense>
+                        {hasWooCommerceCredentials ? (
+                          <>
+                            <React.Suspense fallback={<CircularProgress size={24} />}>
+                              <Tooltip title={!hasWooCommerceCredentials ? "Connect WooCommerce on the integrations page first" : ""}>
+                                <span>
+                                  <ImportProductsButton
+                                    storeUrl={storeUrl}
+                                    apiId={apiId}
+                                    secretKey={secretKey}
+                                    setRefresh={setRefresh}
+                                    setNotificationMessage={(msg) => showToast(msg)}
+                                    disabled={!hasWooCommerceCredentials}
+                                    onClick={!hasWooCommerceCredentials ? handleDisabledButtonClick : undefined}
+                                  />
+                                </span>
+                              </Tooltip>
+                            </React.Suspense>
+                            <React.Suspense fallback={<CircularProgress size={24} />}>
+                              <Tooltip title={!hasWooCommerceCredentials ? "Connect WooCommerce on the integrations page first" : ""}>
+                                <span>
+                                  <UpdateProductsButton
+                                    storeUrl={storeUrl}
+                                    apiId={apiId}
+                                    secretKey={secretKey}
+                                    setRefresh={setRefresh}
+                                    setNotificationMessage={(msg) => showToast(msg)}
+                                    disabled={!hasWooCommerceCredentials}
+                                    onClick={!hasWooCommerceCredentials ? handleDisabledButtonClick : undefined}
+                                  />
+                                </span>
+                              </Tooltip>
+                            </React.Suspense>
+                            <React.Suspense fallback={<CircularProgress size={24} />}>
+                              <Tooltip title={!hasWooCommerceCredentials ? "Connect WooCommerce on the integrations page first" : ""}>
+                                <span>
+                                  <UpdateAllProductsButton
+                                    storeUrl={storeUrl}
+                                    apiId={apiId}
+                                    secretKey={secretKey}
+                                    setRefresh={setRefresh}
+                                    setNotificationMessage={(msg) => showToast(msg)}
+                                    disabled={!hasWooCommerceCredentials}
+                                    onClick={!hasWooCommerceCredentials ? handleDisabledButtonClick : undefined}
+                                  />
+                                </span>
+                              </Tooltip>
+                            </React.Suspense>
+                          </>
+                        ) : hasShopifyCredentials ? (
+                          <>
+                            <React.Suspense fallback={<CircularProgress size={24} />}>
+                              <Tooltip title={!hasShopifyCredentials ? "Connect Shopify on the integrations page first" : ""}>
+                                <span>
+                                  <ShopifyImportProductsButton
+                                    setRefresh={setRefresh}
+                                    setNotificationMessage={(msg) => showToast(msg)}
+                                    disabled={!hasShopifyCredentials}
+                                    onClick={!hasShopifyCredentials ? handleDisabledButtonClick : undefined}
+                                  />
+                                </span>
+                              </Tooltip>
+                            </React.Suspense>
+                            <React.Suspense fallback={<CircularProgress size={24} />}>
+                              <Tooltip title={!hasShopifyCredentials ? "Connect Shopify on the integrations page first" : ""}>
+                                <span>
+                                  <ShopifyUpdateProductsButton
+                                    setRefresh={setRefresh}
+                                    setNotificationMessage={(msg) => showToast(msg)}
+                                    disabled={!hasShopifyCredentials}
+                                    onClick={!hasShopifyCredentials ? handleDisabledButtonClick : undefined}
+                                  />
+                                </span>
+                              </Tooltip>
+                            </React.Suspense>
+                            <React.Suspense fallback={<CircularProgress size={24} />}>
+                              <Tooltip title={!hasShopifyCredentials ? "Connect Shopify on the integrations page first" : ""}>
+                                <span>
+                                  <ShopifyUpdateAllProductsButton
+                                    setRefresh={setRefresh}
+                                    setNotificationMessage={(msg) => showToast(msg)}
+                                    disabled={!hasShopifyCredentials}
+                                    onClick={!hasShopifyCredentials ? handleDisabledButtonClick : undefined}
+                                  />
+                                </span>
+                              </Tooltip>
+                            </React.Suspense>
+                          </>
+                        ) : (
+                          <Typography variant="body2" color="textSecondary">
+                            Please connect either WooCommerce or Shopify in Settings.
+                          </Typography>
+                        )}
                       </Box>
 
                       <Box sx={{ display: 'flex', gap: 2 }}>
