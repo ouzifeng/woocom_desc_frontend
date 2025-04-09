@@ -66,10 +66,11 @@ export default function Products(props) {
   const [notificationMessage, setNotificationMessage] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [hasWooCommerceCredentials, setHasWooCommerceCredentials] = useState(false);
+  const [hasShopifyCredentials, setHasShopifyCredentials] = useState(false);
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchCredentials = async () => {
       setLoading(true);
       try {
         if (user) {
@@ -82,16 +83,18 @@ export default function Products(props) {
             setSecretKey(data.wc_secret || '');
             // Check if all WooCommerce credentials are present
             setHasWooCommerceCredentials(!!(data.wc_url && data.wc_key && data.wc_secret));
+            // Check if Shopify credentials are present
+            setHasShopifyCredentials(!!(data.shopify_access_token && data.shopify_shop));
           }
         }
       } catch (error) {
-        console.error('Error fetching products:', error);
+        console.error('Error fetching credentials:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchProducts();
+    fetchCredentials();
   }, [user]);
 
   const isProductPage = location.pathname.includes('/products/');
@@ -104,7 +107,7 @@ export default function Products(props) {
   };
 
   const handleDisabledButtonClick = () => {
-    showToast('Please connect your WooCommerce store in Settings first.', 'warning');
+    showToast('Please connect either WooCommerce or Shopify store in Settings first.', 'warning');
     setTimeout(() => {
       navigate('/settings');
     }, 2000);
@@ -113,6 +116,8 @@ export default function Products(props) {
   if (loading) {
     return <LoadingSpinner />;
   }
+
+  const isAnyStoreConnected = hasWooCommerceCredentials || hasShopifyCredentials;
 
   return (
     <AppTheme {...props} themeComponents={xThemeComponents}>
@@ -153,7 +158,7 @@ export default function Products(props) {
                     >
                       <Box sx={{ display: 'flex', gap: 2 }}>
                         <React.Suspense fallback={<CircularProgress size={24} />}>
-                          <Tooltip title={!hasWooCommerceCredentials ? "Connect WooCommerce on the integrations page first" : ""}>
+                          <Tooltip title={!isAnyStoreConnected ? "Connect either WooCommerce or Shopify on the integrations page first" : ""}>
                             <span>
                               <ImportProductsButton
                                 storeUrl={storeUrl}
@@ -161,14 +166,14 @@ export default function Products(props) {
                                 secretKey={secretKey}
                                 setRefresh={setRefresh}
                                 setNotificationMessage={(msg) => showToast(msg)}
-                                disabled={!hasWooCommerceCredentials}
-                                onClick={!hasWooCommerceCredentials ? handleDisabledButtonClick : undefined}
+                                disabled={!isAnyStoreConnected}
+                                onClick={!isAnyStoreConnected ? handleDisabledButtonClick : undefined}
                               />
                             </span>
                           </Tooltip>
                         </React.Suspense>
                         <React.Suspense fallback={<CircularProgress size={24} />}>
-                          <Tooltip title={!hasWooCommerceCredentials ? "Connect WooCommerce on the integrations page first" : ""}>
+                          <Tooltip title={!isAnyStoreConnected ? "Connect either WooCommerce or Shopify on the integrations page first" : ""}>
                             <span>
                               <UpdateProductsButton
                                 storeUrl={storeUrl}
@@ -176,14 +181,14 @@ export default function Products(props) {
                                 secretKey={secretKey}
                                 setRefresh={setRefresh}
                                 setNotificationMessage={(msg) => showToast(msg)}
-                                disabled={!hasWooCommerceCredentials}
-                                onClick={!hasWooCommerceCredentials ? handleDisabledButtonClick : undefined}
+                                disabled={!isAnyStoreConnected}
+                                onClick={!isAnyStoreConnected ? handleDisabledButtonClick : undefined}
                               />
                             </span>
                           </Tooltip>
                         </React.Suspense>
                         <React.Suspense fallback={<CircularProgress size={24} />}>
-                          <Tooltip title={!hasWooCommerceCredentials ? "Connect WooCommerce on the integrations page first" : ""}>
+                          <Tooltip title={!isAnyStoreConnected ? "Connect either WooCommerce or Shopify on the integrations page first" : ""}>
                             <span>
                               <UpdateAllProductsButton
                                 storeUrl={storeUrl}
@@ -191,8 +196,8 @@ export default function Products(props) {
                                 secretKey={secretKey}
                                 setRefresh={setRefresh}
                                 setNotificationMessage={(msg) => showToast(msg)}
-                                disabled={!hasWooCommerceCredentials}
-                                onClick={!hasWooCommerceCredentials ? handleDisabledButtonClick : undefined}
+                                disabled={!isAnyStoreConnected}
+                                onClick={!isAnyStoreConnected ? handleDisabledButtonClick : undefined}
                               />
                             </span>
                           </Tooltip>
