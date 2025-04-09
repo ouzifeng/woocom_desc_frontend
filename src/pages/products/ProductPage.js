@@ -15,6 +15,7 @@ import ImproveGrammarButton from './components/ImproveGrammarButton';
 import InstructionsDrawer from './components/InstructionsDrawer';
 import AiSettings from './components/AiSettings';
 import SaveProductButton from './components/SaveProductButton';
+import ShopifySaveProductButton from './components/ShopifySaveProductButton';
 
 // Lazy load components
 const ProductDetails = React.lazy(() => import('./components/ProductDetails'));
@@ -61,6 +62,8 @@ export default function ProductPage() {
   const [aiNameLoading, setAiNameLoading] = useState(false);
   const [additionalRequests, setAdditionalRequests] = useState('');
   const [languageCode, setLanguageCode] = useState(null);
+  const [shopifyAccessToken, setShopifyAccessToken] = useState('');
+  const [shopifyShop, setShopifyShop] = useState('');
 
   useEffect(() => {
     // Check if productId contains language suffix
@@ -105,6 +108,8 @@ export default function ProductPage() {
               setStoreUrl(userData.wc_url || '');
               setApiId(userData.wc_key || '');
               setSecretKey(userData.wc_secret || '');
+              setShopifyAccessToken(userData.shopify_access_token || '');
+              setShopifyShop(userData.shopify_shop || '');
             }
           } catch (err) {
             console.error('Error fetching product:', err);
@@ -276,6 +281,10 @@ export default function ProductPage() {
     }
   };
 
+  // Determine user platform
+  const isWooCommerceUser = storeUrl && apiId && secretKey;
+  const isShopifyUser = shopifyAccessToken && shopifyShop;
+
   if (loading) {
     return <LoadingFallback />;
   }
@@ -311,7 +320,7 @@ export default function ProductPage() {
               </React.Suspense>
             </Box>
             <Box sx={{ display: 'flex', gap: 2 }}>
-              <React.Suspense fallback={<CircularProgress size={24} />}>
+              {isWooCommerceUser && (
                 <SaveProductButton 
                   user={user}
                   productId={productId}
@@ -322,7 +331,18 @@ export default function ProductPage() {
                   product={product}
                   setNotificationMessage={setNotificationMessage}
                 />
-              </React.Suspense>
+              )}
+              {isShopifyUser && (
+                <ShopifySaveProductButton 
+                  user={user}
+                  productId={productId}
+                  shopifyAccessToken={shopifyAccessToken}
+                  shopifyShop={shopifyShop}
+                  description={description}
+                  product={product}
+                  setNotificationMessage={setNotificationMessage}
+                />
+              )}
               <Button variant="outlined" onClick={toggleDrawer(true)}>
                 Instructions
               </Button>
