@@ -23,11 +23,17 @@ import debounce from 'lodash.debounce';
 /** Helper to render status chip */
 function renderStatus(status) {
   const colorMap = {
-    Published: 'success',
-    Draft: 'default',
+    'active': 'success',
+    'archived': 'warning',
+    'draft': 'default',
+  };
+  const displayMap = {
+    'active': 'Active',
+    'archived': 'Archived',
+    'draft': 'Draft',
   };
   return (
-    <Chip label={status} color={colorMap[status] || 'default'} size="small" />
+    <Chip label={displayMap[status] || status} color={colorMap[status] || 'default'} size="small" />
   );
 }
 
@@ -205,10 +211,7 @@ export default function ProductsTable() {
       field: 'status',
       headerName: 'Status',
       width: 150,
-      renderCell: (params) => {
-        const value = params.value === 'publish' ? 'Published' : 'Draft';
-        return renderStatus(value);
-      },
+      renderCell: (params) => renderStatus(params.value),
     },
     {
       field: 'image',

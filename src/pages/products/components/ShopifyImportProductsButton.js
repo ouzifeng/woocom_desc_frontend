@@ -35,7 +35,7 @@ export default function ShopifyImportProductsButton({
 
     try {
       const token = await user.getIdToken();
-      const response = await fetch(`${API_URL}/shopify/products`, {
+      const response = await fetch(`${API_URL}/shopifyProducts/products`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
