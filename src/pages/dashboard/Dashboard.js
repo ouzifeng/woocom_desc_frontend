@@ -20,6 +20,7 @@ import {
 } from './theme/customizations';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import GoogleAnalyticsWarningModal from '../../components/GoogleAnalyticsWarningModal';
 
 const xThemeComponents = {
   ...chartsCustomizations,
@@ -65,6 +66,7 @@ export default function Dashboard(props) {
           </LocalizationProvider>
         </Box>
       </Box>
+      <GoogleAnalyticsWarningModal />
     </AppTheme>
   );
 }

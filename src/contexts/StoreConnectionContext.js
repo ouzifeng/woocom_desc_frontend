@@ -5,6 +5,7 @@ const StoreConnectionContext = createContext();
 
 export function StoreConnectionProvider({ children }) {
   const [connectedPlatform, setConnectedPlatform] = useState(null);
+  const [hasGoogleAnalytics, setHasGoogleAnalytics] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // Check connection status on mount
@@ -19,6 +20,13 @@ export function StoreConnectionProvider({ children }) {
 
         const token = await user.getIdToken();
         const API_URL = process.env.REACT_APP_API_URL;
+
+        // Check Google Analytics connection
+        const gaRes = await fetch(`${API_URL}/analytics/accounts`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const gaData = await gaRes.json();
+        setHasGoogleAnalytics(gaData.connected || false);
 
         // Check Shopify connection
         const shopifyRes = await fetch(`${API_URL}/shopify/status`, {
@@ -46,6 +54,7 @@ export function StoreConnectionProvider({ children }) {
       } catch (error) {
         console.error('Error checking connection status:', error);
         setConnectedPlatform(null);
+        setHasGoogleAnalytics(false);
       } finally {
         setLoading(false);
       }
@@ -57,6 +66,8 @@ export function StoreConnectionProvider({ children }) {
   const value = {
     connectedPlatform,
     setConnectedPlatform,
+    hasGoogleAnalytics,
+    setHasGoogleAnalytics,
     loading
   };
 

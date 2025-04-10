@@ -17,6 +17,7 @@ import { auth } from '../../firebase';
 import WooCommerceSettingsCard from './components/WooCommerceSettingsCard';
 import CsvImport from './components/CsvImport';
 import GoogleAnalyticsCard from './components/GoogleAnalyticsCard';
+import StoreConnectionStatus from '../../components/StoreConnectionStatus';
 import {
   chartsCustomizations,
   dataGridCustomizations,
@@ -56,6 +57,7 @@ export default function SettingsPage(props) {
           <LocalizationProvider dateAdapter={AdapterDayjs}>
             <Box sx={{ p: 3, width: '100%' }}>
               <Header />
+              <StoreConnectionStatus />
               <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 4 }}>
                 Store Settings
               </Typography>

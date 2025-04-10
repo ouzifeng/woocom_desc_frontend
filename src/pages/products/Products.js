@@ -12,7 +12,7 @@ import SideMenu from '../dashboard/components/SideMenu';
 import AppTheme from '../shared-theme/AppTheme';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../../firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import {
   chartsCustomizations,
   dataGridCustomizations,
@@ -24,10 +24,12 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
+import Alert from '@mui/material/Alert';
 import DownloadCSVButton from './components/DownloadCSVButton';
 import Tooltip from '@mui/material/Tooltip';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import { useToast } from '../../components/ToasterAlert';
+import StoreConnectionStatus from '../../components/StoreConnectionStatus';
 
 // Lazy load components
 const ImportProductsButton = React.lazy(() => import('./components/ImportProductsButton'));
@@ -71,6 +73,8 @@ export default function Products(props) {
   const [hasWooCommerceCredentials, setHasWooCommerceCredentials] = useState(false);
   const [hasShopifyCredentials, setHasShopifyCredentials] = useState(false);
   const [loading, setLoading] = React.useState(true);
+  const [products, setProducts] = useState([]);
+  const [error, setError] = useState(null);
 
   React.useEffect(() => {
     const fetchCredentials = async () => {
@@ -100,6 +104,32 @@ export default function Products(props) {
     fetchCredentials();
   }, [user]);
 
+  useEffect(() => {
+    const fetchProducts = async () => {
+      if (!user) return;
+
+      try {
+        const productsRef = collection(db, 'users', user.uid, 'products');
+        const q = query(productsRef, where('improved', '==', true));
+        const querySnapshot = await getDocs(q);
+        
+        const productsData = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+
+        setProducts(productsData);
+        setLoading(false);
+      } catch (err) {
+        console.error('Error fetching products:', err);
+        setError('Failed to fetch products');
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, [user]);
+
   const isProductPage = location.pathname.includes('/products/');
 
   const toggleDrawer = (open) => (event) => {
@@ -118,6 +148,10 @@ export default function Products(props) {
 
   if (loading) {
     return <LoadingSpinner />;
+  }
+
+  if (error) {
+    return <Alert severity="error">{error}</Alert>;
   }
 
   const isAnyStoreConnected = hasWooCommerceCredentials || hasShopifyCredentials;

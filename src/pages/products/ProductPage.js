@@ -16,6 +16,7 @@ import InstructionsDrawer from './components/InstructionsDrawer';
 import AiSettings from './components/AiSettings';
 import SaveProductButton from './components/SaveProductButton';
 import ShopifySaveProductButton from './components/ShopifySaveProductButton';
+import StoreConnectionStatus from '../../components/StoreConnectionStatus';
 
 // Lazy load components
 const ProductDetails = React.lazy(() => import('./components/ProductDetails'));
@@ -301,6 +302,10 @@ export default function ProductPage() {
 
   return (
     <Box sx={{ p: 3 }}>
+      <StoreConnectionStatus />
+      <Typography variant="h4" component="h1" gutterBottom>
+        Product Details
+      </Typography>
       <Grid container spacing={3}>
         <Grid item xs={12} md={9}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2, gap: 2 }}>
