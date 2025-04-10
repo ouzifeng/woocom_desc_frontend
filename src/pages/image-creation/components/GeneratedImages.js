@@ -18,7 +18,7 @@ export const GeneratedImages = ({
       
       {generatedImages.length > 0 ? (
         <Box sx={{ width: '100%' }}>
-          {generatedImages.map((imageUrl, index) => (
+          {generatedImages.map((image, index) => (
             <Box 
               key={index} 
               sx={{ 
@@ -30,9 +30,10 @@ export const GeneratedImages = ({
               }}
             >
               <ImagePreview
-                imageUrl={imageUrl}
-                onDelete={() => onDeleteImage(imageUrl)}
-                timestamp={Date.now()}
+                imageUrl={image.url}
+                onDelete={() => onDeleteImage(image.url)}
+                onDownload={() => onDownloadImage(image.url)}
+                description={image.description}
                 height="600px"
               />
             </Box>
@@ -55,4 +56,5 @@ export const GeneratedImages = ({
     </Paper>
   );
 }; 
+ 
  

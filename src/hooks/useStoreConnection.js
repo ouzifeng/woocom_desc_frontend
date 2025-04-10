@@ -45,3 +45,4 @@ export function useStoreConnection(user) {
   return { connectionType, loading };
 } 
  
+ 

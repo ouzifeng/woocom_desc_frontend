@@ -22,6 +22,7 @@ const ContentStrategy = React.lazy(() => import('./pages/strategy/ContentStrateg
 const ContentPage = React.lazy(() => import('./pages/strategy/ContentPage'));
 const KeywordResearch = React.lazy(() => import('./pages/keyword-research/KeywordResearchPage'));
 const ImageCreation = React.lazy(() => import('./pages/image-creation/ImageCreation'));
+const StockImages = React.lazy(() => import('./pages/stock-images/components/stockImages'));
 const ProductTranslations = React.lazy(() => import('./pages/translations/ProductTranslations'));
 const BrandStrategy = React.lazy(() => import('./pages/brand-strategy/BrandStrategyPage'));
 const Settings = React.lazy(() => import('./pages/settings/SettingsPage'));
@@ -66,6 +67,7 @@ function App() {
                     <Route path="/strategy/:id" element={<ContentPage />} />
                     <Route path="/keyword-research" element={<KeywordResearch />} />
                     <Route path="/image-creation" element={<ImageCreation />} />
+                    <Route path="/stock-images" element={<StockImages />} />
                     <Route path="/translations" element={<ProductTranslations />} />
                     <Route path="/translations/:productId" element={<TranslationProductPage />} />
                     <Route path="/brand-strategy" element={<BrandStrategy />} />

@@ -1,74 +1,45 @@
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { db } from '../../../firebase';
+import { ref, uploadBytes, getDownloadURL, deleteObject, listAll } from 'firebase/storage';
+import { storage } from '../../../firebase';
 
-export const fetchPreviousImages = async (user) => {
-  if (!user) return [];
-  
+export const fetchPreviousImages = async (userId) => {
   try {
-    const userDocRef = doc(db, 'users', user.uid);
-    const userDocSnap = await getDoc(userDocRef);
+    const storageRef = ref(storage, `generated/${userId}`);
+    const result = await listAll(storageRef);
     
-    if (userDocSnap.exists()) {
-      const userData = userDocSnap.data();
-      if (userData?.generatedImages) {
-        return [...userData.generatedImages].sort((a, b) => b.timestamp - a.timestamp);
-      }
-    }
-    return [];
+    const images = await Promise.all(
+      result.items.map(async (item) => {
+        const url = await getDownloadURL(item);
+        return {
+          url,
+          description: item.name.split('_')[1] || 'Generated Image'
+        };
+      })
+    );
+    
+    return images.sort((a, b) => b.url.localeCompare(a.url)); // Sort by URL (which contains timestamp)
   } catch (error) {
     console.error('Error fetching previous images:', error);
-    throw error;
+    return [];
   }
 };
 
-export const saveGeneratedImage = async (user, imageUrl, prompt, imageType, description) => {
-  if (!user) return null;
-  
-  try {
-    const userDocRef = doc(db, 'users', user.uid);
-    const userDoc = await getDoc(userDocRef);
-    
-    if (userDoc.exists()) {
-      const userData = userDoc.data();
-      const newImage = {
-        url: imageUrl,
-        prompt,
-        imageType,
-        description,
-        timestamp: Date.now()
-      };
-      
-      await updateDoc(userDocRef, {
-        generatedImages: [...(userData.generatedImages || []), newImage]
-      });
-      
-      return newImage;
-    }
-    return null;
-  } catch (error) {
-    console.error('Error saving generated image:', error);
-    throw error;
-  }
+export const uploadImageToFirebase = async (file, userId, imageType) => {
+  const timestamp = Date.now();
+  const storageRef = ref(storage, `generated/${userId}/${imageType}_${timestamp}.png`);
+  await uploadBytes(storageRef, file);
+  return getDownloadURL(storageRef);
 };
 
-export const deleteGeneratedImage = async (user, imageUrl) => {
-  if (!user) return;
-  
-  try {
-    const userDocRef = doc(db, 'users', user.uid);
-    const userDoc = await getDoc(userDocRef);
-    
-    if (userDoc.exists()) {
-      const userData = userDoc.data();
-      const updatedImages = userData.generatedImages.filter(img => img.url !== imageUrl);
-      await updateDoc(userDocRef, {
-        generatedImages: updatedImages
-      });
-    }
-  } catch (error) {
-    console.error('Error deleting generated image:', error);
-    throw error;
-  }
+export const deleteImageFromFirebase = async (imageUrl) => {
+  const imageRef = ref(storage, imageUrl);
+  await deleteObject(imageRef);
+};
+
+export const downloadImage = async (imageUrl) => {
+  const response = await fetch(imageUrl);
+  const blob = await response.blob();
+  return blob;
 }; 
+ 
  
  

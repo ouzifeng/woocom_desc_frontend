@@ -23,8 +23,65 @@ import { ImageOptionsTable } from './components/ImageOptionsTable';
 import { ImageDescription } from './components/ImageDescription';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { fetchPreviousImages } from './utils/firebaseUtils';
+import { keyframes } from '@mui/system';
 
 const API_URL = process.env.REACT_APP_API_URL;
+
+// Add the spin animation keyframes
+const spin = keyframes`
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+`;
+
+const LoadingSpinnerSVG = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" style={{ width: '150px', height: '150px' }}>
+    <radialGradient id="a3" cx=".66" fx=".66" cy=".3125" fy=".3125" gradientTransform="scale(1.5)">
+      <stop offset="0" stopColor="hsl(210, 98%, 48%)"></stop>
+      <stop offset=".3" stopColor="hsl(210, 98%, 48%)" stopOpacity=".9"></stop>
+      <stop offset=".6" stopColor="hsl(210, 98%, 48%)" stopOpacity=".6"></stop>
+      <stop offset=".8" stopColor="hsl(210, 98%, 48%)" stopOpacity=".3"></stop>
+      <stop offset="1" stopColor="hsl(210, 98%, 48%)" stopOpacity="0"></stop>
+    </radialGradient>
+    <circle 
+      transform-origin="center" 
+      fill="none" 
+      stroke="url(#a3)" 
+      strokeWidth="15" 
+      strokeLinecap="round" 
+      strokeDasharray="200 1000" 
+      strokeDashoffset="0" 
+      cx="100" 
+      cy="100" 
+      r="70"
+    >
+      <animateTransform 
+        type="rotate" 
+        attributeName="transform" 
+        calcMode="spline" 
+        dur="2" 
+        values="360;0" 
+        keyTimes="0;1" 
+        keySplines="0 0 1 1" 
+        repeatCount="indefinite"
+      ></animateTransform>
+    </circle>
+    <circle 
+      transform-origin="center" 
+      fill="none" 
+      opacity=".2" 
+      stroke="hsl(210, 98%, 48%)" 
+      strokeWidth="15" 
+      strokeLinecap="round" 
+      cx="100" 
+      cy="100" 
+      r="70"
+    ></circle>
+  </svg>
+);
 
 export default function ImageCreation(props) {
   const [user] = useAuthState(auth);
@@ -50,7 +107,7 @@ export default function ImageCreation(props) {
   const fetchPreviousImagesList = useCallback(async () => {
     if (!user) return;
     try {
-      const images = await fetchPreviousImages(user);
+      const images = await fetchPreviousImages(user.uid);
       setPreviousImages(images);
     } catch (error) {
       console.error('Error fetching previous images:', error);
@@ -174,27 +231,27 @@ export default function ImageCreation(props) {
                       <Box sx={{ position: 'relative', height: 600, width: '100%' }}>
                         <ImageList cols={4} rowHeight={200} sx={{ height: '100%' }}>
                           {previousImages.length === 0 ? (
-                            [...Array(4)].map((_, i) => (
-                              <ImageListItem key={i}>
-                                <Box
-                          sx={{
-                                    width: '100%',
-                                    height: '100%',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    backgroundColor: '#f2f2f2',
-                                    borderRadius: 2
-                                  }}
-                                >
-                                  <img
-                                    src="/image-loading.svg"
-                                    alt="Placeholder"
-                                    style={{ maxWidth: '60%', opacity: 0.6 }}
-                                  />
-                                </Box>
-                              </ImageListItem>
-                            ))
+                            <Box
+                              sx={{
+                                width: '100%',
+                                height: '100%',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gridColumn: 'span 4',
+                                p: 3,
+                                textAlign: 'center'
+                              }}
+                            >
+                              <LoadingSpinnerSVG />
+                              <Typography variant="h6" color="text.secondary" gutterBottom sx={{ mt: 2 }}>
+                                No Images Generated Yet
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                Select an image format and add a description to generate your first image
+                              </Typography>
+                            </Box>
                           ) : (
                             previousImages.map((item) => (
                               <ImageListItem key={item.url} onClick={() => handleOpen(item.url)}>
@@ -219,18 +276,18 @@ export default function ImageCreation(props) {
                               width: '100%',
                               backgroundColor: 'rgba(255,255,255,0.8)',
                               zIndex: 1,
-                            display: 'flex', 
+                              display: 'flex', 
                               flexDirection: 'column',
                               alignItems: 'center',
-                            justifyContent: 'center', 
-                            borderRadius: 1
+                              justifyContent: 'center', 
+                              borderRadius: 1
                             }}
                           >
-                            <img src="/image-loading.svg" alt="Generating..." style={{ width: '150px', marginBottom: 16, opacity: 0.8 }} />
-                            <Typography variant="body2" color="text.secondary">
+                            <LoadingSpinnerSVG />
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
                               Generating your image...
-                          </Typography>
-                        </Box>
+                            </Typography>
+                          </Box>
                         )}
                       </Box>
                     </Stack>
