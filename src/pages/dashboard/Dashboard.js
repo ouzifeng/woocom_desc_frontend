@@ -21,6 +21,7 @@ import {
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import GoogleAnalyticsWarningModal from '../../components/GoogleAnalyticsWarningModal';
+import { DashboardGAProvider } from './DashboardGAProvider';
 
 const xThemeComponents = {
   ...chartsCustomizations,
@@ -33,40 +34,42 @@ export default function Dashboard(props) {
   const [user] = useAuthState(auth);
 
   return (
-    <AppTheme {...props} themeComponents={xThemeComponents}>
-      <CssBaseline enableColorScheme />
-      <Box sx={{ display: 'flex' }}>
-        <SideMenu user={user} />
-        <AppNavbar />
-        {/* Main content */}
-        <Box
-          component="main"
-          sx={(theme) => ({
-            flexGrow: 1,
-            backgroundColor: theme.vars
-              ? `rgba(${theme.vars.palette.background.defaultChannel} / 1)`
-              : alpha(theme.palette.background.default, 1),
-            overflow: 'auto',
-          })}
-        >
-          <LocalizationProvider dateAdapter={AdapterDayjs}>
-            <Stack
-              spacing={2}
-              sx={{
-                alignItems: 'center',
-                mx: 3,
-                pb: 5,
-                mt: { xs: 8, md: 0 },
-              }}
-            >
-              <Header />
-              <MainGrid />
-              <Outlet />
-            </Stack>
-          </LocalizationProvider>
+    <DashboardGAProvider>
+      <AppTheme {...props} themeComponents={xThemeComponents}>
+        <CssBaseline enableColorScheme />
+        <Box sx={{ display: 'flex' }}>
+          <SideMenu user={user} />
+          <AppNavbar />
+          {/* Main content */}
+          <Box
+            component="main"
+            sx={(theme) => ({
+              flexGrow: 1,
+              backgroundColor: theme.vars
+                ? `rgba(${theme.vars.palette.background.defaultChannel} / 1)`
+                : alpha(theme.palette.background.default, 1),
+              overflow: 'auto',
+            })}
+          >
+            <LocalizationProvider dateAdapter={AdapterDayjs}>
+              <Stack
+                spacing={2}
+                sx={{
+                  alignItems: 'center',
+                  mx: 3,
+                  pb: 5,
+                  mt: { xs: 8, md: 0 },
+                }}
+              >
+                <Header />
+                <MainGrid />
+                <Outlet />
+              </Stack>
+            </LocalizationProvider>
+          </Box>
         </Box>
-      </Box>
-      <GoogleAnalyticsWarningModal />
-    </AppTheme>
+        <GoogleAnalyticsWarningModal />
+      </AppTheme>
+    </DashboardGAProvider>
   );
 }

@@ -55,3 +55,4 @@ export const GeneratedImages = ({
     </Paper>
   );
 }; 
+ 

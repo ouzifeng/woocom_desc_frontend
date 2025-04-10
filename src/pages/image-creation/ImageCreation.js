@@ -89,7 +89,7 @@ export default function ImageCreation(props) {
         },
         body: JSON.stringify(payload)
       });
-
+      
       if (!response.ok) {
         throw new Error('Failed to generate image');
       }
@@ -177,7 +177,7 @@ export default function ImageCreation(props) {
                             [...Array(4)].map((_, i) => (
                               <ImageListItem key={i}>
                                 <Box
-                                  sx={{
+                          sx={{
                                     width: '100%',
                                     height: '100%',
                                     display: 'flex',
@@ -219,18 +219,18 @@ export default function ImageCreation(props) {
                               width: '100%',
                               backgroundColor: 'rgba(255,255,255,0.8)',
                               zIndex: 1,
-                              display: 'flex',
+                            display: 'flex', 
                               flexDirection: 'column',
                               alignItems: 'center',
-                              justifyContent: 'center',
-                              borderRadius: 1
+                            justifyContent: 'center', 
+                            borderRadius: 1
                             }}
                           >
                             <img src="/image-loading.svg" alt="Generating..." style={{ width: '150px', marginBottom: 16, opacity: 0.8 }} />
                             <Typography variant="body2" color="text.secondary">
                               Generating your image...
-                            </Typography>
-                          </Box>
+                          </Typography>
+                        </Box>
                         )}
                       </Box>
                     </Stack>
@@ -302,4 +302,4 @@ export default function ImageCreation(props) {
       </Modal>
     </AppTheme>
   );
-}
+} 

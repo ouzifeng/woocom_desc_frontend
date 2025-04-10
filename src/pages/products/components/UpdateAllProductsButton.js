@@ -17,6 +17,8 @@ export default function UpdateAllProductsButton({
 }) {
   const [user] = useAuthState(auth);
   const [loading, setLoading] = useState(false);
+  const [updatedCount, setUpdatedCount] = useState(0);
+  const [totalProducts, setTotalProducts] = useState(0);
 
   const updateAllProducts = async () => {
     if (!user) {
@@ -30,6 +32,8 @@ export default function UpdateAllProductsButton({
     }
 
     setLoading(true);
+    setUpdatedCount(0);
+    setTotalProducts(0);
     setNotificationMessage('Starting update...');
 
     try {
@@ -50,19 +54,26 @@ export default function UpdateAllProductsButton({
         if (done) break;
         result += decoder.decode(value, { stream: true });
 
-        // The server may send multiple JSON lines in the stream
         const lines = result.split('\n\n');
         for (const line of lines) {
           if (line.trim()) {
             const data = JSON.parse(line.replace('data: ', ''));
             if (data.result === 'Success') {
-              setNotificationMessage(`Update successful. All products updated.`);
+              setNotificationMessage(`Updated ${data.updatedCount} products successfully.`);
+              setUpdatedCount(data.updatedCount);
+              setTotalProducts(data.totalProducts);
               setLoading(false);
               setRefresh((prev) => !prev);
               return;
-            } else {
-              // If streaming partial updates, you can set a partial message:
-              setNotificationMessage(`Updating ${data.updatedCount}...`);
+            } else if (data.message) {
+              setNotificationMessage(data.message);
+              if (data.message.includes('Updating')) {
+                const match = data.message.match(/Updating (\d+) of (\d+)/);
+                if (match) {
+                  setUpdatedCount(parseInt(match[1]));
+                  setTotalProducts(parseInt(match[2]));
+                }
+              }
             }
           }
         }
@@ -82,7 +93,7 @@ export default function UpdateAllProductsButton({
         onClick={updateAllProducts} 
         disabled={loading || disabled}
       >
-        {loading ? 'Updating...' : 'Update All Products'}
+        {loading ? `Updating ${updatedCount}/${totalProducts}` : 'Update All Products'}
       </Button>
     </Box>
   );

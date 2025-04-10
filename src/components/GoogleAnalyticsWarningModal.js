@@ -1,16 +1,19 @@
 import React, { useEffect } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button, Typography } from '@mui/material';
-import { useStoreConnection } from '../contexts/StoreConnectionContext';
 import { useNavigate } from 'react-router-dom';
+import { useStoreConnection } from '../contexts/StoreConnectionContext';
 
 const GoogleAnalyticsWarningModal = () => {
-  const { hasGoogleAnalytics } = useStoreConnection();
+  const { hasGoogleAnalytics, loading } = useStoreConnection();
   const navigate = useNavigate();
-  const [open, setOpen] = React.useState(!hasGoogleAnalytics);
+  const [open, setOpen] = React.useState(false);
 
   useEffect(() => {
-    setOpen(!hasGoogleAnalytics);
-  }, [hasGoogleAnalytics]);
+    // Only set open state after loading is complete
+    if (!loading) {
+      setOpen(!hasGoogleAnalytics);
+    }
+  }, [hasGoogleAnalytics, loading]);
 
   const handleClose = () => {
     setOpen(false);
@@ -20,6 +23,11 @@ const GoogleAnalyticsWarningModal = () => {
     navigate('/settings');
     handleClose();
   };
+
+  // Don't render anything while loading
+  if (loading) {
+    return null;
+  }
 
   return (
     <Dialog
@@ -57,3 +65,4 @@ const GoogleAnalyticsWarningModal = () => {
 };
 
 export default GoogleAnalyticsWarningModal; 
+ 

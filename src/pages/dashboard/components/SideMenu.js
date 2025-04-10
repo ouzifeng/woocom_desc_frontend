@@ -12,6 +12,7 @@ import Logo from '@mui/icons-material/Web'; // Placeholder logo icon
 import MenuContent from './MenuContent';
 import OptionsMenu from './OptionsMenu';
 import PropTypes from 'prop-types';
+import Tooltip from '@mui/material/Tooltip';
 
 const drawerWidth = 240;
 
@@ -141,9 +142,21 @@ export default function SideMenu({ user = null }) {
             <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: '16px' }}>
               {user?.displayName}
             </Typography>
-            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-              {user?.email}
-            </Typography>
+            <Tooltip title={user?.email}>
+              <Typography
+                variant="caption"
+                sx={{
+                  color: 'text.secondary',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  maxWidth: '120px',
+                  display: 'block', // Adjust as needed
+                }}
+              >
+                {user?.email}
+              </Typography>
+            </Tooltip>
           </Box>
           <OptionsMenu />
         </Stack>

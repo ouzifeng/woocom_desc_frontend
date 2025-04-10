@@ -55,17 +55,25 @@ export default function ShopifyUpdateAllProductsButton({
         for (const line of lines) {
           if (line.trim()) {
             const data = JSON.parse(line.replace('data: ', ''));
-            if (data.result === 'Success') {
-              setNotificationMessage(`Updated ${data.updatedCount} products successfully.`);
-              setUpdatedCount(data.updatedCount);
+            
+            // Update total products if available
+            if (data.totalProducts) {
               setTotalProducts(data.totalProducts);
+            }
+
+            // Update updated count if available
+            if (data.updatedCount) {
+              setUpdatedCount(data.updatedCount);
+            }
+
+            // Show the message
+            setNotificationMessage(data.message);
+
+            // Handle completion
+            if (data.result === 'Success') {
               setLoading(false);
               setRefresh((prev) => !prev);
               return;
-            } else {
-              setUpdatedCount(data.updatedCount);
-              setTotalProducts(data.totalProducts);
-              setNotificationMessage(`Updating ${data.updatedCount}/${data.totalProducts}`);
             }
           }
         }

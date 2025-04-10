@@ -84,4 +84,4 @@ export function useStoreConnection() {
     throw new Error('useStoreConnection must be used within a StoreConnectionProvider');
   }
   return context;
-} 
+}

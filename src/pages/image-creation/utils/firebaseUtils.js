@@ -70,3 +70,5 @@ export const deleteGeneratedImage = async (user, imageUrl) => {
     throw error;
   }
 }; 
+ 
+ 

@@ -55,17 +55,25 @@ export default function ShopifyImportProductsButton({
         for (const line of lines) {
           if (line.trim()) {
             const data = JSON.parse(line.replace('data: ', ''));
-            if (data.result === 'Success') {
-              setNotificationMessage(`Imported ${data.importedCount} products successfully.`);
-              setImportedCount(data.importedCount);
+            
+            // Update total products if available
+            if (data.totalProducts) {
               setTotalProducts(data.totalProducts);
+            }
+
+            // Update imported count if available
+            if (data.importedCount) {
+              setImportedCount(data.importedCount);
+            }
+
+            // Show the message
+            setNotificationMessage(data.message);
+
+            // Handle completion
+            if (data.result === 'Success') {
               setLoading(false);
               setRefresh((prev) => !prev);
               return;
-            } else {
-              setImportedCount(data.importedCount);
-              setTotalProducts(data.totalProducts);
-              setNotificationMessage(`Importing ${data.importedCount}/${data.totalProducts}`);
             }
           }
         }

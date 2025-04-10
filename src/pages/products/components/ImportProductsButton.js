@@ -84,10 +84,16 @@ export default function ImportProductsButton({
               setLoading(false);
               setRefresh((prev) => !prev);
               return;
-            } else {
-              // If streaming partial updates, you can set a partial message:
-              setImportedCount(data.importedCount);
-              setNotificationMessage(`Importing ${data.importedCount}/${totalResult.totalProducts}`);
+            } else if (data.message) {
+              // Handle progress messages
+              setNotificationMessage(data.message);
+              if (data.message.includes('Importing')) {
+                const match = data.message.match(/Importing (\d+) of (\d+)/);
+                if (match) {
+                  setImportedCount(parseInt(match[1]));
+                  setTotalProducts(parseInt(match[2]));
+                }
+              }
             }
           }
         }

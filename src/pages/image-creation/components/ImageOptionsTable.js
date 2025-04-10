@@ -48,3 +48,4 @@ export const ImageOptionsTable = ({ selectedRow, onSelectRow }) => {
     </TableContainer>
   );
 }; 
+ 

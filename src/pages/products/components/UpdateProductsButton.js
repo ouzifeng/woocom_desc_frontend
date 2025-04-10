@@ -18,6 +18,8 @@ export default function UpdateProductsButton({
 }) {
   const [user] = useAuthState(auth);
   const [loading, setLoading] = useState(false);
+  const [updatedCount, setUpdatedCount] = useState(0);
+  const [totalProducts, setTotalProducts] = useState(0);
 
   const updateProducts = async () => {
     if (!user) {
@@ -31,6 +33,8 @@ export default function UpdateProductsButton({
     }
 
     setLoading(true);
+    setUpdatedCount(0);
+    setTotalProducts(0);
     setNotificationMessage('Starting update...');
 
     try {
@@ -57,19 +61,26 @@ export default function UpdateProductsButton({
           if (done) break;
           result += decoder.decode(value, { stream: true });
 
-          // The server may send multiple JSON lines in the stream
           const lines = result.split('\n\n');
           for (const line of lines) {
             if (line.trim()) {
               const data = JSON.parse(line.replace('data: ', ''));
               if (data.result === 'Success') {
-                setNotificationMessage(`Update successful. ${data.updatedCount} products updated.`);
+                setNotificationMessage(`Updated ${data.updatedCount} products successfully.`);
+                setUpdatedCount(data.updatedCount);
+                setTotalProducts(data.totalProducts);
                 setLoading(false);
                 setRefresh((prev) => !prev);
                 return;
-              } else {
-                // If streaming partial updates, you can set a partial message:
-                setNotificationMessage(`Updating ${data.updatedCount}...`);
+              } else if (data.message) {
+                setNotificationMessage(data.message);
+                if (data.message.includes('Updating')) {
+                  const match = data.message.match(/Updating (\d+) of (\d+)/);
+                  if (match) {
+                    setUpdatedCount(parseInt(match[1]));
+                    setTotalProducts(parseInt(match[2]));
+                  }
+                }
               }
             }
           }
@@ -90,7 +101,7 @@ export default function UpdateProductsButton({
         onClick={updateProducts} 
         disabled={loading || disabled}
       >
-        {loading ? 'Updating...' : 'Import New Products'}
+        {loading ? `Updating ${updatedCount}/${totalProducts}` : 'Import New Products'}
       </Button>
     </Box>
   );
