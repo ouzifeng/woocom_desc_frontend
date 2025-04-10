@@ -178,7 +178,7 @@ export default function SignUp(props) {
 
       console.log('Firestore document created for user:', user.uid);
 
-      navigate('/dashboard');
+      navigate('/settings');
     } catch (error) {
       console.error('Error signing up with email and password', error);
       if (error.code === 'auth/email-already-in-use') {

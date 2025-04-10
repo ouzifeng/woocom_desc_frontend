@@ -139,15 +139,6 @@ export default function WooCommerceSettingsCard() {
             >
               {testResult === 'testing' ? 'Testing…' : 'Test Connection'}
             </Button>
-            <Button
-              variant="outlined"
-              color="primary"
-              href="https://shimeruknives.co.uk/wp-admin/admin.php?page=ecommander-settings"
-              target="_blank"
-              fullWidth
-            >
-              Open Plugin Settings
-            </Button>
           </>
         ) : (
           <>
