@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { alpha } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
@@ -7,6 +7,7 @@ import Grid from '@mui/material/Grid';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import ShopifySettingsCard from './components/ShopifySettingsCard';
 import AppNavbar from '../dashboard/components/AppNavbar';
@@ -18,6 +19,7 @@ import WooCommerceSettingsCard from './components/WooCommerceSettingsCard';
 import CsvImport from './components/CsvImport';
 import GoogleAnalyticsCard from './components/GoogleAnalyticsCard';
 import StoreConnectionStatus from '../../components/StoreConnectionStatus';
+import SettingsInstructions from './components/SettingsInstructions';
 import {
   chartsCustomizations,
   dataGridCustomizations,
@@ -36,6 +38,14 @@ const CARD_HEIGHT = 550; // Fixed height for all cards
 
 export default function SettingsPage(props) {
   const [user] = useAuthState(auth);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const toggleDrawer = (open) => (event) => {
+    if (event.type === 'keydown' && (event.key === 'Tab' || event.key === 'Shift')) {
+      return;
+    }
+    setDrawerOpen(open);
+  };
 
   return (
     <AppTheme {...props} themeComponents={xThemeComponents}>
@@ -56,12 +66,19 @@ export default function SettingsPage(props) {
         >
           <LocalizationProvider dateAdapter={AdapterDayjs}>
             <Box sx={{ p: 3, width: '100%' }}>
-              <Header />
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+                <Typography variant="h4" component="h1">
+                  Store Settings
+                </Typography>
+                <Button 
+                  variant="outlined" 
+                  onClick={toggleDrawer(true)}
+                  sx={{ ml: 2 }}
+                >
+                  Instructions
+                </Button>
+              </Box>
               <StoreConnectionStatus />
-              <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 4 }}>
-                Store Settings
-              </Typography>
-
               <Grid container spacing={3}>
                 <Grid item xs={12} md={3} sx={{ height: CARD_HEIGHT }}>
                   <Box sx={{ height: '100%' }}>
@@ -88,12 +105,12 @@ export default function SettingsPage(props) {
                     <ShopifySettingsCard />
                   </Box>
                 </Grid>
-                
               </Grid>
             </Box>
           </LocalizationProvider>
         </Box>
       </Box>
+      <SettingsInstructions drawerOpen={drawerOpen} toggleDrawer={toggleDrawer} />
     </AppTheme>
   );
 }

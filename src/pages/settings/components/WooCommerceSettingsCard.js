@@ -147,18 +147,6 @@ export default function WooCommerceSettingsCard() {
               placement="top"
               arrow
             >
-              <span style={{ width: '100%' }}>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  href="https://shimeruknives.co.uk/wp-admin/admin.php?page=ecommander-settings"
-                  target="_blank"
-                  disabled={connectedPlatform === 'shopify'}
-                  fullWidth
-                >
-                  Connect Plugin
-                </Button>
-              </span>
             </Tooltip>
             <Button
               variant="outlined"
@@ -187,7 +175,7 @@ export default function WooCommerceSettingsCard() {
             ? 'Your store is connected to Ecommander.'
             : connectedPlatform === 'shopify'
               ? 'Shopify is already connected. Disconnect it first to connect WooCommerce.'
-              : 'Not connected. To connect your store, download the plugin, install and activate it on your WordPress site.'}
+              : 'Not connected. To connect your store, download the plugin, upload, install and activate it on your WordPress site.'}
         </Typography>
 
         {error && <Alert severity="error">{error}</Alert>}
