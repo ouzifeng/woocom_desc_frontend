@@ -5,6 +5,7 @@ import { DataGrid } from '@mui/x-data-grid';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../../../firebase';
 import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { TableLoadingSpinner } from './TableLoadingSpinner';
 
 import {
   Box,
@@ -51,6 +52,7 @@ export default function ProductsTable() {
   const [filteredRows, setFilteredRows] = useState([]);
   const [rowSelectionModel, setRowSelectionModel] = useState([]);
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const [paginationModel, setPaginationModel] = useState({
     pageSize: 10,
@@ -118,6 +120,7 @@ export default function ProductsTable() {
   const fetchData = useCallback(async () => {
     if (!user) return;
 
+    setLoading(true);
     try {
       const productsCollection = collection(db, 'users', user.uid, 'products');
       const productsSnapshot = await getDocs(productsCollection);
@@ -137,6 +140,8 @@ export default function ProductsTable() {
       setFilteredRows(products);
     } catch (err) {
       setError(err.message);
+    } finally {
+      setLoading(false);
     }
   }, [user]);
 
@@ -245,7 +250,7 @@ export default function ProductsTable() {
   };
 
   return (
-    <Box sx={{ width: '100%', height: '100%' }}>
+    <Box sx={{ width: '100%', height: '100%', position: 'relative' }}>
       {error ? (
         <Typography variant="body2" color="error">
           {`Error fetching products: ${error}`}
@@ -297,40 +302,43 @@ export default function ProductsTable() {
             </FormControl>
           </Box>
 
-          <DataGrid
-            pagination
-            paginationModel={paginationModel}
-            onPaginationModelChange={setPaginationModel}
-            pageSizeOptions={[10, 20, 50]}
-            rowHeight={70}
-            rows={filteredRows}
-            columns={columns}
-            checkboxSelection
-            disableRowSelectionOnClick
-            disableColumnResize
-            rowSelectionModel={rowSelectionModel}
-            onRowSelectionModelChange={(newSelection) => {
-              const validSelection = newSelection.filter((id) =>
-                filteredRows.some((row) => row.id === id)
-              );
-              setRowSelectionModel(validSelection);
-              setSelectedRows(validSelection);
-            }}
-            onRowClick={handleRowClick}
-            getRowClassName={(params) =>
-              params.indexRelativeToCurrentPage % 2 === 0 ? 'even' : 'odd'
-            }
-            sx={{
-              '& .even': { backgroundColor: '#fafafa' },
-              '& .odd': { backgroundColor: '#ffffff' },
-              '.MuiDataGrid-row': { cursor: 'pointer' },
-              '.MuiDataGrid-cell': {
-                lineHeight: 'normal !important',
-                display: 'flex',
-                alignItems: 'center',
-              },
-            }}
-          />
+          <Box sx={{ position: 'relative', height: 'calc(100% - 80px)' }}>
+            {loading && <TableLoadingSpinner />}
+            <DataGrid
+              pagination
+              paginationModel={paginationModel}
+              onPaginationModelChange={setPaginationModel}
+              pageSizeOptions={[10, 20, 50]}
+              rowHeight={70}
+              rows={filteredRows}
+              columns={columns}
+              checkboxSelection
+              disableRowSelectionOnClick
+              disableColumnResize
+              rowSelectionModel={rowSelectionModel}
+              onRowSelectionModelChange={(newSelection) => {
+                const validSelection = newSelection.filter((id) =>
+                  filteredRows.some((row) => row.id === id)
+                );
+                setRowSelectionModel(validSelection);
+                setSelectedRows(validSelection);
+              }}
+              onRowClick={handleRowClick}
+              getRowClassName={(params) =>
+                params.indexRelativeToCurrentPage % 2 === 0 ? 'even' : 'odd'
+              }
+              sx={{
+                '& .even': { backgroundColor: '#fafafa' },
+                '& .odd': { backgroundColor: '#ffffff' },
+                '.MuiDataGrid-row': { cursor: 'pointer' },
+                '.MuiDataGrid-cell': {
+                  lineHeight: 'normal !important',
+                  display: 'flex',
+                  alignItems: 'center',
+                },
+              }}
+            />
+          </Box>
         </>
       )}
     </Box>
