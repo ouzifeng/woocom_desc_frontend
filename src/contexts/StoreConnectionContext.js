@@ -8,7 +8,37 @@ export function StoreConnectionProvider({ children }) {
   const [hasGoogleAnalytics, setHasGoogleAnalytics] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Check connection status on mount
+  const checkGoogleAnalyticsConnection = async (token) => {
+    const API_URL = process.env.REACT_APP_API_URL;
+    const gaRes = await fetch(`${API_URL}/analytics/accounts`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const gaData = await gaRes.json();
+    setHasGoogleAnalytics(gaData.connected || false);
+  };
+
+  const checkShopifyConnection = async (token) => {
+    const API_URL = process.env.REACT_APP_API_URL;
+    const shopifyRes = await fetch(`${API_URL}/shopify/status`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const shopifyData = await shopifyRes.json();
+    if (shopifyData.connected) {
+      setConnectedPlatform('shopify');
+    }
+  };
+
+  const checkWooCommerceConnection = async (token) => {
+    const API_URL = process.env.REACT_APP_API_URL;
+    const wooRes = await fetch(`${API_URL}/woocommerce/status`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const wooData = await wooRes.json();
+    if (wooData.connected) {
+      setConnectedPlatform('woocommerce');
+    }
+  };
+
   useEffect(() => {
     const checkConnectionStatus = async () => {
       try {
@@ -19,38 +49,9 @@ export function StoreConnectionProvider({ children }) {
         }
 
         const token = await user.getIdToken();
-        const API_URL = process.env.REACT_APP_API_URL;
-
-        // Check Google Analytics connection
-        const gaRes = await fetch(`${API_URL}/analytics/accounts`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const gaData = await gaRes.json();
-        setHasGoogleAnalytics(gaData.connected || false);
-
-        // Check Shopify connection
-        const shopifyRes = await fetch(`${API_URL}/shopify/status`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const shopifyData = await shopifyRes.json();
-        
-        if (shopifyData.connected) {
-          setConnectedPlatform('shopify');
-          setLoading(false);
-          return;
-        }
-
-        // Check WooCommerce connection
-        const wooRes = await fetch(`${API_URL}/woocommerce/status`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const wooData = await wooRes.json();
-        
-        if (wooData.connected) {
-          setConnectedPlatform('woocommerce');
-        } else {
-          setConnectedPlatform(null);
-        }
+        await checkGoogleAnalyticsConnection(token);
+        await checkShopifyConnection(token);
+        await checkWooCommerceConnection(token);
       } catch (error) {
         console.error('Error checking connection status:', error);
         setConnectedPlatform(null);
@@ -68,7 +69,10 @@ export function StoreConnectionProvider({ children }) {
     setConnectedPlatform,
     hasGoogleAnalytics,
     setHasGoogleAnalytics,
-    loading
+    loading,
+    checkGoogleAnalyticsConnection,
+    checkShopifyConnection,
+    checkWooCommerceConnection
   };
 
   return (

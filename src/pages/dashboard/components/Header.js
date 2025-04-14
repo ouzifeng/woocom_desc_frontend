@@ -5,15 +5,8 @@ import CustomDatePicker from './CustomDatePicker';
 import NavbarBreadcrumbs from './NavbarBreadcrumbs';
 import Search from './Search';
 import Weather from './Weather';
-import { useStoreConnection } from '../../../contexts/StoreConnectionContext';
 
 export default function Header() {
-  const { connectedPlatform, hasGoogleAnalytics } = useStoreConnection();
-
-  // Debug logs
-  console.log('Connected Platform:', connectedPlatform);
-  console.log('Has Google Analytics:', hasGoogleAnalytics);
-
   return (
     <Stack
       direction="row"
@@ -30,48 +23,6 @@ export default function Header() {
       <NavbarBreadcrumbs />
       <Stack direction="row" sx={{ gap: 1, alignItems: 'center' }}>
         <Search />
-        {connectedPlatform === 'woocommerce' && (
-          <img 
-            src="/woocommerce-icon.png" 
-            alt="WooCommerce" 
-            style={{ 
-              width: '36px', 
-              height: '36px',
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-              padding: '2px',
-              opacity: '50%'
-            }}
-          />
-        )}
-        {connectedPlatform === 'shopify' && (
-          <img 
-            src="/shopify-icon.webp" 
-            alt="Shopify" 
-            style={{ 
-              width: '36px', 
-              height: '36px',
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-              padding: '2px',
-              opacity: '50%'
-            }}
-          />
-        )}
-        {hasGoogleAnalytics && (
-          <img 
-            src="/google_analytics_icon.png" 
-            alt="Google Analytics" 
-            style={{ 
-              width: '36px', 
-              height: '36px',
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-              padding: '2px',
-              opacity: '50%'
-            }}
-          />
-        )}
         <Weather />
         <CustomDatePicker />
       </Stack>

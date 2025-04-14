@@ -1,10 +1,10 @@
 import * as React from 'react';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { DataGrid } from '@mui/x-data-grid';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../../../firebase';
-import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
 import { TableLoadingSpinner } from './TableLoadingSpinner';
 
 import {
@@ -12,33 +12,24 @@ import {
   Typography,
   Chip,
   Switch,
-  TextField,
   MenuItem,
   Select,
   FormControl,
   InputLabel,
 } from '@mui/material';
 
-import debounce from 'lodash.debounce';
-
-/** Helper to render status chip */
+/** Status chip */
 function renderStatus(status) {
   const colorMap = {
-    'active': 'success',
-    'archived': 'warning',
-    'draft': 'default',
-  };
-  const displayMap = {
-    'active': 'Active',
-    'archived': 'Archived',
-    'draft': 'Draft',
+    publish: 'success',
+    draft: 'default',
   };
   return (
-    <Chip label={displayMap[status] || status} color={colorMap[status] || 'default'} size="small" />
+    <Chip label={status} color={colorMap[status] || 'default'} size="small" />
   );
 }
 
-/** Decode HTML entities */
+/** Decode HTML */
 function decodeHtmlEntities(text) {
   const textarea = document.createElement('textarea');
   textarea.innerHTML = text;
@@ -49,7 +40,6 @@ export default function ProductsTable() {
   const { refresh, setRefresh, setSelectedRows } = useOutletContext();
   const [user] = useAuthState(auth);
   const [rows, setRows] = useState([]);
-  const [filteredRows, setFilteredRows] = useState([]);
   const [rowSelectionModel, setRowSelectionModel] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -57,57 +47,13 @@ export default function ProductsTable() {
   const [paginationModel, setPaginationModel] = useState({
     pageSize: 10,
     page: 0,
+    rowCount: 0,
   });
 
+  const [statusFilter, setStatusFilter] = useState('');
+  const [improvedFilter, setImprovedFilter] = useState('');
+
   const navigate = useNavigate();
-
-  // Load filters from localStorage or use default values
-  const loadInitialFilters = () => {
-    try {
-      const savedFilters = localStorage.getItem('productTableFilters');
-      if (savedFilters) {
-        const { timestamp, filters } = JSON.parse(savedFilters);
-        const isExpired = Date.now() - timestamp > 24 * 60 * 60 * 1000; // 24 hours
-        
-        if (!isExpired) {
-          return filters;
-        }
-      }
-    } catch (error) {
-      console.error('Error loading saved filters:', error);
-    }
-    
-    // Default values if no saved filters or expired
-    return {
-      searchTerm: '',
-      statusFilter: '',
-      improvedFilter: ''
-    };
-  };
-
-  // Initialize state with saved filters
-  const initialFilters = loadInitialFilters();
-  const [searchTerm, setSearchTerm] = useState(initialFilters.searchTerm);
-  const [statusFilter, setStatusFilter] = useState(initialFilters.statusFilter);
-  const [improvedFilter, setImprovedFilter] = useState(initialFilters.improvedFilter);
-
-  // Save filters to localStorage whenever they change
-  useEffect(() => {
-    const filtersData = {
-      timestamp: Date.now(),
-      filters: {
-        searchTerm,
-        statusFilter,
-        improvedFilter
-      }
-    };
-    localStorage.setItem('productTableFilters', JSON.stringify(filtersData));
-  }, [searchTerm, statusFilter, improvedFilter]);
-
-  // Update the handlers for filter changes
-  const handleSearchChange = (e) => {
-    setSearchTerm(e.target.value);
-  };
 
   const handleStatusChange = (e) => {
     setStatusFilter(e.target.value);
@@ -119,76 +65,46 @@ export default function ProductsTable() {
 
   const fetchData = useCallback(async () => {
     if (!user) return;
-
     setLoading(true);
-    try {
-      const productsCollection = collection(db, 'users', user.uid, 'products');
-      const productsSnapshot = await getDocs(productsCollection);
-      const products = productsSnapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
-        ...docSnap.data(),
-      }));
 
-      // Sort descending by numeric ID if possible
-      products.sort((a, b) => {
-        const aNum = Number(a.id);
-        const bNum = Number(b.id);
-        return !isNaN(aNum) && !isNaN(bNum) ? bNum - aNum : b.id.localeCompare(a.id);
+    try {
+      const token = await user.getIdToken();
+      const url = new URL(`${process.env.REACT_APP_API_URL}/product/product-table`);
+      url.searchParams.append('page', paginationModel.page + 1);
+      url.searchParams.append('pageSize', paginationModel.pageSize);
+      url.searchParams.append('sortField', 'name');
+      url.searchParams.append('sortDirection', 'asc');
+      url.searchParams.append('status', statusFilter || '');
+      url.searchParams.append('improved', improvedFilter || '');
+
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
       });
 
-      setRows(products);
-      setFilteredRows(products);
+      if (!response.ok) throw new Error('Failed to fetch products');
+      const data = await response.json();
+
+      setRows(data.products);
+      setPaginationModel((prev) => ({
+        ...prev,
+        rowCount: data.totalProducts,
+      }));
     } catch (err) {
+      console.error('Error fetching products:', err);
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, paginationModel.page, paginationModel.pageSize, statusFilter, improvedFilter]);
 
   useEffect(() => {
     fetchData();
-  }, [user, refresh, fetchData]);
-
-  // Debounced filter logic
-  const debouncedFilter = useMemo(() =>
-    debounce((input, status, improved, allRows) => {
-      let filtered = [...allRows];
-
-      if (input) {
-        const lower = input.toLowerCase();
-        filtered = filtered.filter((row) =>
-          decodeHtmlEntities(row.name || '').toLowerCase().includes(lower)
-        );
-      }
-
-      if (status) {
-        filtered = filtered.filter((row) => (row.status || '').toLowerCase() === status);
-      }
-
-      if (improved) {
-        filtered = filtered.filter((row) => {
-          if (improved === 'true') {
-            return Boolean(row.improved) === true;
-          } else {
-            // Show products where improved is false OR undefined
-            return !row.improved;
-          }
-        });
-      }
-
-      setFilteredRows(filtered);
-      setRowSelectionModel([]); // Clear selection to prevent crash
-      setSelectedRows([]);
-    }, 300), [setSelectedRows]
-  );
-
-  useEffect(() => {
-    debouncedFilter(searchTerm, statusFilter, improvedFilter, rows);
-  }, [searchTerm, statusFilter, improvedFilter, rows, debouncedFilter]);
+  }, [fetchData, refresh]);
 
   const handleImprovedChange = async (id, checked) => {
     if (!user) return;
-
     try {
       const productDocRef = doc(db, 'users', user.uid, 'products', String(id));
       await updateDoc(productDocRef, { improved: checked });
@@ -245,7 +161,6 @@ export default function ProductsTable() {
   ];
 
   const handleRowClick = (params) => {
-    // Use React Router navigation
     navigate(`/products/${params.id}`);
   };
 
@@ -260,22 +175,14 @@ export default function ProductsTable() {
           <Box
             sx={{
               display: 'flex',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
+              flexDirection: 'row',
               gap: 2,
               mb: 2,
+              width: '100%',
+              maxWidth: 400
             }}
           >
-            <TextField
-              label="Search Products"
-              variant="outlined"
-              size="small"
-              value={searchTerm}
-              onChange={handleSearchChange}
-              sx={{ flexGrow: 1 }}
-            />
-
-            <FormControl size="small" sx={{ minWidth: 120 }}>
+            <FormControl size="small" sx={{ flex: 1 }}>
               <InputLabel>Status</InputLabel>
               <Select
                 value={statusFilter}
@@ -288,7 +195,7 @@ export default function ProductsTable() {
               </Select>
             </FormControl>
 
-            <FormControl size="small" sx={{ minWidth: 120 }}>
+            <FormControl size="small" sx={{ flex: 1 }}>
               <InputLabel>Improved</InputLabel>
               <Select
                 value={improvedFilter}
@@ -302,42 +209,45 @@ export default function ProductsTable() {
             </FormControl>
           </Box>
 
-          <Box sx={{ position: 'relative', height: 'calc(100% - 80px)' }}>
+          <Box sx={{ position: 'relative' }}>
             {loading && <TableLoadingSpinner />}
-            <DataGrid
-              pagination
-              paginationModel={paginationModel}
-              onPaginationModelChange={setPaginationModel}
-              pageSizeOptions={[10, 20, 50]}
-              rowHeight={70}
-              rows={filteredRows}
-              columns={columns}
-              checkboxSelection
-              disableRowSelectionOnClick
-              disableColumnResize
-              rowSelectionModel={rowSelectionModel}
-              onRowSelectionModelChange={(newSelection) => {
-                const validSelection = newSelection.filter((id) =>
-                  filteredRows.some((row) => row.id === id)
-                );
-                setRowSelectionModel(validSelection);
-                setSelectedRows(validSelection);
-              }}
-              onRowClick={handleRowClick}
-              getRowClassName={(params) =>
-                params.indexRelativeToCurrentPage % 2 === 0 ? 'even' : 'odd'
-              }
-              sx={{
-                '& .even': { backgroundColor: '#fafafa' },
-                '& .odd': { backgroundColor: '#ffffff' },
-                '.MuiDataGrid-row': { cursor: 'pointer' },
-                '.MuiDataGrid-cell': {
-                  lineHeight: 'normal !important',
-                  display: 'flex',
-                  alignItems: 'center',
-                },
-              }}
-            />
+          <DataGrid
+              autoHeight
+            pagination
+              paginationMode="server"
+              rowCount={paginationModel.rowCount}
+            paginationModel={paginationModel}
+            onPaginationModelChange={setPaginationModel}
+            pageSizeOptions={[10, 20, 50]}
+            rowHeight={70}
+              rows={rows}
+            columns={columns}
+            checkboxSelection
+            disableRowSelectionOnClick
+            disableColumnResize
+            rowSelectionModel={rowSelectionModel}
+            onRowSelectionModelChange={(newSelection) => {
+              const validSelection = newSelection.filter((id) =>
+                  rows.some((row) => String(row.id) === String(id))
+              );
+              setRowSelectionModel(validSelection);
+              setSelectedRows(validSelection);
+            }}
+            onRowClick={handleRowClick}
+            getRowClassName={(params) =>
+              params.indexRelativeToCurrentPage % 2 === 0 ? 'even' : 'odd'
+            }
+            sx={{
+              '& .even': { backgroundColor: '#fafafa' },
+              '& .odd': { backgroundColor: '#ffffff' },
+              '.MuiDataGrid-row': { cursor: 'pointer' },
+              '.MuiDataGrid-cell': {
+                lineHeight: 'normal !important',
+                display: 'flex',
+                alignItems: 'center',
+              },
+            }}
+          />
           </Box>
         </>
       )}

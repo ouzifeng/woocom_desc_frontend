@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { alpha } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
@@ -26,6 +26,7 @@ import {
   datePickersCustomizations,
   treeViewCustomizations,
 } from '../dashboard/theme/customizations';
+import { useStoreConnection } from '../../contexts/StoreConnectionContext';
 
 const xThemeComponents = {
   ...chartsCustomizations,
@@ -39,6 +40,19 @@ const CARD_HEIGHT = 550; // Fixed height for all cards
 export default function SettingsPage(props) {
   const [user] = useAuthState(auth);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const { checkGoogleAnalyticsConnection, checkShopifyConnection, checkWooCommerceConnection } = useStoreConnection();
+
+  useEffect(() => {
+    const checkConnections = async () => {
+      if (!user) return;
+      const token = await user.getIdToken();
+      await checkGoogleAnalyticsConnection(token);
+      await checkShopifyConnection(token);
+      await checkWooCommerceConnection(token);
+    };
+
+    checkConnections();
+  }, [user, checkGoogleAnalyticsConnection, checkShopifyConnection, checkWooCommerceConnection]);
 
   const toggleDrawer = (open) => (event) => {
     if (event.type === 'keydown' && (event.key === 'Tab' || event.key === 'Shift')) {

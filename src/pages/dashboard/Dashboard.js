@@ -21,6 +21,7 @@ import {
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DashboardGAProvider } from './DashboardGAProvider';
+import { useStoreConnection } from '../../contexts/StoreConnectionContext';
 
 const xThemeComponents = {
   ...chartsCustomizations,
@@ -31,6 +32,17 @@ const xThemeComponents = {
 
 export default function Dashboard(props) {
   const [user] = useAuthState(auth);
+  const { checkGoogleAnalyticsConnection } = useStoreConnection();
+
+  React.useEffect(() => {
+    const checkConnection = async () => {
+      if (!user) return;
+      const token = await user.getIdToken();
+      await checkGoogleAnalyticsConnection(token);
+    };
+
+    checkConnection();
+  }, [user, checkGoogleAnalyticsConnection]);
 
   return (
     <DashboardGAProvider>

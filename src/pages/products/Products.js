@@ -30,6 +30,7 @@ import Tooltip from '@mui/material/Tooltip';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import { useToast } from '../../components/ToasterAlert';
 import StoreConnectionStatus from '../../components/StoreConnectionStatus';
+import { useStoreConnection } from '../../contexts/StoreConnectionContext';
 
 // Lazy load components
 const ImportProductsButton = React.lazy(() => import('./components/ImportProductsButton'));
@@ -75,6 +76,18 @@ export default function Products(props) {
   const [loading, setLoading] = React.useState(true);
   const [products, setProducts] = useState([]);
   const [error, setError] = useState(null);
+  const { checkShopifyConnection, checkWooCommerceConnection } = useStoreConnection();
+
+  useEffect(() => {
+    const checkConnections = async () => {
+      if (!user) return;
+      const token = await user.getIdToken();
+      await checkShopifyConnection(token);
+      await checkWooCommerceConnection(token);
+    };
+
+    checkConnections();
+  }, [user, checkShopifyConnection, checkWooCommerceConnection]);
 
   React.useEffect(() => {
     const fetchCredentials = async () => {

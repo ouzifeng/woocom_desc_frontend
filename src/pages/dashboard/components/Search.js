@@ -43,11 +43,14 @@ export default function Search() {
       try {
         const productsRef = collection(db, 'users', user.uid, 'products');
         const querySnapshot = await getDocs(productsRef);
-        const products = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          name: decodeHtmlEntities(doc.data().name || '')
-        }));
+        const products = querySnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: decodeHtmlEntities(data.name || ''),
+            image: data.image || ''
+          };
+        });
         setAllProducts(products);
       } catch (error) {
         console.error('Error fetching products:', error);
