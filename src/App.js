@@ -6,6 +6,7 @@ import LoadingSpinner from './components/LoadingSpinner';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { ToastProvider } from './components/ToasterAlert';
 import { StoreConnectionProvider } from './contexts/StoreConnectionContext';
+import { BrandProvider } from './contexts/BrandContext';
 
 
 // Eagerly loaded components (keep authentication and core components)
@@ -30,6 +31,7 @@ const BrandSettings = React.lazy(() => import('./pages/brandSettings/BrandSettin
 const TranslationProductPage = React.lazy(() => import('./pages/translations/components/TranslationProductPage'));
 const Checkout = React.lazy(() => import('./pages/checkout/Checkout'));
 const WooCommerceConnectRoute = React.lazy(() => import('./pages/settings/WooCommerceConnectRoute'));
+const YourBrands = React.lazy(() => import('./pages/your-brands/YourBrands'));
 
 
 function App() {
@@ -44,42 +46,45 @@ function App() {
       <ThemeProvider theme={createTheme()}>
         <ToastProvider>
           <StoreConnectionProvider>
-            <React.Suspense fallback={<LoadingSpinner />}>
-              <Routes>
-                <Route path="/sign-in" element={!user ? <SignIn /> : <Navigate to="/dashboard" />} />
-                <Route path="/sign-up" element={!user ? <SignUp /> : <Navigate to="/settings" />} />
+            <BrandProvider>
+              <React.Suspense fallback={<LoadingSpinner />}>
+                <Routes>
+                  <Route path="/sign-in" element={!user ? <SignIn /> : <Navigate to="/dashboard" />} />
+                  <Route path="/sign-up" element={!user ? <SignUp /> : <Navigate to="/settings" />} />
 
-                <Route path="/woocommerce/receive" element={<WooCommerceConnectRoute />} />
-                
-                {/* Redirect root to dashboard */}
-                <Route path="/" element={<Navigate to="/dashboard" />} />
-                
-                {/* Protected Routes with Lazy Loading */}
-                {user ? (
-                  <>
-                    <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/products" element={<Products />}>
-                      <Route index element={<ProductsTable />} />
-                      <Route path=":productId" element={<ProductPage />} />
-                      <Route path=":productId_:lang" element={<ProductPage />} />
-                    </Route>
-                    <Route path="/strategy" element={<ContentStrategy />} />
-                    <Route path="/strategy/:id" element={<ContentPage />} />
-                    <Route path="/keyword-research" element={<KeywordResearch />} />
-                    <Route path="/image-creation" element={<ImageCreation />} />
-                    <Route path="/stock-images" element={<StockImages />} />
-                    <Route path="/translations" element={<ProductTranslations />} />
-                    <Route path="/translations/:productId" element={<TranslationProductPage />} />
-                    <Route path="/brand-strategy" element={<BrandStrategy />} />
-                    <Route path="/brand-settings" element={<BrandSettings />} />
-                    <Route path="/settings" element={<Settings />} />
-                    <Route path="/checkout" element={<Checkout />} />
-                  </>
-                ) : (
-                  <Route path="*" element={<Navigate to="/sign-in" />} />
-                )}
-              </Routes>
-            </React.Suspense>
+                  <Route path="/woocommerce/receive" element={<WooCommerceConnectRoute />} />
+                  
+                  {/* Redirect root to dashboard */}
+                  <Route path="/" element={<Navigate to="/dashboard" />} />
+                  
+                  {/* Protected Routes with Lazy Loading */}
+                  {user ? (
+                    <>
+                      <Route path="/dashboard" element={<Dashboard />} />
+                      <Route path="/products" element={<Products />}>
+                        <Route index element={<ProductsTable />} />
+                        <Route path=":productId" element={<ProductPage />} />
+                        <Route path=":productId_:lang" element={<ProductPage />} />
+                      </Route>
+                      <Route path="/strategy" element={<ContentStrategy />} />
+                      <Route path="/strategy/:id" element={<ContentPage />} />
+                      <Route path="/keyword-research" element={<KeywordResearch />} />
+                      <Route path="/image-creation" element={<ImageCreation />} />
+                      <Route path="/stock-images" element={<StockImages />} />
+                      <Route path="/translations" element={<ProductTranslations />} />
+                      <Route path="/translations/:productId" element={<TranslationProductPage />} />
+                      <Route path="/brand-strategy" element={<BrandStrategy />} />
+                      <Route path="/brand-settings" element={<BrandSettings />} />
+                      <Route path="/your-brands" element={<YourBrands />} />
+                      <Route path="/settings" element={<Settings />} />
+                      <Route path="/checkout" element={<Checkout />} />
+                    </>
+                  ) : (
+                    <Route path="*" element={<Navigate to="/sign-in" />} />
+                  )}
+                </Routes>
+              </React.Suspense>
+            </BrandProvider>
           </StoreConnectionProvider>
         </ToastProvider>
       </ThemeProvider>

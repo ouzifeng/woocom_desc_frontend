@@ -14,6 +14,7 @@ import SideMenuMobile from './SideMenuMobile';
 import MenuButton from './MenuButton';
 import ColorModeIconDropdown from '../../shared-theme/ColorModeIconDropdown';
 import TodayDate from './TodayDate';
+import BrandDropdown from './BrandDropdown';
 
 const Toolbar = styled(MuiToolbar)({
   width: '100%',
@@ -73,6 +74,9 @@ export default function AppNavbar() {
               Dashboard
             </Typography>
           </Stack>
+          <Box sx={{ ml: 2 }}>
+            <BrandDropdown />
+          </Box>
           <Box sx={{ flexGrow: 1 }} />
           <Stack
             direction="row"

@@ -17,9 +17,10 @@ import ForgotPassword from './components/ForgotPassword';
 import AppTheme from '../shared-theme/AppTheme';
 import ColorModeSelect from '../shared-theme/ColorModeSelect';
 import { GoogleIcon, SitemarkIcon } from './components/CustomIcons';
-import { auth, googleProvider } from '../../firebase';
+import { auth, googleProvider, db } from '../../firebase';
 import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
+import { collection, query, getDocs } from 'firebase/firestore';
 
 const Card = styled(MuiCard)(({ theme }) => ({
   display: 'flex',
@@ -81,13 +82,45 @@ export default function SignIn(props) {
     setOpen(false);
   };
 
+  // Function to load user's first brand and set in localStorage
+  const loadUserBrands = async (userId) => {
+    try {
+      const brandsRef = collection(db, `users/${userId}/brands`);
+      const q = query(brandsRef);
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const brands = [];
+        querySnapshot.forEach((doc) => {
+          brands.push({
+            id: doc.id,
+            ...doc.data()
+          });
+        });
+        
+        // Set the first brand as active
+        if (brands.length > 0) {
+          localStorage.setItem('activeBrandId', brands[0].id);
+          console.log('Set active brand ID:', brands[0].id);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading user brands:', error);
+    }
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (emailError || passwordError) {
       return;
     }
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      
+      // Load user's brands and set active brand
+      await loadUserBrands(user.uid);
+      
       navigate('/dashboard');
     } catch (error) {
       console.error('Error signing in with email and password', error);
@@ -96,7 +129,12 @@ export default function SignIn(props) {
 
   const handleGoogleSignIn = async () => {
     try {
-      await signInWithPopup(auth, googleProvider);
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+      
+      // Load user's brands and set active brand
+      await loadUserBrands(user.uid);
+      
       navigate('/dashboard');
     } catch (error) {
       console.error('Error signing in with Google', error);

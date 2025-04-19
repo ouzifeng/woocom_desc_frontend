@@ -133,16 +133,42 @@ export default function SignUp(props) {
 
       console.log('Google user created:', user.uid);
 
+      // Create user document with more metadata
       await setDoc(doc(db, 'users', user.uid), {
-        wc_url: '',
-        wc_key: '',
-        wc_secret: '',
-        credits: 10,
         firstName: user.displayName,
-        avatar: user.photoURL
+        email: user.email,
+        avatar: user.photoURL,
+        createdAt: new Date(),
+        lastLogin: new Date(),
+        credits: 10
       });
 
-      console.log('Firestore document created for Google user:', user.uid);
+      // Create their first brand with unique ID (timestamp + first 4 chars of UID)
+      const brandId = `brand_${Date.now()}_${user.uid.substring(0, 4)}`;
+      const brandRef = doc(db, `users/${user.uid}/brands/${brandId}`);
+      await setDoc(brandRef, {
+        name: 'Brand 1',
+        ownerId: user.uid,
+        createdAt: new Date(),
+        // WooCommerce credentials are now at brand level
+        wc_url: '',
+        wc_key: '',
+        wc_secret: ''
+      });
+
+      // Add user as member of their own brand
+      const memberRef = doc(brandRef, `members/${user.uid}`);
+      await setDoc(memberRef, {
+        role: 'owner',
+        email: user.email,
+        displayName: user.displayName,
+        joinedAt: new Date()
+      });
+
+      // Save the active brand ID to localStorage
+      localStorage.setItem('activeBrandId', brandId);
+
+      console.log('Firestore documents created for Google user:', user.uid);
 
       navigate('/settings');
     } catch (error) {
@@ -168,15 +194,41 @@ export default function SignUp(props) {
 
       console.log('User created:', user.uid);
 
+      // Create user document with more metadata
       await setDoc(doc(db, 'users', user.uid), {
-        wc_url: '',
-        wc_key: '',
-        wc_secret: '',
-        credits: 10,
-        firstName: firstName
+        firstName: firstName,
+        email: email,
+        createdAt: new Date(),
+        lastLogin: new Date(),
+        credits: 10
       });
 
-      console.log('Firestore document created for user:', user.uid);
+      // Create their first brand with unique ID (timestamp + first 4 chars of UID)
+      const brandId = `brand_${Date.now()}_${user.uid.substring(0, 4)}`;
+      const brandRef = doc(db, `users/${user.uid}/brands/${brandId}`);
+      await setDoc(brandRef, {
+        name: 'Brand 1',
+        ownerId: user.uid,
+        createdAt: new Date(),
+        // WooCommerce credentials are now at brand level
+        wc_url: '',
+        wc_key: '',
+        wc_secret: ''
+      });
+
+      // Add user as member of their own brand
+      const memberRef = doc(brandRef, `members/${user.uid}`);
+      await setDoc(memberRef, {
+        role: 'owner',
+        email: email,
+        displayName: firstName,
+        joinedAt: new Date()
+      });
+
+      // Save the active brand ID to localStorage
+      localStorage.setItem('activeBrandId', brandId);
+
+      console.log('Firestore documents created for user:', user.uid);
 
       navigate('/settings');
     } catch (error) {
