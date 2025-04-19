@@ -31,6 +31,7 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import { useToast } from '../../components/ToasterAlert';
 import StoreConnectionStatus from '../../components/StoreConnectionStatus';
 import { useStoreConnection } from '../../contexts/StoreConnectionContext';
+import { useBrand } from '../../contexts/BrandContext';
 
 // Lazy load components
 const ImportProductsButton = React.lazy(() => import('./components/ImportProductsButton'));
@@ -62,6 +63,7 @@ const xThemeComponents = {
 export default function Products(props) {
   const { showToast } = useToast();
   const [user] = useAuthState(auth);
+  const { activeBrandId, activeBrand } = useBrand();
   const navigate = useNavigate();
   const [storeUrl, setStoreUrl] = useState('');
   const [apiId, setApiId] = useState('');
@@ -120,9 +122,16 @@ export default function Products(props) {
   useEffect(() => {
     const fetchProducts = async () => {
       if (!user) return;
+      if (!activeBrandId) {
+        console.log('No active brand selected, skipping product fetch');
+        setLoading(false);
+        return;
+      }
 
       try {
-        const productsRef = collection(db, 'users', user.uid, 'products');
+        console.log(`Fetching improved products for brand: ${activeBrandId}`);
+        // Update path to include the brand ID
+        const productsRef = collection(db, 'users', user.uid, 'brands', activeBrandId, 'products');
         const q = query(productsRef, where('improved', '==', true));
         const querySnapshot = await getDocs(q);
         
@@ -131,6 +140,7 @@ export default function Products(props) {
           ...doc.data()
         }));
 
+        console.log(`Found ${productsData.length} improved products for brand ${activeBrandId}`);
         setProducts(productsData);
         setLoading(false);
       } catch (err) {
@@ -141,7 +151,7 @@ export default function Products(props) {
     };
 
     fetchProducts();
-  }, [user]);
+  }, [user, activeBrandId]);
 
   const isProductPage = location.pathname.includes('/products/');
 
@@ -197,6 +207,13 @@ export default function Products(props) {
             >
               <Header />
               <Grid container spacing={3}>
+                {!activeBrandId && (
+                  <Grid item xs={12}>
+                    <Alert severity="warning">
+                      Please select a brand to view and manage products.
+                    </Alert>
+                  </Grid>
+                )}
                 <Grid item xs={12} md={12}>
                   {!isProductPage && (
                     <Box
@@ -218,7 +235,7 @@ export default function Products(props) {
                                     secretKey={secretKey}
                                     setRefresh={setRefresh}
                                     setNotificationMessage={(msg) => showToast(msg)}
-                                    disabled={!hasWooCommerceCredentials}
+                                    disabled={!hasWooCommerceCredentials || !activeBrandId}
                                     onClick={!hasWooCommerceCredentials ? handleDisabledButtonClick : undefined}
                                   />
                                 </span>
@@ -233,7 +250,7 @@ export default function Products(props) {
                                     secretKey={secretKey}
                                     setRefresh={setRefresh}
                                     setNotificationMessage={(msg) => showToast(msg)}
-                                    disabled={!hasWooCommerceCredentials}
+                                    disabled={!hasWooCommerceCredentials || !activeBrandId}
                                     onClick={!hasWooCommerceCredentials ? handleDisabledButtonClick : undefined}
                                   />
                                 </span>
@@ -248,7 +265,7 @@ export default function Products(props) {
                                     secretKey={secretKey}
                                     setRefresh={setRefresh}
                                     setNotificationMessage={(msg) => showToast(msg)}
-                                    disabled={!hasWooCommerceCredentials}
+                                    disabled={!hasWooCommerceCredentials || !activeBrandId}
                                     onClick={!hasWooCommerceCredentials ? handleDisabledButtonClick : undefined}
                                   />
                                 </span>
@@ -263,7 +280,7 @@ export default function Products(props) {
                                   <ShopifyImportProductsButton
                                     setRefresh={setRefresh}
                                     setNotificationMessage={(msg) => showToast(msg)}
-                                    disabled={!hasShopifyCredentials}
+                                    disabled={!hasShopifyCredentials || !activeBrandId}
                                     onClick={!hasShopifyCredentials ? handleDisabledButtonClick : undefined}
                                   />
                                 </span>
@@ -275,7 +292,7 @@ export default function Products(props) {
                                   <ShopifyUpdateProductsButton
                                     setRefresh={setRefresh}
                                     setNotificationMessage={(msg) => showToast(msg)}
-                                    disabled={!hasShopifyCredentials}
+                                    disabled={!hasShopifyCredentials || !activeBrandId}
                                     onClick={!hasShopifyCredentials ? handleDisabledButtonClick : undefined}
                                   />
                                 </span>
@@ -287,7 +304,7 @@ export default function Products(props) {
                                   <ShopifyUpdateAllProductsButton
                                     setRefresh={setRefresh}
                                     setNotificationMessage={(msg) => showToast(msg)}
-                                    disabled={!hasShopifyCredentials}
+                                    disabled={!hasShopifyCredentials || !activeBrandId}
                                     onClick={!hasShopifyCredentials ? handleDisabledButtonClick : undefined}
                                   />
                                 </span>

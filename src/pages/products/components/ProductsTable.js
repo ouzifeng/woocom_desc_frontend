@@ -6,6 +6,7 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../../../firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { TableLoadingSpinner } from './TableLoadingSpinner';
+import { useBrand } from '../../../contexts/BrandContext';
 
 import {
   Box,
@@ -16,6 +17,7 @@ import {
   Select,
   FormControl,
   InputLabel,
+  Alert,
 } from '@mui/material';
 
 /** Status chip */
@@ -39,6 +41,7 @@ function decodeHtmlEntities(text) {
 export default function ProductsTable() {
   const { refresh, setRefresh, setSelectedRows } = useOutletContext();
   const [user] = useAuthState(auth);
+  const { activeBrandId, activeBrand } = useBrand();
   const [rows, setRows] = useState([]);
   const [rowSelectionModel, setRowSelectionModel] = useState([]);
   const [error, setError] = useState(null);
@@ -65,7 +68,15 @@ export default function ProductsTable() {
 
   const fetchData = useCallback(async () => {
     if (!user) return;
+    if (!activeBrandId) {
+      setError('No brand selected. Please select a brand to view products.');
+      setLoading(false);
+      setRows([]);
+      return;
+    }
+    
     setLoading(true);
+    setError(null);
 
     try {
       const token = await user.getIdToken();
@@ -76,7 +87,10 @@ export default function ProductsTable() {
       url.searchParams.append('sortDirection', 'asc');
       url.searchParams.append('status', statusFilter || '');
       url.searchParams.append('improved', improvedFilter || '');
+      url.searchParams.append('brandId', activeBrandId);
 
+      console.log(`Fetching products for brand: ${activeBrandId}`);
+      
       const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -94,19 +108,20 @@ export default function ProductsTable() {
     } catch (err) {
       console.error('Error fetching products:', err);
       setError(err.message);
+      setRows([]);
     } finally {
       setLoading(false);
     }
-  }, [user, paginationModel.page, paginationModel.pageSize, statusFilter, improvedFilter]);
+  }, [user, paginationModel.page, paginationModel.pageSize, statusFilter, improvedFilter, activeBrandId]);
 
   useEffect(() => {
     fetchData();
-  }, [fetchData, refresh]);
+  }, [fetchData, refresh, activeBrandId]);
 
   const handleImprovedChange = async (id, checked) => {
-    if (!user) return;
+    if (!user || !activeBrandId) return;
     try {
-      const productDocRef = doc(db, 'users', user.uid, 'products', String(id));
+      const productDocRef = doc(db, 'users', user.uid, 'brands', activeBrandId, 'products', String(id));
       await updateDoc(productDocRef, { improved: checked });
       setRefresh((prev) => !prev);
     } catch (err) {
@@ -166,12 +181,21 @@ export default function ProductsTable() {
 
   return (
     <Box sx={{ width: '100%', height: '100%', position: 'relative' }}>
-      {error ? (
+      {!activeBrandId ? (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          Please select a brand to view products.
+        </Alert>
+      ) : error ? (
         <Typography variant="body2" color="error">
           {`Error fetching products: ${error}`}
         </Typography>
       ) : (
         <>
+          {activeBrand && (
+            <Typography variant="body2" sx={{ mb: 2 }}>
+              Showing products for brand: <strong>{activeBrand.name}</strong>
+            </Typography>
+          )}
           <Box
             sx={{
               display: 'flex',

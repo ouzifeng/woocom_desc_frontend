@@ -4,8 +4,8 @@ import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Link from '@mui/material/Link';
 import { useLocation, Link as RouterLink } from 'react-router-dom';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth, db } from '../../../firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { auth } from '../../../firebase';
+import { useBrand } from '../../../contexts/BrandContext';
 
 function capitalizeFirstLetter(string) {
   return string.charAt(0).toUpperCase() + string.slice(1);
@@ -14,25 +14,12 @@ function capitalizeFirstLetter(string) {
 export default function NavbarBreadcrumbs() {
   const location = useLocation();
   const [user] = useAuthState(auth);
+  const { activeBrandId } = useBrand();
   const [productName, setProductName] = React.useState('');
   const pathnames = location.pathname.split('/').filter((x) => x);
 
-  React.useEffect(() => {
-    const fetchProductName = async () => {
-      if (pathnames[0] === 'products' && pathnames[1] && user) {
-        try {
-          const productDoc = await getDoc(doc(db, 'users', user.uid, 'products', pathnames[1]));
-          if (productDoc.exists()) {
-            setProductName(productDoc.data().name);
-          }
-        } catch (error) {
-          console.error('Error fetching product:', error);
-        }
-      }
-    };
-
-    fetchProductName();
-  }, [pathnames, user]);
+  // Removed direct Firestore access - we'll rely on parent components for this info
+  // This prevents unnecessary permission errors in the console
 
   return (
     <Breadcrumbs aria-label="breadcrumb">
@@ -44,7 +31,9 @@ export default function NavbarBreadcrumbs() {
         if (value === 'products' && last) {
           displayName = 'Products';
         } else if (pathnames[0] === 'products' && index === 1) {
-          displayName = productName || 'Loading...';
+          // Don't try to display product name, just show product ID
+          const shortId = value.length > 8 ? value.substring(0, 8) + '...' : value;
+          displayName = `Product ${shortId}`;
         } else {
           displayName = value.split('-').map(capitalizeFirstLetter).join(' ');
         }

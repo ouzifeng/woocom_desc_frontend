@@ -19,6 +19,8 @@ import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
 import ClickAwayListener from '@mui/material/ClickAwayListener';
 import { alpha } from '@mui/material/styles';
+import { useBrand } from '../../../contexts/BrandContext';
+import Alert from '@mui/material/Alert';
 
 /** A helper that decodes HTML entities */
 function decodeHtmlEntities(text) {
@@ -33,15 +35,26 @@ export default function Search() {
   const [isLoading, setIsLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [allProducts, setAllProducts] = useState([]);
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
   const [user] = useAuthState(auth);
+  const { activeBrandId } = useBrand();
 
   useEffect(() => {
     const fetchAllProducts = async () => {
       if (!user) return;
+      if (!activeBrandId) {
+        setAllProducts([]);
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
 
       try {
-        const productsRef = collection(db, 'users', user.uid, 'products');
+        console.log(`Fetching products for search from brand: ${activeBrandId}`);
+        // Updated path to include brand ID
+        const productsRef = collection(db, 'users', user.uid, 'brands', activeBrandId, 'products');
         const querySnapshot = await getDocs(productsRef);
         const products = querySnapshot.docs.map(doc => {
           const data = doc.data();
@@ -51,14 +64,19 @@ export default function Search() {
             image: data.image || ''
           };
         });
+        console.log(`Found ${products.length} products for search`);
         setAllProducts(products);
       } catch (error) {
         console.error('Error fetching products:', error);
+        setError(error.message);
+        setAllProducts([]);
+      } finally {
+        setIsLoading(false);
       }
     };
 
     fetchAllProducts();
-  }, [user]);
+  }, [user, activeBrandId]);
 
   useEffect(() => {
     if (searchQuery.length < 3) {
@@ -100,6 +118,41 @@ export default function Search() {
     setShowDropdown(false);
   };
 
+  if (!activeBrandId) {
+    return (
+      <FormControl
+        sx={{ width: '100%' }}
+        variant="outlined"
+      >
+        <OutlinedInput
+          size="small"
+          id="search"
+          placeholder="Select a brand to search products..."
+          disabled={true}
+          sx={{
+            flexGrow: 1,
+            backgroundColor: (theme) => alpha(theme.palette.background.paper, 0.9),
+            borderRadius: '12px',
+          }}
+          startAdornment={
+            <InputAdornment position="start">
+              <SearchRoundedIcon 
+                sx={{ 
+                  color: 'action.disabled',
+                  opacity: 0.8
+                }} 
+                fontSize="small" 
+              />
+            </InputAdornment>
+          }
+          inputProps={{
+            'aria-label': 'search',
+          }}
+        />
+      </FormControl>
+    );
+  }
+
   return (
     <ClickAwayListener onClickAway={handleClickAway}>
       <Box sx={{ position: 'relative', width: { xs: '100%', md: '50ch' } }}>
@@ -112,7 +165,7 @@ export default function Search() {
           <OutlinedInput
             size="small"
             id="search"
-            placeholder="Search products..."
+            placeholder={`Search products in ${allProducts.length > 0 ? allProducts.length : ''} products...`}
             value={searchQuery}
             onChange={handleSearchChange}
             sx={{
@@ -158,6 +211,30 @@ export default function Search() {
             }}
           />
         </FormControl>
+
+        {error && (
+          <Paper
+            elevation={0}
+            sx={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              right: 0,
+              mt: 1,
+              p: 2,
+              zIndex: 1000,
+              backgroundColor: 'background.paper',
+              borderRadius: '12px',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+              border: '1px solid',
+              borderColor: 'error.light',
+            }}
+          >
+            <Alert severity="error" sx={{ py: 0 }}>
+              Error loading products: {error}
+            </Alert>
+          </Paper>
+        )}
 
         {showDropdown && (searchResults.length > 0 ? (
           <Paper
