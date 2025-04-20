@@ -33,9 +33,11 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
+import { useBrand } from '../../contexts/BrandContext';
 
 export default function ContentStrategy(props) {
   const [user] = useAuthState(auth);
+  const { activeBrandId } = useBrand();
   const [loading, setLoading] = React.useState(false);
   const [rows, setRows] = React.useState([]);
   const [articleCount, setArticleCount] = React.useState(100);
@@ -161,11 +163,12 @@ export default function ContentStrategy(props) {
 
   // Load saved strategy from cache or database
   const loadSavedStrategy = React.useCallback(async () => {
-    if (!user) return;
+    if (!user || !activeBrandId) return;
 
     try {
       // Try to get from cache first
-      const cachedStrategy = localStorage.getItem('contentStrategy');
+      const cacheKey = `contentStrategy_${activeBrandId}`;
+      const cachedStrategy = localStorage.getItem(cacheKey);
       if (cachedStrategy) {
         const { timestamp, data } = JSON.parse(cachedStrategy);
         // Check if cache is less than 24 hours old
@@ -175,14 +178,14 @@ export default function ContentStrategy(props) {
         }
       }
 
-      // If no cache or expired, get from database
-      const strategyDoc = await getDocs(collection(db, 'users', user.uid, 'contentStrategy'));
+      // If no cache or expired, get from database with brand isolation
+      const strategyDoc = await getDocs(collection(db, 'users', user.uid, 'brands', activeBrandId, 'contentStrategy'));
       if (!strategyDoc.empty) {
         const strategyData = strategyDoc.docs[0].data().strategy;
         setValidatedRows(strategyData);
         
-        // Save to cache
-        localStorage.setItem('contentStrategy', JSON.stringify({
+        // Save to cache with brand isolation
+        localStorage.setItem(cacheKey, JSON.stringify({
           timestamp: Date.now(),
           data: strategyData
         }));
@@ -191,21 +194,26 @@ export default function ContentStrategy(props) {
       console.error('Error loading strategy:', err);
       setError('Failed to load saved strategy');
     }
-  }, [user]);
+  }, [user, activeBrandId]);
 
-  // Load saved strategy on component mount
+  // Load saved strategy on component mount and when brand changes
   React.useEffect(() => {
-    loadSavedStrategy();
-  }, [loadSavedStrategy]);
+    if (activeBrandId) {
+      setError(null);
+      loadSavedStrategy();
+    } else {
+      setRows([]);
+    }
+  }, [loadSavedStrategy, activeBrandId]);
 
   // Check content generation status for all rows
   React.useEffect(() => {
     const checkContentStatus = async () => {
-      if (!user) return;
+      if (!user || !activeBrandId) return;
 
       try {
-        // Get all content documents that have content
-        const contentCollection = collection(db, 'users', user.uid, 'content');
+        // Get all content documents that have content with brand isolation
+        const contentCollection = collection(db, 'users', user.uid, 'brands', activeBrandId, 'content');
         const contentSnapshot = await getDocs(contentCollection);
         
         // Create a map of content IDs that exist
@@ -224,7 +232,7 @@ export default function ContentStrategy(props) {
     };
 
     checkContentStatus();
-  }, [user]);
+  }, [user, activeBrandId]);
 
   // Toggle pillar expansion
   const togglePillar = (pillarId) => {
@@ -383,23 +391,27 @@ export default function ContentStrategy(props) {
   ];
 
   const handleGenerate = async () => {
-    if (!user) return;
+    if (!user || !activeBrandId) {
+      setError('Please select a brand first');
+      return;
+    }
     
     setLoading(true);
     setError(null);
     
     try {
-      // Get saved keywords
-      const keywordsSnapshot = await getDocs(collection(db, 'users', user.uid, 'savedKeywords'));
-      const savedKeywords = keywordsSnapshot.docs.map(doc => doc.data().keyword);
+      // Get saved keywords with brand isolation
+      const keywordsSnapshot = await getDocs(collection(db, 'users', user.uid, 'brands', activeBrandId, 'savedKeywords'));
+      const savedKeywords = keywordsSnapshot.docs.map(doc => doc.data().keyword || doc.data().text);
       
       if (savedKeywords.length === 0) {
         setError('No saved keywords found. Please save some keywords first.');
+        setLoading(false);
         return;
       }
 
-      // Get existing strategy
-      const strategyDoc = await getDocs(collection(db, 'users', user.uid, 'contentStrategy'));
+      // Get existing strategy with brand isolation
+      const strategyDoc = await getDocs(collection(db, 'users', user.uid, 'brands', activeBrandId, 'contentStrategy'));
       const existingStrategy = strategyDoc.empty ? [] : strategyDoc.docs[0].data().strategy;
 
       // Generate new strategy
@@ -413,7 +425,8 @@ export default function ContentStrategy(props) {
           body: JSON.stringify({
             keywords: savedKeywords,
             articleCount: 11, // Fixed number for one pillar + 10 supporting pieces
-            existingStrategy // Pass existing strategy to backend
+            existingStrategy, // Pass existing strategy to backend
+            brandId: activeBrandId // Include brandId for brand isolation
           }),
         }
       );
@@ -421,14 +434,16 @@ export default function ContentStrategy(props) {
       const data = await response.json();
       
       if (data.result === 'Success') {
-        // Save to database
-        await setDoc(doc(collection(db, 'users', user.uid, 'contentStrategy'), 'current'), {
+        // Save to database with brand isolation
+        await setDoc(doc(db, 'users', user.uid, 'brands', activeBrandId, 'contentStrategy', 'current'), {
           strategy: data.strategy,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          brandId: activeBrandId
         });
 
-        // Save to cache
-        localStorage.setItem('contentStrategy', JSON.stringify({
+        // Save to cache with brand isolation
+        const cacheKey = `contentStrategy_${activeBrandId}`;
+        localStorage.setItem(cacheKey, JSON.stringify({
           timestamp: Date.now(),
           data: data.strategy
         }));
@@ -447,8 +462,14 @@ export default function ContentStrategy(props) {
 
   // Handle row click to navigate to content page
   const handleRowClick = async (params) => {
+    if (!user || !activeBrandId) {
+      setError('Please select a brand first');
+      return;
+    }
+
     try {
-      const contentRef = doc(db, 'users', user.uid, 'content', params.row.id);
+      // Use brand isolation for content reference
+      const contentRef = doc(db, 'users', user.uid, 'brands', activeBrandId, 'content', params.row.id);
       const contentDoc = await getDoc(contentRef);
       
       // Only update if the document doesn't exist or doesn't have content
@@ -456,11 +477,12 @@ export default function ContentStrategy(props) {
         await setDoc(contentRef, {
           ...params.row,
           content: '',
-          lastUpdated: new Date().toISOString()
+          lastUpdated: new Date().toISOString(),
+          brandId: activeBrandId
         });
       }
       
-      // Navigate to content page
+      // Navigate to content page - fix the navigation path
       navigate(`/strategy/${params.row.id}`);
     } catch (err) {
       console.error('Error handling row click:', err);
@@ -470,7 +492,7 @@ export default function ContentStrategy(props) {
 
   // Add delete handler
   const handleDelete = async () => {
-    if (!user || selectedRows.length === 0) return;
+    if (!user || !activeBrandId || selectedRows.length === 0) return;
 
     try {
       setLoading(true);
@@ -493,10 +515,10 @@ export default function ContentStrategy(props) {
         }
       });
 
-      // Delete all content
+      // Delete all content with brand isolation
       for (const id of contentToDelete) {
         // Delete from content collection
-        await deleteDoc(doc(db, 'users', user.uid, 'content', id.toString()));
+        await deleteDoc(doc(db, 'users', user.uid, 'brands', activeBrandId, 'content', id.toString()));
       }
 
       // Update local state
@@ -505,8 +527,9 @@ export default function ContentStrategy(props) {
       setSelectedRows([]);
       setRowSelectionModel([]);
 
-      // Update cache
-      localStorage.setItem('contentStrategy', JSON.stringify({
+      // Update cache with brand isolation
+      const cacheKey = `contentStrategy_${activeBrandId}`;
+      localStorage.setItem(cacheKey, JSON.stringify({
         timestamp: Date.now(),
         data: remainingRows
       }));
@@ -519,6 +542,44 @@ export default function ContentStrategy(props) {
       setLoading(false);
     }
   };
+
+  // Show a message if no brand is selected
+  if (!activeBrandId) {
+    return (
+      <AppTheme {...props}>
+        <CssBaseline enableColorScheme />
+        <Box sx={{ display: 'flex' }}>
+          <SideMenu user={user} />
+          <AppNavbar />
+          <Box
+            component="main"
+            sx={(theme) => ({
+              flexGrow: 1,
+              backgroundColor: theme.vars
+                ? `rgba(${theme.vars.palette.background.defaultChannel} / 1)`
+                : alpha(theme.palette.background.default, 1),
+              overflow: 'auto',
+            })}
+          >
+            <Stack
+              spacing={2}
+              sx={{
+                alignItems: 'center',
+                mx: 3,
+                pb: 5,
+                mt: { xs: 8, md: 0 },
+              }}
+            >
+              <Header />
+              <Alert severity="warning" sx={{ width: '100%', mt: 2 }}>
+                Please select a brand to view content strategy.
+              </Alert>
+            </Stack>
+          </Box>
+        </Box>
+      </AppTheme>
+    );
+  }
 
   return (
     <AppTheme {...props}>

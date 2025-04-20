@@ -95,9 +95,9 @@ export default function Products(props) {
     const fetchCredentials = async () => {
       setLoading(true);
       try {
-        if (user) {
-          const userDocRef = doc(db, 'users', user.uid);
-          const docSnap = await getDoc(userDocRef);
+        if (user && activeBrandId) {
+          const brandDocRef = doc(db, 'users', user.uid, 'brands', activeBrandId);
+          const docSnap = await getDoc(brandDocRef);
           if (docSnap.exists()) {
             const data = docSnap.data();
             setStoreUrl(data.wc_url || '');
@@ -106,7 +106,7 @@ export default function Products(props) {
             // Check if all WooCommerce credentials are present
             setHasWooCommerceCredentials(!!(data.wc_url && data.wc_key && data.wc_secret));
             // Check if Shopify credentials are present
-            setHasShopifyCredentials(!!(data.shopify_access_token && data.shopify_shop));
+            setHasShopifyCredentials(!!(data.shopify_domain && data.shopify_token));
           }
         }
       } catch (error) {
@@ -117,7 +117,7 @@ export default function Products(props) {
     };
 
     fetchCredentials();
-  }, [user]);
+  }, [user, activeBrandId]);
 
   useEffect(() => {
     const fetchProducts = async () => {

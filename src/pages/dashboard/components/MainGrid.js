@@ -13,6 +13,7 @@ import SessionsChart from './SessionsComponent';
 import PageViewsBarChart from './PageViewsBarChart';
 import TopProductsChart from './TopProductsChart';
 import RevenueTrendChart from './RevenueTrendChart';
+import { useBrand } from '../../../contexts/BrandContext';
 
 const API_BASE_URL = process.env.NODE_ENV === 'production'
   ? 'https://woocomdescbackend-451f66b3eb02.herokuapp.com'
@@ -44,6 +45,7 @@ export default function MainGrid() {
   const [tempEndDate, setTempEndDate] = React.useState(endDate);
   const [comparisonPeriod, setComparisonPeriod] = React.useState('');
   const [selectedCurrency, setSelectedCurrency] = React.useState('USD');
+  const { activeBrandId } = useBrand();
 
   // Load saved currency preference on mount
   React.useEffect(() => {
@@ -81,6 +83,12 @@ export default function MainGrid() {
 
   const fetchOverview = async () => {
     try {
+      if (!activeBrandId) {
+        console.error('No active brand selected');
+        setLoading(false);
+        return;
+      }
+      
       setLoading(true);
       const user = auth.currentUser;
       const token = await user.getIdToken();
@@ -89,9 +97,14 @@ export default function MainGrid() {
       console.log("API URL:", API_BASE_URL); // Check if it points to the correct local API
 
 
-      const res = await fetch(`${API_BASE_URL}/analytics/dashboard/overview?startDate=${startDate}&endDate=${endDate}`, {
+      const res = await fetch(`${API_BASE_URL}/analytics/dashboard/overview?startDate=${startDate}&endDate=${endDate}&brandId=${activeBrandId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to fetch overview data');
+      }
 
       const data = await res.json();
       setOverview(data);
@@ -100,12 +113,13 @@ export default function MainGrid() {
     } finally {
       setLoading(false);
     }
-};
-
+  };
 
   React.useEffect(() => {
-    fetchOverview();
-  }, [startDate, endDate]);
+    if (activeBrandId) {
+      fetchOverview();
+    }
+  }, [startDate, endDate, activeBrandId]);
 
   const formatTrend = (trend) => {
     console.log('Formatting trend:', trend);

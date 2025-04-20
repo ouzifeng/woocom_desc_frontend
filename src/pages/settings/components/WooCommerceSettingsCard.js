@@ -13,6 +13,7 @@ import {
 import { styled } from '@mui/material/styles';
 import { auth } from '../../../firebase';
 import { useStoreConnection } from '../../../contexts/StoreConnectionContext';
+import { useBrand } from '../../../contexts/BrandContext';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -41,11 +42,17 @@ export default function WooCommerceSettingsCard() {
   const [testResult, setTestResult] = useState('');
   const user = auth.currentUser;
   const { connectedPlatform, setConnectedPlatform } = useStoreConnection();
+  const { activeBrandId } = useBrand();
 
   const fetchConnectionStatus = async () => {
+    if (!activeBrandId) {
+      setStatus('no-brand');
+      return;
+    }
+    
     try {
       const token = await user.getIdToken();
-      const res = await fetch(`${API_URL}/woocommerce/status`, {
+      const res = await fetch(`${API_URL}/woocommerce/status?brandId=${activeBrandId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -68,6 +75,11 @@ export default function WooCommerceSettingsCard() {
   };
 
   const disconnect = async () => {
+    if (!activeBrandId) {
+      setError('No brand selected.');
+      return;
+    }
+    
     try {
       setStatus('loading');
       const token = await user.getIdToken();
@@ -75,7 +87,11 @@ export default function WooCommerceSettingsCard() {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          brandId: activeBrandId
+        }),
       });
       const data = await res.json();
       if (data.result === 'Success') {
@@ -95,10 +111,15 @@ export default function WooCommerceSettingsCard() {
   };
 
   const testConnection = async () => {
+    if (!activeBrandId) {
+      setError('No brand selected.');
+      return;
+    }
+    
     try {
       setTestResult('testing');
       const token = await user.getIdToken();
-      const res = await fetch(`${API_URL}/woocommerce/test`, {
+      const res = await fetch(`${API_URL}/woocommerce/test?brandId=${activeBrandId}`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -118,7 +139,7 @@ export default function WooCommerceSettingsCard() {
 
   useEffect(() => {
     if (user) fetchConnectionStatus();
-  }, [user]);
+  }, [user, activeBrandId]);
 
   const renderActionButtons = () => {
     if (status === 'loading') return <CircularProgress size={24} />;
@@ -173,6 +194,8 @@ export default function WooCommerceSettingsCard() {
         <Typography variant="body2">
           {status === 'connected'
             ? 'Your store is connected to Ecommander.'
+            : status === 'no-brand'
+            ? 'Please select a brand to manage WooCommerce connection.'
             : connectedPlatform === 'shopify'
               ? 'Shopify is already connected. Disconnect it first to connect WooCommerce.'
               : 'Not connected. To connect your store, download the plugin, upload, install and activate it on your WordPress site.'}

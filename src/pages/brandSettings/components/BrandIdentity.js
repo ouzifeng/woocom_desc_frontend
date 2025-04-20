@@ -16,6 +16,7 @@ import Alert from '@mui/material/Alert';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../../../firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { useBrand } from '../../../contexts/BrandContext';
 
 const archetypes = ['Hero', 'Rebel', 'Caregiver', 'Creator', 'Sage'];
 const tones = ['Friendly', 'Professional', 'Casual', 'Formal'];
@@ -24,6 +25,7 @@ const vocabLevels = ['Simple', 'Intermediate', 'Advanced'];
 
 export default function BrandIdentity() {
   const [user] = useAuthState(auth);
+  const { activeBrandId } = useBrand();
   const [brandName, setBrandName] = React.useState('');
   const [brandTagline, setBrandTagline] = React.useState('');
   const [brandArchetype, setBrandArchetype] = React.useState('');
@@ -33,13 +35,15 @@ export default function BrandIdentity() {
   const [pronouns, setPronouns] = React.useState('');
   const [vocabLevel, setVocabLevel] = React.useState('');
   const [modalOpen, setModalOpen] = React.useState(false);
+  const [error, setError] = React.useState('');
 
   React.useEffect(() => {
     const fetchData = async () => {
-      if (user) {
+      if (user && activeBrandId) {
         try {
-          const userDocRef = doc(db, 'users', user.uid, 'BrandIdentity', 'settings');
-          const docSnap = await getDoc(userDocRef);
+          setError('');
+          const docRef = doc(db, 'users', user.uid, 'brands', activeBrandId, 'BrandIdentity', 'settings');
+          const docSnap = await getDoc(docRef);
           if (docSnap.exists()) {
             const data = docSnap.data();
             setBrandName(data.brandName || '');
@@ -53,14 +57,15 @@ export default function BrandIdentity() {
           }
         } catch (error) {
           console.error('Error fetching brand identity data:', error);
+          setError('Failed to load brand settings');
         }
       }
     };
     fetchData();
-  }, [user]);
+  }, [user, activeBrandId]);
 
   const handleSave = async () => {
-    if (user) {
+    if (user && activeBrandId) {
       const brandIdentityData = {};
       if (brandName) brandIdentityData.brandName = brandName;
       if (brandTagline) brandIdentityData.brandTagline = brandTagline;
@@ -70,21 +75,35 @@ export default function BrandIdentity() {
       if (toneOfVoice) brandIdentityData.toneOfVoice = toneOfVoice;
       if (pronouns) brandIdentityData.pronouns = pronouns;
       if (vocabLevel) brandIdentityData.vocabLevel = vocabLevel;
+      
+      brandIdentityData.brandId = activeBrandId;
 
       try {
-        const userDocRef = doc(db, 'users', user.uid, 'BrandIdentity', 'settings');
-        await setDoc(userDocRef, brandIdentityData, { merge: true });
+        const docRef = doc(db, 'users', user.uid, 'brands', activeBrandId, 'BrandIdentity', 'settings');
+        await setDoc(docRef, brandIdentityData, { merge: true });
         console.log('Brand identity data saved successfully');
         setModalOpen(true);
+        setError('');
       } catch (error) {
         console.error('Error saving brand identity data:', error);
+        setError('Failed to save brand settings');
       }
+    } else if (!activeBrandId) {
+      setError('Please select a brand first');
     }
   };
 
   const handleCloseModal = () => {
     setModalOpen(false);
   };
+
+  if (!activeBrandId) {
+    return (
+      <Box sx={{ mb: 4 }}>
+        <Alert severity="warning">Please select a brand to view brand settings.</Alert>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ mb: 4 }}>
@@ -97,6 +116,11 @@ export default function BrandIdentity() {
             Save
           </Button>
         </Box>
+        {error && (
+          <Alert severity="error" sx={{ mx: 2, mb: 2 }}>
+            {error}
+          </Alert>
+        )}
         <TableContainer>
           <Table sx={{ mb: 2 }}>
             <TableHead>
@@ -243,16 +267,33 @@ export default function BrandIdentity() {
           </Table>
         </TableContainer>
       </Paper>
+      
       <Modal
         open={modalOpen}
         onClose={handleCloseModal}
-        aria-labelledby="modal-title"
-        aria-describedby="modal-description"
+        aria-labelledby="save-confirmation-modal"
+        aria-describedby="confirmation-of-brand-identity-save"
       >
-        <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 400, bgcolor: 'background.paper', boxShadow: 24, p: 4 }}>
-          <Alert onClose={handleCloseModal} severity="success">
-            Brand identity data saved successfully!
-          </Alert>
+        <Box sx={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: 400,
+          bgcolor: 'background.paper',
+          boxShadow: 24,
+          p: 4,
+          borderRadius: 1,
+        }}>
+          <Typography id="save-confirmation-modal" variant="h6" component="h2" gutterBottom>
+            Changes Saved Successfully
+          </Typography>
+          <Typography id="confirmation-of-brand-identity-save">
+            Your brand identity settings have been updated.
+          </Typography>
+          <Button onClick={handleCloseModal} sx={{ mt: 2 }}>
+            Close
+          </Button>
         </Box>
       </Modal>
     </Box>

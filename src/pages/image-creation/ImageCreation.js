@@ -9,7 +9,8 @@ import {
   ImageList,
   ImageListItem,
   Modal,
-  IconButton
+  IconButton,
+  Alert
 } from '@mui/material';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import CloseIcon from '@mui/icons-material/Close';
@@ -24,6 +25,7 @@ import { ImageDescription } from './components/ImageDescription';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { fetchPreviousImages } from './utils/firebaseUtils';
 import { keyframes } from '@mui/system';
+import { useBrand } from '../../contexts/BrandContext';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -85,6 +87,7 @@ const LoadingSpinnerSVG = () => (
 
 export default function ImageCreation(props) {
   const [user] = useAuthState(auth);
+  const { activeBrandId } = useBrand();
   const { showToast } = useToast();
   const [selectedRow, setSelectedRow] = useState(null);
   const [description, setDescription] = useState('');
@@ -105,22 +108,36 @@ export default function ImageCreation(props) {
   };
 
   const fetchPreviousImagesList = useCallback(async () => {
-    if (!user) return;
+    if (!user || !activeBrandId) return;
     try {
-      const images = await fetchPreviousImages(user.uid);
+      const images = await fetchPreviousImages(user.uid, activeBrandId);
       setPreviousImages(images);
     } catch (error) {
       console.error('Error fetching previous images:', error);
       showToast('Failed to load previous images', 'error');
     }
-  }, [user, showToast]);
+  }, [user, showToast, activeBrandId]);
 
   useEffect(() => {
     fetchPreviousImagesList();
-  }, [fetchPreviousImagesList]);
+  }, [fetchPreviousImagesList, activeBrandId]);
 
   const handleGenerateImage = async () => {
-    if (!user || !description) return;
+    if (!user || !description) {
+      showToast('Please enter a description', 'error');
+      return;
+    }
+    
+    if (!activeBrandId) {
+      showToast('Please select a brand first', 'error');
+      setError('No brand selected. Please select a brand before generating images.');
+      return;
+    }
+
+    if (!selectedRow) {
+      showToast('Please select an image format', 'error');
+      return;
+    }
 
     try {
       setIsLoading({ generation: true });
@@ -132,23 +149,29 @@ export default function ImageCreation(props) {
         : selectedRow === 4 ? { width: 1792, height: 1024 }
         : { width: 1024, height: 1024 };
 
+      const token = await user.getIdToken();
+      
       const payload = {
         positivePrompt: description,
         height: selectedSize.height,
-        width: selectedSize.width
+        width: selectedSize.width,
+        brandId: activeBrandId
       };
 
+      console.log('Making request with payload:', payload);
+      
       const response = await fetch(`${API_URL}/runware/generate-image`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user.accessToken}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(payload)
       });
       
       if (!response.ok) {
-        throw new Error('Failed to generate image');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate image');
       }
 
       const data = await response.json();
@@ -163,26 +186,32 @@ export default function ImageCreation(props) {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${user.accessToken}`
+            'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({
             imageUrl: image.url,
             prompt: image.description,
             imageType: 'generated',
             description,
-            userId: user.uid
+            brandId: activeBrandId
           })
         });
 
-        if (!saveResponse.ok) throw new Error('Failed to save image to storage');
+        if (!saveResponse.ok) {
+          const errorData = await saveResponse.json();
+          throw new Error(errorData.message || 'Failed to save image to storage');
+        }
+        
         const saveData = await saveResponse.json();
         savedImages.push({ url: saveData.permanentUrl, description: image.description });
       }
 
       setPreviousImages(prev => [...savedImages, ...prev]);
+      showToast('Image generated successfully', 'success');
     } catch (err) {
       console.error('Error generating image:', err);
       setError(err.message);
+      showToast(err.message || 'Failed to generate image', 'error');
     } finally {
       setIsLoading({ generation: false });
     }
@@ -212,15 +241,32 @@ export default function ImageCreation(props) {
                 <Typography variant="body1" color="text.secondary" sx={{ mt: 1, mb: 4 }}>
                   Generate professional images for social media
                 </Typography>
+                
+                {!activeBrandId && (
+                  <Alert severity="warning" sx={{ mb: 3 }}>
+                    Please select a brand first to generate images
+                  </Alert>
+                )}
+                
+                {error && (
+                  <Alert severity="error" sx={{ mb: 3 }}>
+                    {error}
+                  </Alert>
+                )}
+                
                 <Grid container spacing={3}>
                   <Grid item xs={12} md={6}>
                     <Stack spacing={3}>
-                      <ImageOptionsTable selectedRow={selectedRow} onSelectRow={setSelectedRow} />
+                      <ImageOptionsTable 
+                        selectedRow={selectedRow} 
+                        onSelectRow={setSelectedRow} 
+                      />
                       <ImageDescription
                         description={description}
                         setDescription={setDescription}
                         onGenerate={handleGenerateImage}
                         isLoading={isLoading.generation}
+                        disabled={!activeBrandId}
                       />
                     </Stack>
                   </Grid>
@@ -253,8 +299,8 @@ export default function ImageCreation(props) {
                               </Typography>
                             </Box>
                           ) : (
-                            previousImages.map((item) => (
-                              <ImageListItem key={item.url} onClick={() => handleOpen(item.url)}>
+                            previousImages.map((item, index) => (
+                              <ImageListItem key={`${item.url}-${index}`} onClick={() => handleOpen(item.url)}>
                                 <img
                                   src={item.url}
                                   alt={item.title || 'Generated Image'}

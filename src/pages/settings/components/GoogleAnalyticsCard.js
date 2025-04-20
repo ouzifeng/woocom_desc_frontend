@@ -20,6 +20,7 @@ import {
 import { Google as GoogleIcon, Analytics as AnalyticsIcon, CheckCircle } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import { auth } from '../../../firebase';
+import { useBrand } from '../../../contexts/BrandContext';
 
 const SettingsCard = styled(Card)(({ theme }) => ({
   display: 'flex',
@@ -41,6 +42,7 @@ const API_BASE_URL = process.env.NODE_ENV === 'production'
   : 'http://localhost:5000';
 
 export default function GoogleAnalyticsCard() {
+  const { activeBrandId } = useBrand();
   const [open, setOpen] = React.useState(false);
   const [isConnected, setIsConnected] = React.useState(false);
   const [accounts, setAccounts] = React.useState([]);
@@ -65,46 +67,59 @@ export default function GoogleAnalyticsCard() {
   };
 
   React.useEffect(() => {
-    checkConnectionStatus();
-  }, []);
+    if (activeBrandId) {
+      checkConnectionStatus();
+      setError(null);
+    }
+  }, [activeBrandId]);
 
-    const checkConnectionStatus = async () => {
+  const checkConnectionStatus = async () => {
+    if (!activeBrandId) {
+      setError('Please select a brand first');
+      return;
+    }
+    
     try {
-        setLoading(true);
-        const headers = await getAuthHeader();
-        const res = await fetch(`${API_BASE_URL}/analytics/accounts`, { headers });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed to fetch accounts');
+      setLoading(true);
+      const headers = await getAuthHeader();
+      const res = await fetch(`${API_BASE_URL}/analytics/accounts?brandId=${activeBrandId}`, { headers });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to fetch accounts');
 
-        setAccounts(data.accounts || []);
-        setIsConnected(data.connected);
+      setAccounts(data.accounts || []);
+      setIsConnected(data.connected);
 
-        // ✅ Pull saved selections from Firestore and auto-fill
-        if (data.accountId) {
+      // ✅ Pull saved selections from Firestore and auto-fill
+      if (data.accountId) {
         setSelectedAccount(data.accountId);
 
         // Fetch and set properties
-        const propRes = await fetch(`${API_BASE_URL}/analytics/properties?account=${data.accountId}`, { headers });
+        const propRes = await fetch(`${API_BASE_URL}/analytics/properties?account=${data.accountId}&brandId=${activeBrandId}`, { headers });
         const propData = await propRes.json();
         if (!propRes.ok) throw new Error(propData.error || 'Failed to fetch properties');
         setProperties(propData.properties || []);
         if (data.propertyId) {
-            setSelectedProperty(data.propertyId);
+          setSelectedProperty(data.propertyId);
         }
-        }
+      }
     } catch (err) {
-        setError(err.message);
-        setSnackbar({ open: true, message: err.message, severity: 'error' });
+      setError(err.message);
+      setSnackbar({ open: true, message: err.message, severity: 'error' });
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
-    };
+  };
 
   const handleAccountChange = async (accountId) => {
+    if (!activeBrandId) {
+      setError('Please select a brand first');
+      return;
+    }
+    
     try {
       setLoading(true);
       const headers = await getAuthHeader();
-      const res = await fetch(`${API_BASE_URL}/analytics/properties?account=${accountId}`, { headers });
+      const res = await fetch(`${API_BASE_URL}/analytics/properties?account=${accountId}&brandId=${activeBrandId}`, { headers });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to fetch properties');
       setSelectedAccount(accountId);
@@ -123,6 +138,11 @@ export default function GoogleAnalyticsCard() {
   };
 
   const handleConnect = async () => {
+    if (!activeBrandId) {
+      setError('Please select a brand first');
+      return;
+    }
+    
     try {
       setLoading(true);
       const user = auth.currentUser;
@@ -130,7 +150,7 @@ export default function GoogleAnalyticsCard() {
       const redirectUri = process.env.NODE_ENV === 'production'
         ? 'https://woocomdescbackend-451f66b3eb02.herokuapp.com/analytics/auth/callback'
         : 'http://localhost:5000/analytics/auth/callback';
-      const url = `${API_BASE_URL}/analytics/auth/url?redirect_uri=${encodeURIComponent(redirectUri)}&token=${encodeURIComponent(idToken)}`;
+      const url = `${API_BASE_URL}/analytics/auth/url?redirect_uri=${encodeURIComponent(redirectUri)}&token=${encodeURIComponent(idToken)}&brandId=${encodeURIComponent(activeBrandId)}`;
       const res = await fetch(url);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to get Auth URL');
@@ -144,10 +164,19 @@ export default function GoogleAnalyticsCard() {
   };
 
   const handleDisconnect = async () => {
+    if (!activeBrandId) {
+      setError('Please select a brand first');
+      return;
+    }
+    
     try {
       setLoading(true);
       const headers = await getAuthHeader();
-      await fetch(`${API_BASE_URL}/analytics/disconnect`, { method: 'POST', headers });
+      await fetch(`${API_BASE_URL}/analytics/disconnect`, { 
+        method: 'POST', 
+        headers,
+        body: JSON.stringify({ brandId: activeBrandId })
+      });
       setIsConnected(false);
       setAccounts([]);
       setProperties([]);
@@ -162,13 +191,22 @@ export default function GoogleAnalyticsCard() {
   };
 
   const handleSave = async () => {
+    if (!activeBrandId) {
+      setError('Please select a brand first');
+      return;
+    }
+    
     try {
       setSaving(true);
       const headers = await getAuthHeader();
       const res = await fetch(`${API_BASE_URL}/analytics/save-selection`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ accountId: selectedAccount, propertyId: selectedProperty })
+        body: JSON.stringify({ 
+          accountId: selectedAccount, 
+          propertyId: selectedProperty,
+          brandId: activeBrandId
+        })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save selection');
@@ -181,10 +219,15 @@ export default function GoogleAnalyticsCard() {
   };
 
   const handleTest = async () => {
+    if (!activeBrandId) {
+      setError('Please select a brand first');
+      return;
+    }
+    
     try {
       setTesting(true);
       const headers = await getAuthHeader();
-      const res = await fetch(`${API_BASE_URL}/analytics/test`, { headers });
+      const res = await fetch(`${API_BASE_URL}/analytics/test?brandId=${activeBrandId}`, { headers });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Test failed');
       setVisitors(data.visitors);
@@ -195,6 +238,18 @@ export default function GoogleAnalyticsCard() {
       setTesting(false);
     }
   };
+
+  if (!activeBrandId) {
+    return (
+      <SettingsCard variant="outlined">
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, marginBottom: 4 }}>
+          <AnalyticsIcon color="primary" />
+          <Typography variant="h6">Google Analytics</Typography>
+        </Box>
+        <Alert severity="warning">Please select a brand to configure Google Analytics.</Alert>
+      </SettingsCard>
+    );
+  }
 
   return (
     <>

@@ -4,6 +4,7 @@ import { useTheme } from '@mui/material/styles';
 import { Card, CardContent, Typography, Stack, Chip } from '@mui/material';
 import { LineChart } from '@mui/x-charts/LineChart';
 import { auth } from '../../../firebase';
+import { useBrand } from '../../../contexts/BrandContext';
 
 // Helper function to parse dates safely
 const parseDate = (dateStr) => {
@@ -77,6 +78,7 @@ AreaGradient.propTypes = {
 
 export default function SessionsChart({ startDate, endDate }) {
   const theme = useTheme();
+  const { activeBrandId } = useBrand();
   const [sessionsData, setSessionsData] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState(null);
@@ -96,10 +98,16 @@ export default function SessionsChart({ startDate, endDate }) {
   };
 
   const fetchSessionsData = async () => {
+    if (!activeBrandId) {
+      setError('Please select a brand first');
+      return;
+    }
+    
     try {
       setLoading(true);
+      setError(null);
       const headers = await getAuthHeader();
-      const response = await fetch(`${API_BASE_URL}/analytics/dashboard/trends?startDate=${startDate}&endDate=${endDate}`, { headers });
+      const response = await fetch(`${API_BASE_URL}/analytics/dashboard/trends?startDate=${startDate}&endDate=${endDate}&brandId=${activeBrandId}`, { headers });
       const data = await response.json();
 
       if (!response.ok) throw new Error(data.error || 'Failed to fetch session data');
@@ -108,14 +116,17 @@ export default function SessionsChart({ startDate, endDate }) {
       setSessionsData(sessions);
     } catch (err) {
       setError(err.message);
+      setSessionsData([]);
     } finally {
       setLoading(false);
     }
   };
 
   React.useEffect(() => {
-    fetchSessionsData();
-  }, [startDate, endDate]);
+    if (activeBrandId) {
+      fetchSessionsData();
+    }
+  }, [startDate, endDate, activeBrandId]);
 
   const data = sessionsData.map(row => formatDate(row.date));
   const activeUsersData = sessionsData.map(row => parseInt(row.users, 10));

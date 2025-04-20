@@ -14,6 +14,7 @@ import {
 import { styled } from '@mui/material/styles';
 import { auth } from '../../../firebase';
 import { useStoreConnection } from '../../../contexts/StoreConnectionContext';
+import { useBrand } from '../../../contexts/BrandContext';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -44,6 +45,7 @@ export default function ShopifySettingsCard() {
   const [isConnecting, setIsConnecting] = useState(false);
   const user = auth.currentUser;
   const { connectedPlatform, setConnectedPlatform } = useStoreConnection();
+  const { activeBrandId } = useBrand();
 
   const cleanUrl = (url) => {
     // Remove protocol and www
@@ -70,9 +72,14 @@ export default function ShopifySettingsCard() {
   };
 
   const fetchConnectionStatus = async () => {
+    if (!activeBrandId) {
+      setStatus('no-brand');
+      return;
+    }
+    
     try {
       const token = await user.getIdToken();
-      const res = await fetch(`${API_URL}/shopify/status`, {
+      const res = await fetch(`${API_URL}/shopify/status?brandId=${activeBrandId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -95,6 +102,11 @@ export default function ShopifySettingsCard() {
   };
 
   const disconnect = async () => {
+    if (!activeBrandId) {
+      setError('No brand selected');
+      return;
+    }
+    
     try {
       setStatus('loading');
       const token = await user.getIdToken();
@@ -102,7 +114,11 @@ export default function ShopifySettingsCard() {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          brandId: activeBrandId
+        }),
       });
       const data = await res.json();
       if (data.result === 'Success') {
@@ -122,10 +138,15 @@ export default function ShopifySettingsCard() {
   };
 
   const testConnection = async () => {
+    if (!activeBrandId) {
+      setError('No brand selected');
+      return;
+    }
+    
     try {
       setTestResult('testing');
       const token = await user.getIdToken();
-      const res = await fetch(`${API_URL}/shopify/test`, {
+      const res = await fetch(`${API_URL}/shopify/test?brandId=${activeBrandId}`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -144,11 +165,16 @@ export default function ShopifySettingsCard() {
   };
 
   const handleConnect = async () => {
-    const cleaned = cleanUrl(storeUrl);
-    const error = validateUrl(storeUrl);
+    if (!activeBrandId) {
+      setError('No brand selected. Please select a brand before connecting Shopify.');
+      return;
+    }
     
-    if (error) {
-      setError(error);
+    const cleaned = cleanUrl(storeUrl);
+    const validationError = validateUrl(storeUrl);
+    
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
@@ -156,7 +182,7 @@ export default function ShopifySettingsCard() {
       setIsConnecting(true);
       setError('');
       const token = await user.getIdToken();
-      window.location.href = `${API_URL}/shopify/install?token=${token}&shop=${encodeURIComponent(cleaned)}`;
+      window.location.href = `${API_URL}/shopify/install?token=${token}&shop=${encodeURIComponent(cleaned)}&brandId=${encodeURIComponent(activeBrandId)}`;
     } catch (err) {
       console.error('Failed to start connection:', err);
       setError('Failed to start Shopify connection');
@@ -165,8 +191,8 @@ export default function ShopifySettingsCard() {
   };
 
   useEffect(() => {
-    if (user) fetchConnectionStatus();
-  }, [user]);
+    if (user && activeBrandId) fetchConnectionStatus();
+  }, [user, activeBrandId]);
 
   const renderActionButtons = () => {
     if (status === 'loading') return <CircularProgress size={24} />;
@@ -208,12 +234,18 @@ export default function ShopifySettingsCard() {
                 setError(''); // Clear error when user types
               }}
               fullWidth
-              disabled={connectedPlatform === 'woocommerce'}
+              disabled={connectedPlatform === 'woocommerce' || !activeBrandId}
               error={!!error}
               helperText={error || "Enter your store's domain (e.g., yourstore.com)"}
             />
             <Tooltip 
-              title={connectedPlatform === 'woocommerce' ? "Disconnect WooCommerce first to connect Shopify" : ""}
+              title={
+                !activeBrandId 
+                  ? "Please select a brand first" 
+                  : connectedPlatform === 'woocommerce' 
+                    ? "Disconnect WooCommerce first to connect Shopify" 
+                    : ""
+              }
               placement="top"
               arrow
             >
@@ -222,7 +254,7 @@ export default function ShopifySettingsCard() {
                   variant="contained"
                   color="primary"
                   onClick={handleConnect}
-                  disabled={connectedPlatform === 'woocommerce' || isConnecting}
+                  disabled={connectedPlatform === 'woocommerce' || isConnecting || !activeBrandId}
                   fullWidth
                 >
                   {isConnecting ? 'Connecting...' : 'Connect Shopify'}
@@ -235,7 +267,7 @@ export default function ShopifySettingsCard() {
     );
   };
 
-  const isDisabled = connectedPlatform === 'woocommerce';
+  const isDisabled = connectedPlatform === 'woocommerce' || !activeBrandId;
 
   return (
     <SettingsCard variant="outlined" disabled={isDisabled}>
@@ -244,6 +276,8 @@ export default function ShopifySettingsCard() {
         <Typography variant="body2">
           {status === 'connected'
             ? 'Your store is connected to Ecommander.'
+            : status === 'no-brand'
+            ? 'Please select a brand to manage Shopify connection.'
             : connectedPlatform === 'woocommerce'
               ? 'WooCommerce is already connected. Disconnect it first to connect Shopify.'
               : 'Not connected. Enter your store\'s domain below (e.g., yourstore.com) to connect your Shopify store.'}

@@ -15,19 +15,24 @@ import Alert from '@mui/material/Alert';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../../../firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { useBrand } from '../../../contexts/BrandContext';
 
 export default function ReferencesExamples() {
   const [user] = useAuthState(auth);
+  const { activeBrandId } = useBrand();
   const [referenceUrls, setReferenceUrls] = React.useState('');
   const [exampleDescriptions, setExampleDescriptions] = React.useState('');
   const [modalOpen, setModalOpen] = React.useState(false);
+  const [error, setError] = React.useState('');
 
   React.useEffect(() => {
     const fetchData = async () => {
-      if (user) {
+      if (user && activeBrandId) {
         try {
-          const userDocRef = doc(db, 'users', user.uid, 'ReferencesExamples', 'settings');
-          const docSnap = await getDoc(userDocRef);
+          setError('');
+          // Updated path to use brand isolation
+          const docRef = doc(db, 'users', user.uid, 'brands', activeBrandId, 'ReferencesExamples', 'settings');
+          const docSnap = await getDoc(docRef);
           if (docSnap.exists()) {
             const data = docSnap.data();
             setReferenceUrls(data.referenceUrls || '');
@@ -35,32 +40,49 @@ export default function ReferencesExamples() {
           }
         } catch (error) {
           console.error('Error fetching references and examples data:', error);
+          setError('Failed to load references and examples settings');
         }
       }
     };
     fetchData();
-  }, [user]);
+  }, [user, activeBrandId]);
 
   const handleSave = async () => {
-    if (user) {
+    if (user && activeBrandId) {
       const referencesExamplesData = {};
       if (referenceUrls) referencesExamplesData.referenceUrls = referenceUrls;
       if (exampleDescriptions) referencesExamplesData.exampleDescriptions = exampleDescriptions;
+      
+      // Add brandId to the data
+      referencesExamplesData.brandId = activeBrandId;
 
       try {
-        const userDocRef = doc(db, 'users', user.uid, 'ReferencesExamples', 'settings');
-        await setDoc(userDocRef, referencesExamplesData, { merge: true });
+        // Updated path to use brand isolation
+        const docRef = doc(db, 'users', user.uid, 'brands', activeBrandId, 'ReferencesExamples', 'settings');
+        await setDoc(docRef, referencesExamplesData, { merge: true });
         console.log('References and examples data saved successfully');
         setModalOpen(true);
+        setError('');
       } catch (error) {
         console.error('Error saving references and examples data:', error);
+        setError('Failed to save references and examples settings');
       }
+    } else if (!activeBrandId) {
+      setError('Please select a brand first');
     }
   };
 
   const handleCloseModal = () => {
     setModalOpen(false);
   };
+
+  if (!activeBrandId) {
+    return (
+      <Box sx={{ mb: 4 }}>
+        <Alert severity="warning">Please select a brand to view references and examples settings.</Alert>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ mb: 4 }}>
@@ -73,6 +95,11 @@ export default function ReferencesExamples() {
             Save
           </Button>
         </Box>
+        {error && (
+          <Alert severity="error" sx={{ mx: 2, mb: 2 }}>
+            {error}
+          </Alert>
+        )}
         <TableContainer>
           <Table sx={{ mb: 2 }}>
             <TableHead>
@@ -117,13 +144,29 @@ export default function ReferencesExamples() {
       <Modal
         open={modalOpen}
         onClose={handleCloseModal}
-        aria-labelledby="modal-title"
-        aria-describedby="modal-description"
+        aria-labelledby="save-confirmation-modal"
+        aria-describedby="confirmation-of-references-examples-save"
       >
-        <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 400, bgcolor: 'background.paper', boxShadow: 24, p: 4 }}>
-          <Alert onClose={handleCloseModal} severity="success">
-            References and examples data saved successfully!
-          </Alert>
+        <Box sx={{ 
+          position: 'absolute', 
+          top: '50%', 
+          left: '50%', 
+          transform: 'translate(-50%, -50%)', 
+          width: 400, 
+          bgcolor: 'background.paper', 
+          boxShadow: 24, 
+          p: 4,
+          borderRadius: 1
+        }}>
+          <Typography id="save-confirmation-modal" variant="h6" component="h2" gutterBottom>
+            Changes Saved Successfully
+          </Typography>
+          <Typography id="confirmation-of-references-examples-save">
+            Your references and examples settings have been updated.
+          </Typography>
+          <Button onClick={handleCloseModal} sx={{ mt: 2 }}>
+            Close
+          </Button>
         </Box>
       </Modal>
     </Box>

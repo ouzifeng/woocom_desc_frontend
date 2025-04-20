@@ -35,7 +35,6 @@ import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 
 const mainListItems = [
-  // ADD THE FUCKIGN DOWNDROPDOWN MENU FOR THE BRANDS HERE!!
   
   { text: 'Home', icon: <HomeRoundedIcon />, link: '/dashboard' },
   { text: 'Product Descriptions', icon: <InventoryRoundedIcon />, link: '/products' },
@@ -111,108 +110,121 @@ export default function MenuContent() {
   return (
     <>
       <Stack sx={{ flexGrow: 1, p: 1, justifyContent: 'space-between' }}>
-        {/* Brand selector dropdown */}
-        <Box sx={{ mb: 2, mt: 1 }}>
-          <FormControl fullWidth size="small">
-            <InputLabel id="brand-select-label">Brand</InputLabel>
-            <Select
-              labelId="brand-select-label"
-              id="brand-select"
-              value={activeBrandId || ''}
-              label="Brand"
-              onChange={handleBrandChange}
-              disabled={loading || userBrands.length === 0}
-              startAdornment={
-                loading ? (
-                  <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} />
-                ) : null
-              }
-              endAdornment={
-                error ? (
-                  <IconButton 
-                    size="small" 
-                    edge="end" 
-                    aria-label="refresh" 
-                    onClick={() => window.location.reload()}
-                    sx={{ mr: 1 }}
-                  >
-                    <RefreshIcon />
-                  </IconButton>
-                ) : null
-              }
-            >
-              {userBrands.length === 0 && !loading ? (
-                <MenuItem disabled>
-                  <Typography color="text.secondary" variant="body2">
-                    No brands available
-                  </Typography>
-                </MenuItem>
-              ) : (
-                userBrands.map((brand) => (
-                  <MenuItem key={brand.id} value={brand.id}>
-                    {brand.name}
-                  </MenuItem>
-                ))
-              )}
-            </Select>
-          </FormControl>
-          {error && (
-            <Typography color="error" variant="caption" sx={{ mt: 0.5, display: 'block' }}>
-              Error: {error}. <Link to="#" onClick={() => window.location.reload()}>Refresh</Link>
-            </Typography>
-          )}
-        </Box>
-        
-        <List dense>
-          {mainListItems.map((item, index) => (
-            <ListItem key={index} disablePadding sx={{ display: 'block' }}>
-              <ListItemButton
-                component={item.link ? Link : 'div'}
-                to={item.link}
-                selected={location.pathname === item.link}
-              >
-                <ListItemIcon>{item.icon}</ListItemIcon>
-                <ListItemText primary={item.text} />
-              </ListItemButton>
-            </ListItem>
-          ))}
-        </List>
-        <List dense>
-          {secondaryListItems.map((item, index) => (
-            <ListItem key={index} disablePadding sx={{ display: 'block' }}>
-              <ListItemButton
-                component={item.link ? Link : 'div'}
-                to={item.link}
-                selected={location.pathname === item.link}
-                onClick={item.text === 'Credit FAQ' ? handleOpenCreditCosts : undefined}
-              >
-                <ListItemIcon>{item.icon}</ListItemIcon>
-                <ListItemText primary={item.text} />
-              </ListItemButton>
-            </ListItem>
-          ))}
-          <ListItem sx={{ display: 'block', py: 1 }}>
-            <Chip
-              icon={<AutoAwesomeIcon />}
-              label={`${credits} credits left`}
-              color="primary"
-              variant="outlined"
-              size="large"
-              sx={{ 
-                width: '100%',
-                borderColor: 'primary.main',
-                '& .MuiChip-label': {
-                  px: 1,
+        {/* Top section: Brand dropdown + main menu items */}
+        <Box>
+          {/* Brand selector dropdown */}
+          <Box sx={{ mt: 1, mb: 1 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel id="brand-select-label">Brand</InputLabel>
+              <Select
+                labelId="brand-select-label"
+                id="brand-select"
+                value={activeBrandId || ''}
+                label="Brand"
+                onChange={handleBrandChange}
+                disabled={loading || userBrands.length === 0}
+                startAdornment={
+                  loading ? (
+                    <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} />
+                  ) : null
                 }
-              }}
-            />
-          </ListItem>        
-        </List>
+                endAdornment={
+                  error ? (
+                    <IconButton
+                      size="small"
+                      edge="end"
+                      aria-label="refresh"
+                      onClick={() => window.location.reload()}
+                      sx={{ mr: 1 }}
+                    >
+                      <RefreshIcon />
+                    </IconButton>
+                  ) : null
+                }
+              >
+                {userBrands.length === 0 && !loading ? (
+                  <MenuItem disabled>
+                    <Typography color="text.secondary" variant="body2">
+                      No brands available
+                    </Typography>
+                  </MenuItem>
+                ) : (
+                  userBrands.map((brand) => (
+                    <MenuItem key={brand.id} value={brand.id}>
+                      {brand.name}
+                    </MenuItem>
+                  ))
+                )}
+              </Select>
+            </FormControl>
+            {error && (
+              <Typography color="error" variant="caption" sx={{ mt: 0.5, display: 'block' }}>
+                Error: {error}. <Link to="#" onClick={() => window.location.reload()}>Refresh</Link>
+              </Typography>
+            )}
+          </Box>
+
+          {/* Main list items */}
+          <List dense>
+            {mainListItems.map((item, index) => (
+              <ListItem key={index} disablePadding sx={{ display: 'block' }}>
+                <ListItemButton
+                  component={item.link ? Link : 'div'}
+                  to={item.link}
+                  selected={location.pathname === item.link}
+                >
+                  <ListItemIcon>{item.icon}</ListItemIcon>
+                  <ListItemText primary={item.text} />
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </List>
+        </Box>
+
+        {/* Bottom section: secondary list + credits */}
+        <Box>
+          <List dense>
+            {secondaryListItems.map((item, index) => (
+              <ListItem key={index} disablePadding sx={{ display: 'block' }}>
+                <ListItemButton
+                  component={item.link ? Link : 'div'}
+                  to={item.link}
+                  selected={location.pathname === item.link}
+                  onClick={item.text === 'Credit FAQ' ? handleOpenCreditCosts : undefined}
+                >
+                  <ListItemIcon>{item.icon}</ListItemIcon>
+                  <ListItemText primary={item.text} />
+                </ListItemButton>
+              </ListItem>
+            ))}
+
+            {/* Credits chip */}
+            <ListItem sx={{ display: 'block', py: 1 }}>
+              <Chip
+                icon={<AutoAwesomeIcon />}
+                label={`${credits} credits left`}
+                color="primary"
+                variant="outlined"
+                size="large"
+                sx={{
+                  width: '100%',
+                  borderColor: 'primary.main',
+                  '& .MuiChip-label': {
+                    px: 1,
+                  },
+                }}
+              />
+            </ListItem>
+          </List>
+        </Box>
       </Stack>
+
+      {/* Credit drawer modal */}
       <CreditCostsDrawer 
         open={creditCostsOpen} 
         onClose={() => setCreditCostsOpen(false)} 
       />
     </>
   );
+
 }

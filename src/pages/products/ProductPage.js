@@ -112,15 +112,23 @@ export default function ProductPage() {
             setError('Product not found in this brand');
           }
 
-          const userDocRef = doc(db, 'users', user.uid);
-          const userDoc = await getDoc(userDocRef);
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            setStoreUrl(userData.wc_url || '');
-            setApiId(userData.wc_key || '');
-            setSecretKey(userData.wc_secret || '');
-            setShopifyAccessToken(userData.shopify_access_token || '');
-            setShopifyShop(userData.shopify_shop || '');
+          // Fetch credentials from the brand document
+          const brandDocRef = doc(db, 'users', user.uid, 'brands', activeBrandId);
+          const brandDoc = await getDoc(brandDocRef);
+          
+          if (brandDoc.exists()) {
+            const brandData = brandDoc.data();
+            // Set WooCommerce credentials
+            setStoreUrl(brandData.wc_url || '');
+            setApiId(brandData.wc_key || '');
+            setSecretKey(brandData.wc_secret || '');
+            
+            // Set Shopify credentials
+            setShopifyAccessToken(brandData.shopify_token || '');
+            setShopifyShop(brandData.shopify_domain || '');
+          } else {
+            console.log('Brand not found');
+            setError('Brand not found');
           }
         } catch (err) {
           console.error('Error fetching product:', err);

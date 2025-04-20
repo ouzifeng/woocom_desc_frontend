@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Button, Box } from '@mui/material';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '../../../firebase';
+import { useBrand } from '../../../contexts/BrandContext';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -16,6 +17,7 @@ export default function UpdateAllProductsButton({
   onClick,
 }) {
   const [user] = useAuthState(auth);
+  const { activeBrandId } = useBrand();
   const [loading, setLoading] = useState(false);
   const [updatedCount, setUpdatedCount] = useState(0);
   const [totalProducts, setTotalProducts] = useState(0);
@@ -23,6 +25,11 @@ export default function UpdateAllProductsButton({
   const updateAllProducts = async () => {
     if (!user) {
       setNotificationMessage('User not authenticated');
+      return;
+    }
+
+    if (!activeBrandId) {
+      setNotificationMessage('No brand selected');
       return;
     }
 
@@ -42,7 +49,13 @@ export default function UpdateAllProductsButton({
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ storeUrl, apiId, secretKey, userId: user.uid }),
+        body: JSON.stringify({ 
+          storeUrl, 
+          apiId, 
+          secretKey, 
+          userId: user.uid,
+          brandId: activeBrandId 
+        }),
       });
 
       const reader = response.body.getReader();
@@ -91,7 +104,7 @@ export default function UpdateAllProductsButton({
         size="small" 
         variant="outlined" 
         onClick={updateAllProducts} 
-        disabled={loading || disabled}
+        disabled={loading || disabled || !activeBrandId}
       >
         {loading ? `Updating ${updatedCount}/${totalProducts}` : 'Update All Products'}
       </Button>

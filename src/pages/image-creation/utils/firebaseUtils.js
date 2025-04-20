@@ -1,22 +1,47 @@
 import { ref, uploadBytes, getDownloadURL, deleteObject, listAll } from 'firebase/storage';
 import { storage } from '../../../firebase';
+import { collection, getDocs, query, orderBy, where } from 'firebase/firestore';
+import { db } from '../../../firebase';
 
-export const fetchPreviousImages = async (userId) => {
+export const fetchPreviousImages = async (userId, brandId) => {
+  if (!userId || !brandId) {
+    console.error('fetchPreviousImages: Missing userId or brandId');
+    return [];
+  }
+  
   try {
-    const storageRef = ref(storage, `generated/${userId}`);
-    const result = await listAll(storageRef);
-    
-    const images = await Promise.all(
-      result.items.map(async (item) => {
-        const url = await getDownloadURL(item);
-        return {
-          url,
-          description: item.name.split('_')[1] || 'Generated Image'
-        };
-      })
+    // CRITICAL: Always use the brand-specific path for security isolation
+    const imagesCollection = collection(
+      db, 
+      'users', 
+      userId, 
+      'brands', 
+      brandId, 
+      'images'
     );
     
-    return images.sort((a, b) => b.url.localeCompare(a.url)); // Sort by URL (which contains timestamp)
+    // Simplified query - remove redundant brandId filter
+    const q = query(
+      imagesCollection,
+      orderBy('created', 'desc')
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const images = [];
+    
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      images.push({
+        id: doc.id,
+        url: data.url,
+        title: data.prompt || data.description || 'Generated Image',
+        description: data.description || data.prompt || '',
+        created: data.created ? data.created.toDate() : new Date()
+      });
+    });
+    
+    console.log(`Fetched ${images.length} images for brand ${brandId}`);
+    return images;
   } catch (error) {
     console.error('Error fetching previous images:', error);
     return [];

@@ -3,6 +3,7 @@ import { useTheme } from '@mui/material/styles';
 import { Card, CardContent, Typography, Stack, Chip } from '@mui/material';
 import { LineChart } from '@mui/x-charts/LineChart';
 import { auth } from '../../../firebase';
+import { useBrand } from '../../../contexts/BrandContext';
 
 const API_BASE_URL = process.env.NODE_ENV === 'production'
   ? 'https://woocomdescbackend-451f66b3eb02.herokuapp.com'
@@ -64,17 +65,26 @@ const formatDateRange = (startDate, endDate) => {
 
 export default function RevenueTrendChart({ startDate, endDate, selectedCurrency }) {
   const theme = useTheme();
+  const { activeBrandId } = useBrand();
   const [data, setData] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [total, setTotal] = React.useState(0);
+  const [error, setError] = React.useState(null);
 
   const getTrends = async () => {
+    if (!activeBrandId) {
+      setError('Please select a brand first');
+      setLoading(false);
+      return;
+    }
+    
     try {
       setLoading(true);
+      setError(null);
       const user = auth.currentUser;
       const token = await user.getIdToken();
       const res = await fetch(
-        `${API_BASE_URL}/analytics/dashboard/trends?startDate=${startDate}&endDate=${endDate}`,
+        `${API_BASE_URL}/analytics/dashboard/trends?startDate=${startDate}&endDate=${endDate}&brandId=${activeBrandId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -82,6 +92,12 @@ export default function RevenueTrendChart({ startDate, endDate, selectedCurrency
           },
         }
       );
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to fetch revenue trends');
+      }
+      
       const json = await res.json();
 
       const chartData = json.trends.map(row => ({
@@ -95,16 +111,47 @@ export default function RevenueTrendChart({ startDate, endDate, selectedCurrency
       setTotal(totalRevenue);
     } catch (err) {
       console.error('Error loading revenue data:', err);
+      setError(err.message || 'Failed to load revenue data');
+      setData([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }
   };
 
   React.useEffect(() => {
-    getTrends();
-  }, [startDate, endDate]);
+    if (activeBrandId) {
+      getTrends();
+    }
+  }, [startDate, endDate, activeBrandId]);
 
   if (loading) return <Typography>Loading...</Typography>;
+  
+  if (error) {
+    return (
+      <Card variant="outlined" sx={{ width: '100%' }}>
+        <CardContent>
+          <Typography component="h2" variant="subtitle2" gutterBottom>
+            Revenue Trend
+          </Typography>
+          <Typography color="error">{error}</Typography>
+        </CardContent>
+      </Card>
+    );
+  }
+  
+  if (data.length === 0) {
+    return (
+      <Card variant="outlined" sx={{ width: '100%' }}>
+        <CardContent>
+          <Typography component="h2" variant="subtitle2" gutterBottom>
+            Revenue Trend
+          </Typography>
+          <Typography>No revenue data available for the selected period</Typography>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card variant="outlined" sx={{ width: '100%' }}>

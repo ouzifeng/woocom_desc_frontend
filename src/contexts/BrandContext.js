@@ -41,7 +41,8 @@ export const BrandProvider = ({ children }) => {
     checkShopifyConnection, 
     checkGoogleAnalyticsConnection,
     setConnectedPlatform,
-    setHasGoogleAnalytics 
+    setHasGoogleAnalytics,
+    setActiveBrandId: setStoreActiveBrandId 
   } = useStoreConnection();
 
   // Clear any existing state when user logs out
@@ -135,13 +136,18 @@ export const BrandProvider = ({ children }) => {
       setActiveBrand(brand);
       setError(null); // Clear any previous errors
       
+      // Update StoreConnectionContext with the current brand ID
+      if (setStoreActiveBrandId) {
+        setStoreActiveBrandId(activeBrandId);
+      }
+      
       // Check integration status for this brand if we don't have recent data
       checkIntegrationStatus(activeBrandId);
     } else {
       console.warn("Brand not found for ID:", activeBrandId);
       // Don't set error - this is likely a temporary state during brand creation
     }
-  }, [activeBrandId, userBrands]);
+  }, [activeBrandId, userBrands, setStoreActiveBrandId]);
 
   // Function to check integration status for a brand
   const checkIntegrationStatus = async (brandId) => {
@@ -257,6 +263,10 @@ export const BrandProvider = ({ children }) => {
           // Brand exists in Firestore but not in our state yet
           // This is likely due to a race condition during brand creation
           setActiveBrandId(brandId);
+          // Also update StoreConnectionContext
+          if (setStoreActiveBrandId) {
+            setStoreActiveBrandId(brandId);
+          }
           localStorage.setItem('activeBrandId', brandId);
           return true;
         } else {

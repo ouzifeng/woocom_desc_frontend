@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Button, Box } from '@mui/material';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '../../../firebase';
+import { useBrand } from '../../../contexts/BrandContext';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -13,6 +14,7 @@ export default function ShopifyImportProductsButton({
   onClick,
 }) {
   const [user] = useAuthState(auth);
+  const { activeBrandId } = useBrand();
   const [loading, setLoading] = useState(false);
   const [importedCount, setImportedCount] = useState(0);
   const [totalProducts, setTotalProducts] = useState(0);
@@ -20,6 +22,11 @@ export default function ShopifyImportProductsButton({
   const importProducts = async () => {
     if (!user) {
       setNotificationMessage('User not authenticated');
+      return;
+    }
+
+    if (!activeBrandId) {
+      setNotificationMessage('No brand selected');
       return;
     }
 
@@ -35,7 +42,7 @@ export default function ShopifyImportProductsButton({
 
     try {
       const token = await user.getIdToken();
-      const response = await fetch(`${API_URL}/shopifyProducts/products`, {
+      const response = await fetch(`${API_URL}/shopifyProducts/products?brandId=${activeBrandId}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -90,7 +97,7 @@ export default function ShopifyImportProductsButton({
       variant="contained"
       color="primary"
       onClick={importProducts}
-      disabled={loading || disabled}
+      disabled={loading || disabled || !activeBrandId}
       sx={{ minWidth: '150px' }}
     >
       {loading ? (

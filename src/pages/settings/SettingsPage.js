@@ -20,6 +20,7 @@ import CsvImport from './components/CsvImport';
 import GoogleAnalyticsCard from './components/GoogleAnalyticsCard';
 import StoreConnectionStatus from '../../components/StoreConnectionStatus';
 import SettingsInstructions from './components/SettingsInstructions';
+import { useBrand } from '../../contexts/BrandContext';
 import {
   chartsCustomizations,
   dataGridCustomizations,
@@ -39,20 +40,21 @@ const CARD_HEIGHT = 550; // Fixed height for all cards
 
 export default function SettingsPage(props) {
   const [user] = useAuthState(auth);
+  const { activeBrandId } = useBrand();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { checkGoogleAnalyticsConnection, checkShopifyConnection, checkWooCommerceConnection } = useStoreConnection();
 
   useEffect(() => {
     const checkConnections = async () => {
-      if (!user) return;
+      if (!user || !activeBrandId) return;
       const token = await user.getIdToken();
-      await checkGoogleAnalyticsConnection(token);
-      await checkShopifyConnection(token);
-      await checkWooCommerceConnection(token);
+      await checkGoogleAnalyticsConnection(token, activeBrandId);
+      await checkShopifyConnection(token, activeBrandId);
+      await checkWooCommerceConnection(token, activeBrandId);
     };
 
     checkConnections();
-  }, [user, checkGoogleAnalyticsConnection, checkShopifyConnection, checkWooCommerceConnection]);
+  }, [user, activeBrandId, checkGoogleAnalyticsConnection, checkShopifyConnection, checkWooCommerceConnection]);
 
   const toggleDrawer = (open) => (event) => {
     if (event.type === 'keydown' && (event.key === 'Tab' || event.key === 'Shift')) {

@@ -5,7 +5,8 @@ export const ImageDescription = ({
   description, 
   setDescription, 
   onGenerate, 
-  isLoading 
+  isLoading,
+  disabled
 }) => {
   return (
     <Paper sx={{ p: 3 }}>
@@ -23,7 +24,7 @@ export const ImageDescription = ({
         placeholder="Example: 'To empower busy parents by delivering healthy, convenient meal options, while minimizing environmental impact.'"
         value={description}
         onChange={(e) => setDescription(e.target.value)}
-        disabled={isLoading}
+        disabled={isLoading || disabled}
         sx={{
           '& .MuiInputBase-root': {
             padding: '12px 16px',
@@ -49,7 +50,7 @@ export const ImageDescription = ({
           variant="contained"
           size="large"
           onClick={onGenerate}
-          disabled={isLoading || !description.trim()}
+          disabled={isLoading || !description.trim() || disabled}
           startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : null}
         >
           {isLoading ? 'Generating...' : 'Generate Image'}

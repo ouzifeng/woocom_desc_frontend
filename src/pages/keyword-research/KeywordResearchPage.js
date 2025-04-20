@@ -23,11 +23,13 @@ import SideMenu from '../dashboard/components/SideMenu';
 import AppTheme from '../shared-theme/AppTheme';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '../../firebase';
+import { useBrand } from '../../contexts/BrandContext';
 
 import { formatRows, getDateRangeByLabel } from './utils'; // Helpers used by parent
 import { fetchCountries, fetchLanguages } from './utils';   // Or place them here
 import SearchControls from './components/SearchControls';
 import KeywordDataGrid from './components/KeywordDataGrid';
+import Alert from '@mui/material/Alert';
 
 // ----------------------------------------------------------------
 // Simple TabPanel helper
@@ -58,6 +60,7 @@ const CACHE_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
 export default function KeywordResearchPage(props) {
   const [user] = useAuthState(auth);
+  const { activeBrandId } = useBrand();
 
   // ------------------ State ------------------
   const [keywords, setKeywords] = useState('');
@@ -170,13 +173,13 @@ export default function KeywordResearchPage(props) {
   }, [rangeLabel]);
 
   // ----------------------------------------------------------------
-  // Load all saved tabs exactly once when user is defined
+  // Load all saved tabs whenever user or activeBrandId changes
   useEffect(() => {
-    if (!user) return;
+    if (!user || !activeBrandId) return;
 
     const loadSavedResearch = async () => {
       try {
-        const researchRef = collection(db, 'users', user.uid, 'keywordResearch');
+        const researchRef = collection(db, 'users', user.uid, 'brands', activeBrandId, 'keywordResearch');
         const querySnapshot = await getDocs(query(researchRef));
 
         const savedTabs = [];
@@ -215,20 +218,23 @@ export default function KeywordResearchPage(props) {
     };
 
     loadSavedResearch();
-  }, [user]);
+  }, [user, activeBrandId]);
 
-  // Add this effect to load saved keywords
+  // Add this effect to load saved keywords when user or activeBrandId changes
   useEffect(() => {
-    if (!user) return;
+    if (!user || !activeBrandId) return;
 
     const loadSavedKeywords = async () => {
       try {
-        const savedRef = collection(db, 'users', user.uid, 'savedKeywords');
+        const savedRef = collection(db, 'users', user.uid, 'brands', activeBrandId, 'savedKeywords');
         const querySnapshot = await getDocs(query(savedRef));
         
         const keywords = [];
         querySnapshot.forEach(doc => {
-          keywords.push(doc.data());
+          keywords.push({
+            ...doc.data(),
+            id: doc.id // Include the document ID from Firestore
+          });
         });
         
         setSavedKeywords(keywords);
@@ -238,11 +244,16 @@ export default function KeywordResearchPage(props) {
     };
 
     loadSavedKeywords();
-  }, [user]);
+  }, [user, activeBrandId]);
 
   // ----------------------------------------------------------------
   // Run search
   const handleSearch = async () => {
+    if (!activeBrandId) {
+      console.error('No active brand selected');
+      return;
+    }
+
     // If user clicked the "Saved Words" tab (the last tab),
     // or the plus tab, do nothing:
     if (tabValue >= tabs.length) return;
@@ -284,7 +295,8 @@ export default function KeywordResearchPage(props) {
               keywords,
               rows: formatted,
               payload,
-              lastUpdated: new Date().toISOString()
+              lastUpdated: new Date().toISOString(),
+              brandId: activeBrandId // Store the brandId with the tab data
             };
           }
           return tab;
@@ -295,9 +307,9 @@ export default function KeywordResearchPage(props) {
 
         // Save the current tab to Firestore
         const currentTab = updatedTabs[tabValue];
-        if (user && currentTab) {
+        if (user && currentTab && activeBrandId) {
           await setDoc(
-            doc(db, 'users', user.uid, 'keywordResearch', currentTab.id),
+            doc(db, 'users', user.uid, 'brands', activeBrandId, 'keywordResearch', currentTab.id),
             currentTab,
             { merge: true }
           );
@@ -334,7 +346,7 @@ export default function KeywordResearchPage(props) {
 
   // Create a new blank tab
   const handleAddTab = async () => {
-    if (!user) return;
+    if (!user || !activeBrandId) return;
 
     const newTabId = `tab-${Date.now()}`;
     const newTab = {
@@ -344,6 +356,7 @@ export default function KeywordResearchPage(props) {
       rows: [],
       isDeletable: true,
       lastUpdated: new Date().toISOString(),
+      brandId: activeBrandId // Store the brandId with the tab data
     };
 
     try {
@@ -357,7 +370,7 @@ export default function KeywordResearchPage(props) {
       setTabValue(newTabs.length - 1);
 
       // Save the new tab to Firestore
-      await setDoc(doc(db, 'users', user.uid, 'keywordResearch', newTabId), newTab);
+      await setDoc(doc(db, 'users', user.uid, 'brands', activeBrandId, 'keywordResearch', newTabId), newTab);
     } catch (error) {
       console.error('Error creating new tab:', error);
     }
@@ -365,13 +378,13 @@ export default function KeywordResearchPage(props) {
 
   // Deleting an existing tab
   const handleDeleteTab = async (tabIndex) => {
-    if (!user) return;
+    if (!user || !activeBrandId) return;
     const tabToDelete = tabs[tabIndex];
     if (!tabToDelete) return;
 
     try {
       // Remove from Firestore
-      await deleteDoc(doc(db, 'users', user.uid, 'keywordResearch', tabToDelete.id));
+      await deleteDoc(doc(db, 'users', user.uid, 'brands', activeBrandId, 'keywordResearch', tabToDelete.id));
 
       // Remove from local state
       const newTabs = tabs.filter((_, i) => i !== tabIndex);
@@ -403,7 +416,7 @@ export default function KeywordResearchPage(props) {
     setEditingTabName(event.target.value);
   };
   const handleTabNameSave = async () => {
-    if (!user || !editingTabName.trim()) {
+    if (!user || !activeBrandId || !editingTabName.trim()) {
       setEditingTabId(null);
       setEditingTabName('');
       return;
@@ -418,7 +431,7 @@ export default function KeywordResearchPage(props) {
 
       // Save in Firestore
       await setDoc(
-        doc(db, 'users', user.uid, 'keywordResearch', editingTabId),
+        doc(db, 'users', user.uid, 'brands', activeBrandId, 'keywordResearch', editingTabId),
         { ...tabToUpdate },
         { merge: true }
       );
@@ -432,13 +445,58 @@ export default function KeywordResearchPage(props) {
     }
   };
 
-  // Add these handlers
-  const handleSaveKeyword = (keyword) => {
-    setSavedKeywords(prev => [...prev, keyword]);
+  // Update to save keywords with brand ID
+  const handleSaveKeyword = async (keyword) => {
+    if (!user || !activeBrandId) return;
+
+    const keywordWithBrand = {
+      ...keyword,
+      brandId: activeBrandId,
+      savedAt: new Date().toISOString()
+    };
+
+    try {
+      // Save to Firestore
+      const keywordId = `keyword_${Date.now()}`;
+      await setDoc(
+        doc(db, 'users', user.uid, 'brands', activeBrandId, 'savedKeywords', keywordId),
+        keywordWithBrand
+      );
+
+      // Update local state
+      setSavedKeywords(prev => [...prev, keywordWithBrand]);
+    } catch (error) {
+      console.error('Error saving keyword:', error);
+    }
   };
 
-  const handleRemoveKeyword = (keyword) => {
-    setSavedKeywords(prev => prev.filter(k => k.keyword !== keyword.keyword));
+  // Update to remove keywords with brand ID
+  const handleRemoveKeyword = async (keyword) => {
+    if (!user || !activeBrandId) return;
+
+    try {
+      // Find the keyword document ID
+      const savedRef = collection(db, 'users', user.uid, 'brands', activeBrandId, 'savedKeywords');
+      const querySnapshot = await getDocs(query(savedRef));
+      
+      let keywordDocId = null;
+      querySnapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.keyword === keyword.keyword) {
+          keywordDocId = doc.id;
+        }
+      });
+
+      if (keywordDocId) {
+        // Delete from Firestore
+        await deleteDoc(doc(db, 'users', user.uid, 'brands', activeBrandId, 'savedKeywords', keywordDocId));
+      }
+
+      // Update local state
+      setSavedKeywords(prev => prev.filter(k => k.keyword !== keyword.keyword));
+    } catch (error) {
+      console.error('Error removing keyword:', error);
+    }
   };
 
   // ----------------------------------------------------------------
@@ -483,152 +541,162 @@ export default function KeywordResearchPage(props) {
                 </Typography>
               </Grid>
 
-              <Grid item xs={12} md={12}>
-                <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                  <Tabs
-                    value={tabValue}
-                    onChange={handleTabChange}
-                    aria-label="keyword research tabs"
-                  >
-                    {/* Render the "real" research tabs */}
-                    {tabs.map((tab) => (
-                      <Tab 
-                        key={tab.id}
-                        label={
-                          editingTabId === tab.id ? (
-                            <ClickAwayListener onClickAway={handleTabNameSave}>
-                              <TextField
-                                size="small"
-                                value={editingTabName}
-                                onChange={handleTabNameChange}
-                                onKeyDown={(e) => {
-                                  // Stop propagation for all keys to prevent tab switching
-                                  e.stopPropagation();
-                                  
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    handleTabNameSave();
-                                  }
-                                  if (e.key === 'Escape') {
-                                    e.preventDefault();
-                                    setEditingTabId(null);
-                                    setEditingTabName('');
-                                  }
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                                autoFocus
-                                sx={{
-                                  '& .MuiInputBase-root': {
-                                    height: '24px',
-                                    fontSize: '0.875rem',
-                                    backgroundColor: 'white',
-                                  },
-                                  '& input': {
-                                    userSelect: 'none'
-                                  }
-                                }}
-                              />
-                            </ClickAwayListener>
-                          ) : (
-                            <Box 
-                              sx={{ 
-                                display: 'flex', 
-                                alignItems: 'center',
-                                cursor: 'text'
-                              }}
-                              onDoubleClick={() => handleTabDoubleClick(tab.id, tab.label)}
-                            >
-                              {tab.label}
-                              {tab.isDeletable && (
-                                <span  // Use span instead of Box to avoid button nesting
-                                  onClick={(e) => {
+              {!activeBrandId && (
+                <Grid item xs={12}>
+                  <Alert severity="warning">
+                    Please select a brand to use keyword research
+                  </Alert>
+                </Grid>
+              )}
+
+              {activeBrandId && (
+                <Grid item xs={12} md={12}>
+                  <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                    <Tabs
+                      value={tabValue}
+                      onChange={handleTabChange}
+                      aria-label="keyword research tabs"
+                    >
+                      {/* Render the "real" research tabs */}
+                      {tabs.map((tab) => (
+                        <Tab 
+                          key={tab.id}
+                          label={
+                            editingTabId === tab.id ? (
+                              <ClickAwayListener onClickAway={handleTabNameSave}>
+                                <TextField
+                                  size="small"
+                                  value={editingTabName}
+                                  onChange={handleTabNameChange}
+                                  onKeyDown={(e) => {
+                                    // Stop propagation for all keys to prevent tab switching
                                     e.stopPropagation();
-                                    handleDeleteTab(tabs.indexOf(tab));
+                                    
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleTabNameSave();
+                                    }
+                                    if (e.key === 'Escape') {
+                                      e.preventDefault();
+                                      setEditingTabId(null);
+                                      setEditingTabName('');
+                                    }
                                   }}
-                                  sx={{ 
-                                    display: 'inline-flex',
-                                    ml: 1,
-                                    cursor: 'pointer'
+                                  onClick={(e) => e.stopPropagation()}
+                                  autoFocus
+                                  sx={{
+                                    '& .MuiInputBase-root': {
+                                      height: '24px',
+                                      fontSize: '0.875rem',
+                                      backgroundColor: 'white',
+                                    },
+                                    '& input': {
+                                      userSelect: 'none'
+                                    }
                                   }}
-                                >
-                                  <CloseIcon fontSize="small" />
-                                </span>
-                              )}
-                            </Box>
-                          )
+                                />
+                              </ClickAwayListener>
+                            ) : (
+                              <Box 
+                                sx={{ 
+                                  display: 'flex', 
+                                  alignItems: 'center',
+                                  cursor: 'text'
+                                }}
+                                onDoubleClick={() => handleTabDoubleClick(tab.id, tab.label)}
+                              >
+                                {tab.label}
+                                {tab.isDeletable && (
+                                  <span  // Use span instead of Box to avoid button nesting
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteTab(tabs.indexOf(tab));
+                                    }}
+                                    sx={{ 
+                                      display: 'inline-flex',
+                                      ml: 1,
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    <CloseIcon fontSize="small" />
+                                  </span>
+                                )}
+                              </Box>
+                            )
+                          }
+                        />
+                      ))}
+                      {/* The plus tab (index == tabs.length) */}
+                      <Tab 
+                        icon={
+                          <span onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleAddTab();
+                          }}>
+                            <AddIcon />
+                          </span>
                         }
+                        sx={{ minWidth: '50px' }}
                       />
-                    ))}
-                    {/* The plus tab (index == tabs.length) */}
-                    <Tab 
-                      icon={
-                        <span onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          handleAddTab();
-                        }}>
-                          <AddIcon />
-                        </span>
-                      }
-                      sx={{ minWidth: '50px' }}
-                    />
-                    {/* Saved Words tab (index == tabs.length+1) */}
-                    <Tab
-                      label="Saved Words"
-                      sx={{
-                        borderLeft: 1,
-                        borderColor: 'divider',
-                        minWidth: '120px',
-                      }}
-                    />
-                  </Tabs>
-                </Box>
+                      {/* Saved Words tab (index == tabs.length+1) */}
+                      <Tab
+                        label="Saved Words"
+                        sx={{
+                          borderLeft: 1,
+                          borderColor: 'divider',
+                          minWidth: '120px',
+                        }}
+                      />
+                    </Tabs>
+                  </Box>
 
-                {/* Render each real tab's contents */}
-                {tabs.map((tab, index) => (
-                  <TabPanel key={tab.id} value={tabValue} index={index}>
-                    <SearchControls
-                      keywords={keywords}
-                      setKeywords={setKeywords}
-                      country={country}
-                      setCountry={setCountry}
-                      countries={countries}
-                      countriesLoading={countriesLoading}
-                      language={language}
-                      setLanguage={setLanguage}
-                      languages={languages}
-                      languagesLoading={languagesLoading}
-                      rangeLabel={rangeLabel}
-                      setRangeLabel={setRangeLabel}
-                      includePartners={includePartners}
-                      setIncludePartners={setIncludePartners}
-                      handleSearch={handleSearch}
-                    />
-                    <Box sx={{ mt: 3 }}>
-                      <KeywordDataGrid 
-                        rows={rows} 
-                        loading={loading}
-                        savedKeywords={savedKeywords}
-                        onSaveKeyword={handleSaveKeyword}
-                        onRemoveKeyword={handleRemoveKeyword}
-                        isSavedWordsTab={false}
+                  {/* Render each real tab's contents */}
+                  {tabs.map((tab, index) => (
+                    <TabPanel key={tab.id} value={tabValue} index={index}>
+                      <SearchControls
+                        keywords={keywords}
+                        setKeywords={setKeywords}
+                        country={country}
+                        setCountry={setCountry}
+                        countries={countries}
+                        countriesLoading={countriesLoading}
+                        language={language}
+                        setLanguage={setLanguage}
+                        languages={languages}
+                        languagesLoading={languagesLoading}
+                        rangeLabel={rangeLabel}
+                        setRangeLabel={setRangeLabel}
+                        includePartners={includePartners}
+                        setIncludePartners={setIncludePartners}
+                        handleSearch={handleSearch}
                       />
-                    </Box>
+                      <Box sx={{ mt: 3 }}>
+                        <KeywordDataGrid 
+                          rows={rows} 
+                          loading={loading}
+                          savedKeywords={savedKeywords}
+                          onSaveKeyword={handleSaveKeyword}
+                          onRemoveKeyword={handleRemoveKeyword}
+                          isSavedWordsTab={false}
+                        />
+                      </Box>
+                    </TabPanel>
+                  ))}
+
+                  {/* Saved Words tab */}
+                  <TabPanel value={tabValue} index={tabs.length + 1}>
+                    <KeywordDataGrid 
+                      rows={savedKeywords}
+                      loading={loading}
+                      savedKeywords={savedKeywords}
+                      onSaveKeyword={handleSaveKeyword}
+                      onRemoveKeyword={handleRemoveKeyword}
+                      isSavedWordsTab={true}
+                    />
                   </TabPanel>
-                ))}
-
-                {/* Saved Words tab */}
-                <TabPanel value={tabValue} index={tabs.length + 1}>
-                  <KeywordDataGrid 
-                    rows={savedKeywords}
-                    loading={loading}
-                    savedKeywords={savedKeywords}
-                    onSaveKeyword={handleSaveKeyword}
-                    onRemoveKeyword={handleRemoveKeyword}
-                    isSavedWordsTab={true}
-                  />
-                </TabPanel>
-              </Grid>
+                </Grid>
+              )}
             </Grid>
           </Stack>
         </Box>

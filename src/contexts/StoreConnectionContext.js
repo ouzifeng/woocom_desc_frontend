@@ -7,19 +7,41 @@ export function StoreConnectionProvider({ children }) {
   const [connectedPlatform, setConnectedPlatform] = useState(null);
   const [hasGoogleAnalytics, setHasGoogleAnalytics] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [activeBrandId, setActiveBrandId] = useState(null);
 
-  const checkGoogleAnalyticsConnection = async (token) => {
+  useEffect(() => {
+    const savedBrandId = localStorage.getItem('activeBrandId');
+    if (savedBrandId) {
+      setActiveBrandId(savedBrandId);
+    }
+  }, []);
+
+  const checkGoogleAnalyticsConnection = async (token, brandId = null) => {
     const API_URL = process.env.REACT_APP_API_URL;
-    const gaRes = await fetch(`${API_URL}/analytics/accounts`, {
+    const targetBrandId = brandId || activeBrandId;
+    
+    if (!targetBrandId) {
+      console.error('No brand ID available for Google Analytics connection check');
+      return;
+    }
+    
+    const gaRes = await fetch(`${API_URL}/analytics/accounts?brandId=${targetBrandId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const gaData = await gaRes.json();
     setHasGoogleAnalytics(gaData.connected || false);
   };
 
-  const checkShopifyConnection = async (token) => {
+  const checkShopifyConnection = async (token, brandId = null) => {
     const API_URL = process.env.REACT_APP_API_URL;
-    const shopifyRes = await fetch(`${API_URL}/shopify/status`, {
+    const targetBrandId = brandId || activeBrandId;
+    
+    if (!targetBrandId) {
+      console.error('No brand ID available for Shopify connection check');
+      return;
+    }
+
+    const shopifyRes = await fetch(`${API_URL}/shopify/status?brandId=${targetBrandId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const shopifyData = await shopifyRes.json();
@@ -28,14 +50,25 @@ export function StoreConnectionProvider({ children }) {
     }
   };
 
-  const checkWooCommerceConnection = async (token) => {
+  const checkWooCommerceConnection = async (token, brandId = null) => {
     const API_URL = process.env.REACT_APP_API_URL;
-    const wooRes = await fetch(`${API_URL}/woocommerce/status`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const wooData = await wooRes.json();
-    if (wooData.connected) {
-      setConnectedPlatform('woocommerce');
+    const targetBrandId = brandId || activeBrandId;
+    
+    if (!targetBrandId) {
+      console.error('No brand ID available for WooCommerce connection check');
+      return;
+    }
+    
+    try {
+      const wooRes = await fetch(`${API_URL}/woocommerce/status?brandId=${targetBrandId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const wooData = await wooRes.json();
+      if (wooData.connected) {
+        setConnectedPlatform('woocommerce');
+      }
+    } catch (error) {
+      console.error('Error checking WooCommerce status:', error);
     }
   };
 
@@ -43,15 +76,15 @@ export function StoreConnectionProvider({ children }) {
     const checkConnectionStatus = async () => {
       try {
         const user = auth.currentUser;
-        if (!user) {
+        if (!user || !activeBrandId) {
           setLoading(false);
           return;
         }
 
         const token = await user.getIdToken();
-        await checkGoogleAnalyticsConnection(token);
-        await checkShopifyConnection(token);
-        await checkWooCommerceConnection(token);
+        await checkGoogleAnalyticsConnection(token, activeBrandId);
+        await checkShopifyConnection(token, activeBrandId);
+        await checkWooCommerceConnection(token, activeBrandId);
       } catch (error) {
         console.error('Error checking connection status:', error);
         setConnectedPlatform(null);
@@ -61,8 +94,12 @@ export function StoreConnectionProvider({ children }) {
       }
     };
 
-    checkConnectionStatus();
-  }, []);
+    if (activeBrandId) {
+      checkConnectionStatus();
+    } else {
+      setLoading(false);
+    }
+  }, [activeBrandId]);
 
   const value = {
     connectedPlatform,
@@ -72,7 +109,9 @@ export function StoreConnectionProvider({ children }) {
     loading,
     checkGoogleAnalyticsConnection,
     checkShopifyConnection,
-    checkWooCommerceConnection
+    checkWooCommerceConnection,
+    setActiveBrandId,
+    activeBrandId
   };
 
   return (

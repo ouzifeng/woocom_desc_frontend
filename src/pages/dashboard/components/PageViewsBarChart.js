@@ -3,6 +3,7 @@ import { useTheme } from '@mui/material/styles';
 import { Card, CardContent, Typography, Stack, Chip } from '@mui/material';
 import { BarChart } from '@mui/x-charts/BarChart';
 import { auth } from '../../../firebase';
+import { useBrand } from '../../../contexts/BrandContext';
 
 // Helper function to parse dates safely
 const parseDate = (dateStr) => {
@@ -60,9 +61,11 @@ const formatDateRange = (startDate, endDate) => {
 
 export default function PageViewsBarChart({ startDate, endDate }) {
   const theme = useTheme();
+  const { activeBrandId } = useBrand();
   const [labels, setLabels] = React.useState([]);
   const [views, setViews] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState(null);
 
   const getAuthHeader = async () => {
     const user = auth.currentUser;
@@ -76,11 +79,26 @@ export default function PageViewsBarChart({ startDate, endDate }) {
 
   React.useEffect(() => {
     const fetchData = async () => {
+      if (!activeBrandId) {
+        setError('Please select a brand first');
+        setLoading(false);
+        return;
+      }
+      
       try {
+        setLoading(true);
+        setError(null);
         const headers = await getAuthHeader();
-        const res = await fetch(`${process.env.NODE_ENV === 'production' 
+        const apiUrl = `${process.env.NODE_ENV === 'production' 
           ? 'https://woocomdescbackend-451f66b3eb02.herokuapp.com' 
-          : 'http://localhost:5000'}/analytics/dashboard/trends?startDate=${startDate}&endDate=${endDate}`, { headers });
+          : 'http://localhost:5000'}/analytics/dashboard/trends?startDate=${startDate}&endDate=${endDate}&brandId=${activeBrandId}`;
+        
+        const res = await fetch(apiUrl, { headers });
+
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || 'Failed to fetch page views data');
+        }
 
         const data = await res.json();
         const trends = data.trends || [];
@@ -89,13 +107,18 @@ export default function PageViewsBarChart({ startDate, endDate }) {
         setViews(trends.map(t => parseInt(t.pageViews || 0, 10)));
       } catch (err) {
         console.error('Error loading page views:', err);
+        setError(err.message || 'Failed to load page views data');
+        setLabels([]);
+        setViews([]);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
-  }, [startDate, endDate]);
+    if (activeBrandId) {
+      fetchData();
+    }
+  }, [startDate, endDate, activeBrandId]);
 
   const colorPalette = [
     theme.palette.primary.dark,
@@ -104,6 +127,34 @@ export default function PageViewsBarChart({ startDate, endDate }) {
   ];
 
   const totalViews = views.reduce((sum, val) => sum + val, 0);
+
+  if (loading) return <Typography>Loading...</Typography>;
+  
+  if (error) {
+    return (
+      <Card variant="outlined" sx={{ width: '100%' }}>
+        <CardContent>
+          <Typography component="h2" variant="subtitle2" gutterBottom>
+            Page Views
+          </Typography>
+          <Typography color="error">{error}</Typography>
+        </CardContent>
+      </Card>
+    );
+  }
+  
+  if (views.length === 0) {
+    return (
+      <Card variant="outlined" sx={{ width: '100%' }}>
+        <CardContent>
+          <Typography component="h2" variant="subtitle2" gutterBottom>
+            Page Views
+          </Typography>
+          <Typography>No page views data available for the selected period</Typography>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card variant="outlined" sx={{ width: '100%' }}>

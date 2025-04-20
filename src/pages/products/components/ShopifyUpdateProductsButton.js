@@ -4,6 +4,7 @@ import { Button, Box } from '@mui/material';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../../../firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import { useBrand } from '../../../contexts/BrandContext';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -14,6 +15,7 @@ export default function ShopifyUpdateProductsButton({
   onClick,
 }) {
   const [user] = useAuthState(auth);
+  const { activeBrandId } = useBrand();
   const [loading, setLoading] = useState(false);
   const [updatedCount, setUpdatedCount] = useState(0);
   const [totalProducts, setTotalProducts] = useState(0);
@@ -21,6 +23,11 @@ export default function ShopifyUpdateProductsButton({
   const updateProducts = async () => {
     if (!user) {
       setNotificationMessage('User not authenticated');
+      return;
+    }
+
+    if (!activeBrandId) {
+      setNotificationMessage('No brand selected');
       return;
     }
 
@@ -35,14 +42,14 @@ export default function ShopifyUpdateProductsButton({
     setNotificationMessage('Starting update...');
 
     try {
-      // Get lastImport timestamp from Firestore
-      const userDocRef = doc(db, 'users', user.uid);
-      const userDoc = await getDoc(userDocRef);
-      if (!userDoc.exists()) {
-        throw new Error('User document not found');
+      // Get lastImport timestamp from Firestore brand document
+      const brandDocRef = doc(db, 'users', user.uid, 'brands', activeBrandId);
+      const brandDoc = await getDoc(brandDocRef);
+      if (!brandDoc.exists()) {
+        throw new Error('Brand not found');
       }
-      const userData = userDoc.data();
-      const lastImport = userData.lastImport;
+      const brandData = brandDoc.data();
+      const lastImport = brandData.lastImport;
 
       if (!lastImport) {
         setNotificationMessage('No previous import found. Please use Import All Products first.');
@@ -57,7 +64,10 @@ export default function ShopifyUpdateProductsButton({
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ lastImport }),
+        body: JSON.stringify({ 
+          lastImport,
+          brandId: activeBrandId
+        }),
       });
 
       const reader = response.body.getReader();
@@ -108,7 +118,7 @@ export default function ShopifyUpdateProductsButton({
       variant="contained"
       color="primary"
       onClick={updateProducts}
-      disabled={loading || disabled}
+      disabled={loading || disabled || !activeBrandId}
       sx={{ minWidth: '150px' }}
     >
       {loading ? (

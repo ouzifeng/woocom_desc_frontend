@@ -20,6 +20,7 @@ import { doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '../../../firebase';
+import { useBrand } from '../../../contexts/BrandContext';
 
 // If you want even fewer re-renders when the parent changes some unrelated props,
 // you can wrap the entire component in React.memo:
@@ -35,6 +36,7 @@ export default function KeywordDataGrid({
   isSavedWordsTab = false,
 }) {
   const [user] = useAuthState(auth);
+  const { activeBrandId } = useBrand();
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   // ----------------------------------------------------------------
@@ -157,22 +159,39 @@ export default function KeywordDataGrid({
   const [isBulkSaving, setIsBulkSaving] = useState(false);
 
   const handleSaveToggle = async (keywordObj) => {
-    if (!user) return;
+    if (!user || !activeBrandId) return;
 
     const alreadySaved = savedKeywords.some((k) => k.keyword === keywordObj.keyword);
     try {
       if (alreadySaved) {
-        // remove
+        // Find the saved keyword with this keyword text
+        const savedKeyword = savedKeywords.find(k => k.keyword === keywordObj.keyword);
+        if (!savedKeyword) {
+          console.error('Could not find saved keyword to remove');
+          return;
+        }
+        
+        // Use the document ID from the saved keyword
+        const keywordId = savedKeyword.id;
+        
+        if (!keywordId) {
+          console.error('Saved keyword missing document ID');
+          return;
+        }
+        
+        // Remove the keyword using its document ID
         await deleteDoc(
-          doc(db, 'users', user.uid, 'savedKeywords', keywordObj.keyword)
+          doc(db, 'users', user.uid, 'brands', activeBrandId, 'savedKeywords', keywordId)
         );
         onRemoveKeyword?.(keywordObj);
       } else {
-        // add
+        // add a new keyword
+        const keywordId = `keyword_${Date.now()}`;
         await setDoc(
-          doc(db, 'users', user.uid, 'savedKeywords', keywordObj.keyword),
+          doc(db, 'users', user.uid, 'brands', activeBrandId, 'savedKeywords', keywordId),
           {
             ...keywordObj,
+            brandId: activeBrandId,
             savedAt: new Date().toISOString(),
           }
         );
@@ -185,35 +204,70 @@ export default function KeywordDataGrid({
 
   // Bulk save/remove selected keywords based on tab context
   const handleBulkOperation = async () => {
-    if (!user || rowSelectionModel.length === 0) return;
+    if (!user || !activeBrandId || !rowSelectionModel || rowSelectionModel.length === 0) return;
 
     setIsBulkSaving(true);
     try {
-      const selectedRows = filteredRows.filter(row => rowSelectionModel.includes(row.id));
+      // Safely get selected rows - ensure we're dealing with arrays
+      const selectedRows = Array.isArray(filteredRows) && Array.isArray(rowSelectionModel) 
+        ? filteredRows.filter(row => rowSelectionModel.includes(row.id))
+        : [];
+        
+      if (selectedRows.length === 0) {
+        console.error('No valid rows selected for bulk operation');
+        setSnackbar({
+          open: true,
+          message: 'No valid rows selected',
+          severity: 'error'
+        });
+        setIsBulkSaving(false);
+        return;
+      }
+      
       let operationCount = 0;
       
       // Create a batch
       const batch = writeBatch(db);
       
       if (isSavedWordsTab) {
-        // In Saved Words tab, remove the keywords
+        // In Saved Words tab, remove the keywords using their document IDs
         for (const row of selectedRows) {
-          const ref = doc(db, 'users', user.uid, 'savedKeywords', row.keyword);
+          // The document ID should be in the row.id field (if loaded from Firestore)
+          if (!row || !row.id) {
+            console.error('Saved keyword missing document ID:', row);
+            continue;
+          }
+          
+          const ref = doc(db, 'users', user.uid, 'brands', activeBrandId, 'savedKeywords', row.id);
           batch.delete(ref);
-          onRemoveKeyword?.(row);
+          if (typeof onRemoveKeyword === 'function') {
+            onRemoveKeyword(row);
+          }
           operationCount++;
         }
       } else {
         // In Research tab, add new keywords (skip existing ones)
         for (const row of selectedRows) {
-          const alreadySaved = savedKeywords.some((k) => k.keyword === row.keyword);
+          if (!row || !row.keyword) {
+            console.error('Invalid row for saving:', row);
+            continue;
+          }
+          
+          const alreadySaved = Array.isArray(savedKeywords) 
+            ? savedKeywords.some(k => k && k.keyword === row.keyword)
+            : false;
+            
           if (!alreadySaved) {
-            const ref = doc(db, 'users', user.uid, 'savedKeywords', row.keyword);
+            const keywordId = `keyword_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+            const ref = doc(db, 'users', user.uid, 'brands', activeBrandId, 'savedKeywords', keywordId);
             batch.set(ref, {
               ...row,
+              brandId: activeBrandId,
               savedAt: new Date().toISOString(),
             });
-            onSaveKeyword?.(row);
+            if (typeof onSaveKeyword === 'function') {
+              onSaveKeyword(row);
+            }
             operationCount++;
           }
         }
@@ -272,7 +326,9 @@ export default function KeywordDataGrid({
         width: 70,
         sortable: false,
         renderCell: (params) => {
-          const isSaved = savedKeywords.some((k) => k.keyword === params.row.keyword);
+          const isSaved = Array.isArray(savedKeywords) 
+            ? savedKeywords.some(k => k && k.keyword === params.row.keyword)
+            : false;
           return (
             <IconButton
               size="small"
@@ -522,6 +578,11 @@ export default function KeywordDataGrid({
         autoHideDuration={6000} 
         onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        slotProps={{ 
+          clickAwayListener: { 
+            disableReactTree: true 
+          } 
+        }}
       >
         <Alert 
           onClose={() => setSnackbar(prev => ({ ...prev, open: false }))} 

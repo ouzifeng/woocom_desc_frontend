@@ -26,6 +26,8 @@ import TableBody from '@mui/material/TableBody';
 import TableRow from '@mui/material/TableRow';
 import TableCell from '@mui/material/TableCell';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
+import { useBrand } from '../../contexts/BrandContext';
+import Alert from '@mui/material/Alert';
 
 // Loading component
 const LoadingFallback = () => (
@@ -37,6 +39,7 @@ const LoadingFallback = () => (
 export default function ContentPage() {
   const { id } = useParams();
   const [user] = useAuthState(auth);
+  const { activeBrandId } = useBrand();
   const [content, setContent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -50,10 +53,10 @@ export default function ContentPage() {
 
   useEffect(() => {
     const fetchContent = async () => {
-      if (user && id) {
+      if (user && id && activeBrandId) {
         try {
-          // First try to get from content collection
-          const contentDocRef = doc(db, 'users', user.uid, 'content', id);
+          // First try to get from content collection with brand isolation
+          const contentDocRef = doc(db, 'users', user.uid, 'brands', activeBrandId, 'content', id);
           const contentDoc = await getDoc(contentDocRef);
           
           if (contentDoc.exists()) {
@@ -62,18 +65,19 @@ export default function ContentPage() {
             setEditorContent(contentData.content || '');
           } else {
             // If not found in content collection, try to get from contentStrategy
-            const strategyDoc = await getDoc(doc(db, 'users', user.uid, 'contentStrategy', 'current'));
+            const strategyDoc = await getDoc(doc(db, 'users', user.uid, 'brands', activeBrandId, 'contentStrategy', 'current'));
             if (strategyDoc.exists()) {
               const strategyData = strategyDoc.data();
               const contentItem = strategyData.strategy.find(item => item.id === id);
               if (contentItem) {
                 setContent(contentItem);
                 setEditorContent(contentItem.content || '');
-                // Create the content document
+                // Create the content document with brand isolation
                 await setDoc(contentDocRef, {
                   ...contentItem,
                   content: contentItem.content || '',
-                  lastUpdated: new Date().toISOString()
+                  lastUpdated: new Date().toISOString(),
+                  brandId: activeBrandId
                 });
               } else {
                 setError('Content not found');
@@ -88,17 +92,22 @@ export default function ContentPage() {
         } finally {
           setLoading(false);
         }
+      } else {
+        setLoading(false);
+        if (!activeBrandId) {
+          setError('Please select a brand first');
+        }
       }
     };
     fetchContent();
-  }, [user, id]);
+  }, [user, id, activeBrandId]);
 
   const handleSave = async () => {
-    if (!user || !id) return;
+    if (!user || !id || !activeBrandId) return;
     
     setSaving(true);
     try {
-      const contentDocRef = doc(db, 'users', user.uid, 'content', id);
+      const contentDocRef = doc(db, 'users', user.uid, 'brands', activeBrandId, 'content', id);
       console.log('Saving content to:', contentDocRef.path);
       console.log('Content to save:', editorContent);
       
@@ -122,7 +131,7 @@ export default function ContentPage() {
   };
 
   const handleGenerateOutline = async () => {
-    if (!user || !id) return;
+    if (!user || !id || !activeBrandId) return;
     
     setGenerating(true);
     try {
@@ -134,7 +143,8 @@ export default function ContentPage() {
         body: JSON.stringify({
           title: content.title,
           keywords: content.outline.split(','),
-          type: content.type
+          type: content.type,
+          brandId: activeBrandId
         }),
       });
 
@@ -155,7 +165,7 @@ export default function ContentPage() {
   };
 
   const handleGenerateContent = async () => {
-    if (!user || !id || !outlineGenerated) return;
+    if (!user || !id || !activeBrandId || !outlineGenerated) return;
     
     setGenerating(true);
     try {
@@ -168,7 +178,8 @@ export default function ContentPage() {
           title: content.title,
           keywords: content.outline.split(','),
           type: content.type,
-          outline: editorContent // Use the current outline in the editor
+          outline: editorContent, // Use the current outline in the editor
+          brandId: activeBrandId
         }),
       });
 
@@ -198,6 +209,24 @@ export default function ContentPage() {
           {error}
         </Typography>
       </Box>
+    );
+  }
+
+  if (!activeBrandId) {
+    return (
+      <AppTheme>
+        <Box sx={{ display: 'flex' }}>
+          <CssBaseline />
+          <AppNavbar />
+          <SideMenu />
+          <Box component="main" sx={{ flexGrow: 1, p: 3, width: { sm: `calc(100% - 240px)` } }}>
+            <Header />
+            <Alert severity="warning" sx={{ mt: 4 }}>
+              Please select a brand to view content.
+            </Alert>
+          </Box>
+        </Box>
+      </AppTheme>
     );
   }
 
@@ -445,11 +474,11 @@ export default function ContentPage() {
                     onClick={async () => {
                       try {
                         setAnalyzing(true);
-                        // Fetch brand settings
-                        const brandIdentityDoc = await getDoc(doc(db, 'users', user.uid, 'BrandIdentity', 'settings'));
-                        const marketAudienceDoc = await getDoc(doc(db, 'users', user.uid, 'MarketAudience', 'settings'));
-                        const productPositioningDoc = await getDoc(doc(db, 'users', user.uid, 'ProductPositioning', 'settings'));
-                        const referencesExamplesDoc = await getDoc(doc(db, 'users', user.uid, 'ReferencesExamples', 'settings'));
+                        // Fetch brand settings with brand isolation
+                        const brandIdentityDoc = await getDoc(doc(db, 'users', user.uid, 'brands', activeBrandId, 'BrandIdentity', 'settings'));
+                        const marketAudienceDoc = await getDoc(doc(db, 'users', user.uid, 'brands', activeBrandId, 'MarketAudience', 'settings'));
+                        const productPositioningDoc = await getDoc(doc(db, 'users', user.uid, 'brands', activeBrandId, 'ProductPositioning', 'settings'));
+                        const referencesExamplesDoc = await getDoc(doc(db, 'users', user.uid, 'brands', activeBrandId, 'ReferencesExamples', 'settings'));
 
                         const brandSettings = {
                           brandIdentity: brandIdentityDoc.exists() ? brandIdentityDoc.data() : {},
@@ -467,7 +496,8 @@ export default function ContentPage() {
                             content: editorContent,
                             keywords: content?.outline?.split(','),
                             title: content?.title,
-                            brandSettings
+                            brandSettings,
+                            brandId: activeBrandId
                           }),
                         });
 
