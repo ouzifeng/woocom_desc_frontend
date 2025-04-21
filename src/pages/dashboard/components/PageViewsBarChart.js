@@ -90,7 +90,7 @@ export default function PageViewsBarChart({ startDate, endDate }) {
         setError(null);
         const headers = await getAuthHeader();
         const apiUrl = `${process.env.NODE_ENV === 'production' 
-          ? 'https://woocomdescbackend-451f66b3eb02.herokuapp.com' 
+          ? 'https://us-central1-apps-84c5e.cloudfunctions.net/api' 
           : 'http://localhost:5000'}/analytics/dashboard/trends?startDate=${startDate}&endDate=${endDate}&brandId=${activeBrandId}`;
         
         const res = await fetch(apiUrl, { headers });

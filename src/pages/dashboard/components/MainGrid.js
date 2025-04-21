@@ -14,9 +14,10 @@ import PageViewsBarChart from './PageViewsBarChart';
 import TopProductsChart from './TopProductsChart';
 import RevenueTrendChart from './RevenueTrendChart';
 import { useBrand } from '../../../contexts/BrandContext';
+import TopSellingProducts from './TopSellingProducts';
 
 const API_BASE_URL = process.env.NODE_ENV === 'production'
-  ? 'https://woocomdescbackend-451f66b3eb02.herokuapp.com'
+  ? 'https://us-central1-apps-84c5e.cloudfunctions.net/api'
   : 'http://localhost:5000'
 
 // Currency options
@@ -251,7 +252,7 @@ export default function MainGrid() {
           <Grid item xs={12} md={6}><PageViewsBarChart startDate={startDate} endDate={endDate} /></Grid>
 
           <Grid item xs={12} md={4}>
-            <TopProductsChart 
+            <TopSellingProducts 
               startDate={startDate} 
               endDate={endDate} 
               selectedCurrency={selectedCurrency} 

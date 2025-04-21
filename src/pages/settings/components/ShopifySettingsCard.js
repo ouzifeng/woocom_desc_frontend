@@ -16,7 +16,11 @@ import { auth } from '../../../firebase';
 import { useStoreConnection } from '../../../contexts/StoreConnectionContext';
 import { useBrand } from '../../../contexts/BrandContext';
 
-const API_URL = process.env.REACT_APP_API_URL;
+const API_URL = process.env.REACT_APP_API_URL || (
+  process.env.NODE_ENV === 'production' 
+    ? 'https://us-central1-apps-84c5e.cloudfunctions.net/api'
+    : 'http://localhost:5000'
+);
 
 const SettingsCard = styled(Card)(({ theme, disabled }) => ({
   display: 'flex',
@@ -73,19 +77,28 @@ export default function ShopifySettingsCard() {
 
   const fetchConnectionStatus = async () => {
     if (!activeBrandId) {
+      console.log('No active brand selected for Shopify status check');
       setStatus('no-brand');
       return;
     }
     
     try {
+      console.log(`Checking Shopify connection status for brand: ${activeBrandId}`);
       const token = await user.getIdToken();
       const res = await fetch(`${API_URL}/shopify/status?brandId=${activeBrandId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'Failed to check connection status');
+      }
+      
       const data = await res.json();
       const isConnected = data.connected;
+      console.log(`Shopify connection status for brand ${activeBrandId}: ${isConnected ? 'Connected' : 'Not connected'}`);
       setStatus(isConnected ? 'connected' : 'disconnected');
       
       // Update the global connection state
@@ -95,7 +108,7 @@ export default function ShopifySettingsCard() {
         setConnectedPlatform(null);
       }
     } catch (err) {
-      console.error('Status check failed:', err);
+      console.error('Shopify status check failed:', err);
       setError('Failed to check Shopify status.');
       setStatus('error');
     }
@@ -108,6 +121,7 @@ export default function ShopifySettingsCard() {
     }
     
     try {
+      console.log(`Disconnecting Shopify for brand: ${activeBrandId}`);
       setStatus('loading');
       const token = await user.getIdToken();
       const res = await fetch(`${API_URL}/shopify/disconnect`, {
@@ -120,8 +134,15 @@ export default function ShopifySettingsCard() {
           brandId: activeBrandId
         }),
       });
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'Disconnection failed');
+      }
+      
       const data = await res.json();
       if (data.result === 'Success') {
+        console.log(`Successfully disconnected Shopify for brand: ${activeBrandId}`);
         setStatus('disconnected');
         setError('');
         setTestResult('');
@@ -144,6 +165,7 @@ export default function ShopifySettingsCard() {
     }
     
     try {
+      console.log(`Testing Shopify connection for brand: ${activeBrandId}`);
       setTestResult('testing');
       const token = await user.getIdToken();
       const res = await fetch(`${API_URL}/shopify/test?brandId=${activeBrandId}`, {
@@ -152,7 +174,14 @@ export default function ShopifySettingsCard() {
           Authorization: `Bearer ${token}`,
         },
       });
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'Test connection failed');
+      }
+      
       const data = await res.json();
+      console.log(`Shopify test result for brand ${activeBrandId}:`, data.result);
       if (data.result === 'Success') {
         setTestResult('success');
       } else {
@@ -179,6 +208,7 @@ export default function ShopifySettingsCard() {
     }
 
     try {
+      console.log(`Connecting Shopify for brand: ${activeBrandId}, shop: ${cleaned}`);
       setIsConnecting(true);
       setError('');
       const token = await user.getIdToken();
@@ -191,7 +221,10 @@ export default function ShopifySettingsCard() {
   };
 
   useEffect(() => {
-    if (user && activeBrandId) fetchConnectionStatus();
+    if (user && activeBrandId) {
+      console.log('Initializing Shopify settings card with brand:', activeBrandId);
+      fetchConnectionStatus();
+    }
   }, [user, activeBrandId]);
 
   const renderActionButtons = () => {

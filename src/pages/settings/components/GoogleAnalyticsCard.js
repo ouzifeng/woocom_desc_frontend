@@ -38,7 +38,7 @@ const SettingsCard = styled(Card)(({ theme }) => ({
 }));
 
 const API_BASE_URL = process.env.NODE_ENV === 'production'
-  ? 'https://woocomdescbackend-451f66b3eb02.herokuapp.com'
+  ? 'https://us-central1-apps-84c5e.cloudfunctions.net/api'
   : 'http://localhost:5000';
 
 export default function GoogleAnalyticsCard() {
@@ -148,7 +148,7 @@ export default function GoogleAnalyticsCard() {
       const user = auth.currentUser;
       const idToken = await user.getIdToken();
       const redirectUri = process.env.NODE_ENV === 'production'
-        ? 'https://woocomdescbackend-451f66b3eb02.herokuapp.com/analytics/auth/callback'
+        ? 'https://us-central1-apps-84c5e.cloudfunctions.net/api/analytics/auth/callback'
         : 'http://localhost:5000/analytics/auth/callback';
       const url = `${API_BASE_URL}/analytics/auth/url?redirect_uri=${encodeURIComponent(redirectUri)}&token=${encodeURIComponent(idToken)}&brandId=${encodeURIComponent(activeBrandId)}`;
       const res = await fetch(url);

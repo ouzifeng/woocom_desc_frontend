@@ -84,7 +84,7 @@ export default function SessionsChart({ startDate, endDate }) {
   const [error, setError] = React.useState(null);
 
   const API_BASE_URL = process.env.NODE_ENV === 'production'
-    ? 'https://woocomdescbackend-451f66b3eb02.herokuapp.com'
+    ? 'https://us-central1-apps-84c5e.cloudfunctions.net/api'
     : 'http://localhost:5000';
 
   const getAuthHeader = async () => {

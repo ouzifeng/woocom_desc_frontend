@@ -6,7 +6,7 @@ import { auth } from '../../../firebase';
 import { useBrand } from '../../../contexts/BrandContext';
 
 const API_BASE_URL = process.env.NODE_ENV === 'production'
-  ? 'https://woocomdescbackend-451f66b3eb02.herokuapp.com'
+  ? 'https://us-central1-apps-84c5e.cloudfunctions.net/api'
   : 'http://localhost:5000';
 
 // Helper function to parse dates safely

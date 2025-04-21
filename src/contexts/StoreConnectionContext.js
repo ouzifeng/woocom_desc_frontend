@@ -40,13 +40,29 @@ export function StoreConnectionProvider({ children }) {
       console.error('No brand ID available for Shopify connection check');
       return;
     }
-
-    const shopifyRes = await fetch(`${API_URL}/shopify/status?brandId=${targetBrandId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const shopifyData = await shopifyRes.json();
-    if (shopifyData.connected) {
-      setConnectedPlatform('shopify');
+    
+    console.log(`Checking Shopify connection for brand: ${targetBrandId}`);
+    try {
+      const shopifyRes = await fetch(`${API_URL}/shopify/status?brandId=${targetBrandId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      if (!shopifyRes.ok) {
+        console.error(`Shopify status check failed with status: ${shopifyRes.status}`);
+        return;
+      }
+      
+      const shopifyData = await shopifyRes.json();
+      console.log(`Shopify connection status for brand ${targetBrandId}:`, shopifyData);
+      
+      if (shopifyData.connected) {
+        setConnectedPlatform('shopify');
+      } else if (connectedPlatform === 'shopify') {
+        // Only reset if shopify was previously connected
+        setConnectedPlatform(null);
+      }
+    } catch (error) {
+      console.error('Error checking Shopify connection:', error);
     }
   };
 
@@ -59,13 +75,25 @@ export function StoreConnectionProvider({ children }) {
       return;
     }
     
+    console.log(`Checking WooCommerce connection for brand: ${targetBrandId}`);
     try {
       const wooRes = await fetch(`${API_URL}/woocommerce/status?brandId=${targetBrandId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      
+      if (!wooRes.ok) {
+        console.error(`WooCommerce status check failed with status: ${wooRes.status}`);
+        return;
+      }
+      
       const wooData = await wooRes.json();
+      console.log(`WooCommerce connection status for brand ${targetBrandId}:`, wooData);
+      
       if (wooData.connected) {
         setConnectedPlatform('woocommerce');
+      } else if (connectedPlatform === 'woocommerce') {
+        // Only reset if woocommerce was previously connected
+        setConnectedPlatform(null);
       }
     } catch (error) {
       console.error('Error checking WooCommerce status:', error);
