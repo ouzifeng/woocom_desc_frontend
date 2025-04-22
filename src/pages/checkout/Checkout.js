@@ -46,48 +46,59 @@ export default function Checkout() {
     }
   };
 
-  const CreditPackage = ({ price, credits }) => (
-    <Card
-      sx={{
-        p: 3,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        height: '100%',
-        transition: 'transform 0.2s',
-        '&:hover': {
-          transform: 'translateY(-4px)',
-          boxShadow: 3,
-        },
-      }}
-    >
-      <Typography variant="h4" gutterBottom>
-        {credits} Credits
-      </Typography>
-      <Typography variant="h5" color="primary" gutterBottom>
-        ${price}
-      </Typography>
-      <Typography variant="body2" color="text.secondary" gutterBottom>
-        ${(price / credits).toFixed(2)} per credit
-      </Typography>
-      <Box sx={{ mt: 'auto', pt: 2, width: '100%' }}>
-        <Button
-          variant="contained"
-          fullWidth
-          onClick={() => handlePurchase(price, credits)}
-        >
-          Purchase Now
-        </Button>
-      </Box>
-    </Card>
-  );
-
   const creditPackages = [
-    { price: 1, credits: 10 },
-    { price: 5, credits: 50 },
-    { price: 20, credits: 200 },
-    { price: 50, credits: 500 },
+    { price: 1, credits: 10, bonus: 0 },
+    { price: 5, credits: 50, bonus: 0 },
+    { price: 20, credits: 200, bonus: 10 }, // 0.095c per credit
+    { price: 50, credits: 500, bonus: 50 }, // 0.09c per credit
+    { price: 100, credits: 1000, bonus: 150 }, // 0.086c per credit
   ];
+
+  const CreditPackage = ({ price, credits, bonus }) => {
+    const totalCredits = credits + bonus;
+    const perCreditPrice = (price / totalCredits).toFixed(3);
+    
+    return (
+      <Card
+        sx={{
+          p: 3,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          height: '100%',
+          transition: 'transform 0.2s',
+          '&:hover': {
+            transform: 'translateY(-4px)',
+            boxShadow: 3,
+          },
+        }}
+      >
+        <Typography variant="h4" gutterBottom>
+          {credits} Credits
+        </Typography>
+        {bonus > 0 && (
+          <Typography variant="h6" color="success.main" gutterBottom>
+            +{bonus} Bonus Credits ({Math.round((bonus/credits)*100)}% Extra)
+          </Typography>
+        )}
+        <Typography variant="h5" color="primary" gutterBottom>
+          ${price}
+        </Typography>
+        <Typography variant="body2" color="text.secondary" gutterBottom>
+          ${perCreditPrice} per credit
+        </Typography>
+        <Box sx={{ mt: 'auto', pt: 2, width: '100%' }}>
+          <Button
+            variant="contained"
+            fullWidth
+            onClick={() => handlePurchase(price, totalCredits)}
+          >
+            Purchase Now
+          </Button>
+        </Box>
+      </Card>
+    );
+  };
 
   return (
     <AppTheme>

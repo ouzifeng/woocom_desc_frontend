@@ -34,10 +34,12 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import { useBrand } from '../../contexts/BrandContext';
+import { useToast } from '../../components/ToasterAlert';
 
 export default function ContentStrategy(props) {
   const [user] = useAuthState(auth);
   const { activeBrandId } = useBrand();
+  const { showToast } = useToast();
   const [loading, setLoading] = React.useState(false);
   const [rows, setRows] = React.useState([]);
   const [articleCount, setArticleCount] = React.useState(100);
@@ -163,7 +165,12 @@ export default function ContentStrategy(props) {
 
   // Load saved strategy from cache or database
   const loadSavedStrategy = React.useCallback(async () => {
-    if (!user || !activeBrandId) return;
+    if (!user || !activeBrandId) {
+      if (!activeBrandId) {
+        setError('Please select a brand first');
+      }
+      return;
+    }
 
     try {
       // Try to get from cache first
@@ -178,13 +185,13 @@ export default function ContentStrategy(props) {
         }
       }
 
-      // If no cache or expired, get from database with brand isolation
+      // If no cache or expired, get from database
       const strategyDoc = await getDocs(collection(db, 'users', user.uid, 'brands', activeBrandId, 'contentStrategy'));
       if (!strategyDoc.empty) {
         const strategyData = strategyDoc.docs[0].data().strategy;
         setValidatedRows(strategyData);
         
-        // Save to cache with brand isolation
+        // Save to cache
         localStorage.setItem(cacheKey, JSON.stringify({
           timestamp: Date.now(),
           data: strategyData
@@ -193,18 +200,14 @@ export default function ContentStrategy(props) {
     } catch (err) {
       console.error('Error loading strategy:', err);
       setError('Failed to load saved strategy');
+      showToast('Failed to load content strategy', 'error');
     }
-  }, [user, activeBrandId]);
+  }, [user, activeBrandId, showToast]);
 
-  // Load saved strategy on component mount and when brand changes
+  // Load saved strategy on component mount
   React.useEffect(() => {
-    if (activeBrandId) {
-      setError(null);
-      loadSavedStrategy();
-    } else {
-      setRows([]);
-    }
-  }, [loadSavedStrategy, activeBrandId]);
+    loadSavedStrategy();
+  }, [loadSavedStrategy]);
 
   // Check content generation status for all rows
   React.useEffect(() => {
@@ -212,7 +215,7 @@ export default function ContentStrategy(props) {
       if (!user || !activeBrandId) return;
 
       try {
-        // Get all content documents that have content with brand isolation
+        // Get all content documents that have content
         const contentCollection = collection(db, 'users', user.uid, 'brands', activeBrandId, 'content');
         const contentSnapshot = await getDocs(contentCollection);
         
@@ -392,7 +395,7 @@ export default function ContentStrategy(props) {
 
   const handleGenerate = async () => {
     if (!user || !activeBrandId) {
-      setError('Please select a brand first');
+      showToast('Please select a brand first', 'error');
       return;
     }
     
@@ -400,17 +403,17 @@ export default function ContentStrategy(props) {
     setError(null);
     
     try {
-      // Get saved keywords with brand isolation
+      // Get saved keywords
       const keywordsSnapshot = await getDocs(collection(db, 'users', user.uid, 'brands', activeBrandId, 'savedKeywords'));
-      const savedKeywords = keywordsSnapshot.docs.map(doc => doc.data().keyword || doc.data().text);
+      const savedKeywords = keywordsSnapshot.docs.map(doc => doc.data().keyword);
       
       if (savedKeywords.length === 0) {
         setError('No saved keywords found. Please save some keywords first.');
-        setLoading(false);
+        showToast('No saved keywords found. Please save some keywords first.', 'error');
         return;
       }
 
-      // Get existing strategy with brand isolation
+      // Get existing strategy
       const strategyDoc = await getDocs(collection(db, 'users', user.uid, 'brands', activeBrandId, 'contentStrategy'));
       const existingStrategy = strategyDoc.empty ? [] : strategyDoc.docs[0].data().strategy;
 
@@ -426,7 +429,7 @@ export default function ContentStrategy(props) {
             keywords: savedKeywords,
             articleCount: 11, // Fixed number for one pillar + 10 supporting pieces
             existingStrategy, // Pass existing strategy to backend
-            brandId: activeBrandId // Include brandId for brand isolation
+            brandId: activeBrandId // Pass brand ID to backend
           }),
         }
       );
@@ -434,14 +437,13 @@ export default function ContentStrategy(props) {
       const data = await response.json();
       
       if (data.result === 'Success') {
-        // Save to database with brand isolation
+        // Save to database
         await setDoc(doc(db, 'users', user.uid, 'brands', activeBrandId, 'contentStrategy', 'current'), {
           strategy: data.strategy,
-          timestamp: new Date().toISOString(),
-          brandId: activeBrandId
+          timestamp: new Date().toISOString()
         });
 
-        // Save to cache with brand isolation
+        // Save to cache
         const cacheKey = `contentStrategy_${activeBrandId}`;
         localStorage.setItem(cacheKey, JSON.stringify({
           timestamp: Date.now(),
@@ -449,11 +451,14 @@ export default function ContentStrategy(props) {
         }));
 
         setValidatedRows(data.strategy);
+        showToast('Content strategy generated successfully', 'success');
       } else {
         setError(data.message || 'Failed to generate content strategy');
+        showToast(data.message || 'Failed to generate content strategy', 'error');
       }
     } catch (err) {
       setError('Failed to generate content strategy. Please try again.');
+      showToast('Failed to generate content strategy. Please try again.', 'error');
       console.error('Error:', err);
     } finally {
       setLoading(false);
@@ -463,36 +468,41 @@ export default function ContentStrategy(props) {
   // Handle row click to navigate to content page
   const handleRowClick = async (params) => {
     if (!user || !activeBrandId) {
-      setError('Please select a brand first');
+      showToast('Please select a brand first', 'error');
       return;
     }
 
     try {
-      // Use brand isolation for content reference
-      const contentRef = doc(db, 'users', user.uid, 'brands', activeBrandId, 'content', params.row.id);
+      const contentRef = doc(db, 'users', user.uid, 'brands', activeBrandId, 'content', params.row.id.toString());
       const contentDoc = await getDoc(contentRef);
       
       // Only update if the document doesn't exist or doesn't have content
       if (!contentDoc.exists() || !contentDoc.data().content) {
         await setDoc(contentRef, {
           ...params.row,
+          brandId: activeBrandId,
           content: '',
-          lastUpdated: new Date().toISOString(),
-          brandId: activeBrandId
+          lastUpdated: new Date().toISOString()
         });
       }
       
-      // Navigate to content page - fix the navigation path
+      // Navigate to content page
       navigate(`/strategy/${params.row.id}`);
     } catch (err) {
       console.error('Error handling row click:', err);
       setError('Failed to navigate to content page');
+      showToast('Failed to navigate to content page', 'error');
     }
   };
 
   // Add delete handler
   const handleDelete = async () => {
-    if (!user || !activeBrandId || selectedRows.length === 0) return;
+    if (!user || !activeBrandId || selectedRows.length === 0) {
+      if (!activeBrandId) {
+        showToast('Please select a brand first', 'error');
+      }
+      return;
+    }
 
     try {
       setLoading(true);
@@ -515,7 +525,7 @@ export default function ContentStrategy(props) {
         }
       });
 
-      // Delete all content with brand isolation
+      // Delete all content
       for (const id of contentToDelete) {
         // Delete from content collection
         await deleteDoc(doc(db, 'users', user.uid, 'brands', activeBrandId, 'content', id.toString()));
@@ -527,59 +537,29 @@ export default function ContentStrategy(props) {
       setSelectedRows([]);
       setRowSelectionModel([]);
 
-      // Update cache with brand isolation
+      // Update cache and database
       const cacheKey = `contentStrategy_${activeBrandId}`;
       localStorage.setItem(cacheKey, JSON.stringify({
         timestamp: Date.now(),
         data: remainingRows
       }));
+      
+      // Update strategy document
+      await setDoc(doc(db, 'users', user.uid, 'brands', activeBrandId, 'contentStrategy', 'current'), {
+        strategy: remainingRows,
+        updatedAt: new Date().toISOString(),
+      });
 
       setDeleteDialogOpen(false);
+      showToast('Selected items deleted successfully', 'success');
     } catch (error) {
       console.error('Error deleting content:', error);
       setError('Failed to delete content');
+      showToast('Failed to delete content', 'error');
     } finally {
       setLoading(false);
     }
   };
-
-  // Show a message if no brand is selected
-  if (!activeBrandId) {
-    return (
-      <AppTheme {...props}>
-        <CssBaseline enableColorScheme />
-        <Box sx={{ display: 'flex' }}>
-          <SideMenu user={user} />
-          <AppNavbar />
-          <Box
-            component="main"
-            sx={(theme) => ({
-              flexGrow: 1,
-              backgroundColor: theme.vars
-                ? `rgba(${theme.vars.palette.background.defaultChannel} / 1)`
-                : alpha(theme.palette.background.default, 1),
-              overflow: 'auto',
-            })}
-          >
-            <Stack
-              spacing={2}
-              sx={{
-                alignItems: 'center',
-                mx: 3,
-                pb: 5,
-                mt: { xs: 8, md: 0 },
-              }}
-            >
-              <Header />
-              <Alert severity="warning" sx={{ width: '100%', mt: 2 }}>
-                Please select a brand to view content strategy.
-              </Alert>
-            </Stack>
-          </Box>
-        </Box>
-      </AppTheme>
-    );
-  }
 
   return (
     <AppTheme {...props}>

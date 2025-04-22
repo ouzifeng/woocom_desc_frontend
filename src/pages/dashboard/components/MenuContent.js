@@ -47,7 +47,6 @@ const mainListItems = [
 
 const secondaryListItems = [
   { text: 'Your Brands', icon: <BusinessRoundedIcon />, link: '/your-brands' },
-  { text: 'Brand Strategy', icon: <PeopleRoundedIcon />, link: '/brand-strategy' },
   { text: 'Brand Settings', icon: <BusinessRoundedIcon />, link: '/brand-settings' },
   { text: 'Integrations', icon: <SettingsRoundedIcon />, link: '/settings' },
   { text: 'Credit FAQ', icon: <InfoRoundedIcon /> },
@@ -199,13 +198,16 @@ export default function MenuContent() {
             ))}
 
             {/* Credits chip */}
-            <ListItem sx={{ display: 'block', py: 1 }}>
+            <ListItem sx={{ display: 'block', py: 1, '& .MuiButtonBase-root': { opacity: 1 } }}>
               <Chip
                 icon={<AutoAwesomeIcon />}
                 label={`${credits} credits left`}
                 color="primary"
                 variant="outlined"
                 size="large"
+                component={Link}
+                to="/checkout"
+                clickable
                 sx={{
                   width: '100%',
                   borderColor: 'primary.main',

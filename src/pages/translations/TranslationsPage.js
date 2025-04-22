@@ -2,17 +2,21 @@ import React, { useState } from 'react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useUser } from '../../contexts/UserContext';
+import { useBrand } from '../../contexts/BrandContext';
 import LanguageProductTable from './components/LanguageProductTable';
 
 const TranslationsPage = () => {
   const [deleteTranslationsFunc, setDeleteTranslationsFunc] = useState(null);
   const [languages, setLanguages] = useState([]);
   const user = useUser();
+  const { activeBrandId } = useBrand();
 
   const handleDeleteLanguage = async (languageToDelete) => {
+    if (!user || !activeBrandId) return;
+    
     try {
       // First delete the language from settings
-      const languageSettingsRef = doc(db, 'users', user.uid, 'settings', 'languages');
+      const languageSettingsRef = doc(db, 'users', user.uid, 'brands', activeBrandId, 'settings', 'languages');
       const currentSettings = await getDoc(languageSettingsRef);
       const currentLanguages = currentSettings.data()?.languages || [];
       
@@ -36,6 +40,7 @@ const TranslationsPage = () => {
   return (
     <LanguageProductTable
       onDeleteLanguage={setDeleteTranslationsFunc}
+      brandId={activeBrandId}
     />
   );
 };

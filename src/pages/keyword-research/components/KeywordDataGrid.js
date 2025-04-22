@@ -13,6 +13,7 @@ import {
   CircularProgress,
   Snackbar,
   Alert,
+  Tooltip,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
@@ -159,122 +160,116 @@ export default function KeywordDataGrid({
   const [isBulkSaving, setIsBulkSaving] = useState(false);
 
   const handleSaveToggle = async (keywordObj) => {
-    if (!user || !activeBrandId) return;
+    if (!user || !activeBrandId) {
+      setSnackbar({
+        open: true,
+        message: 'Please select a brand first',
+        severity: 'error'
+      });
+      return;
+    }
 
     const alreadySaved = savedKeywords.some((k) => k.keyword === keywordObj.keyword);
     try {
+      // Create a sanitized doc ID from the keyword
+      const docId = `keyword_${Date.now()}`;
+      
       if (alreadySaved) {
-        // Find the saved keyword with this keyword text
+        // Find the saved keyword document ID
         const savedKeyword = savedKeywords.find(k => k.keyword === keywordObj.keyword);
-        if (!savedKeyword) {
-          console.error('Could not find saved keyword to remove');
-          return;
+        if (savedKeyword && savedKeyword.id) {
+          // Remove using the stored ID
+          await deleteDoc(
+            doc(db, 'users', user.uid, 'brands', activeBrandId, 'savedKeywords', savedKeyword.id)
+          );
+          onRemoveKeyword?.(keywordObj);
+        } else {
+          console.error('Could not find the saved keyword ID');
+          throw new Error('Could not find the saved keyword ID');
         }
-        
-        // Use the document ID from the saved keyword
-        const keywordId = savedKeyword.id;
-        
-        if (!keywordId) {
-          console.error('Saved keyword missing document ID');
-          return;
-        }
-        
-        // Remove the keyword using its document ID
-        await deleteDoc(
-          doc(db, 'users', user.uid, 'brands', activeBrandId, 'savedKeywords', keywordId)
-        );
-        onRemoveKeyword?.(keywordObj);
       } else {
-        // add a new keyword
-        const keywordId = `keyword_${Date.now()}`;
+        // Add with a new generated ID
         await setDoc(
-          doc(db, 'users', user.uid, 'brands', activeBrandId, 'savedKeywords', keywordId),
+          doc(db, 'users', user.uid, 'brands', activeBrandId, 'savedKeywords', docId),
           {
             ...keywordObj,
+            id: docId,
             brandId: activeBrandId,
-            savedAt: new Date().toISOString(),
+            savedAt: new Date().toISOString()
           }
         );
         onSaveKeyword?.(keywordObj);
       }
     } catch (err) {
       console.error('Error toggling saved keyword:', err);
+      setSnackbar({
+        open: true,
+        message: `Error ${alreadySaved ? 'removing' : 'saving'} keyword. Please try again.`,
+        severity: 'error'
+      });
     }
   };
 
   // Bulk save/remove selected keywords based on tab context
   const handleBulkOperation = async () => {
-    if (!user || !activeBrandId || !rowSelectionModel || rowSelectionModel.length === 0) return;
+    if (!user || !activeBrandId) {
+      setSnackbar({
+        open: true,
+        message: 'Please select a brand first',
+        severity: 'error'
+      });
+      return;
+    }
+    
+    if (rowSelectionModel.length === 0) return;
 
     setIsBulkSaving(true);
     try {
-      // Safely get selected rows - ensure we're dealing with arrays
-      const selectedRows = Array.isArray(filteredRows) && Array.isArray(rowSelectionModel) 
-        ? filteredRows.filter(row => rowSelectionModel.includes(row.id))
-        : [];
-        
-      if (selectedRows.length === 0) {
-        console.error('No valid rows selected for bulk operation');
-        setSnackbar({
-          open: true,
-          message: 'No valid rows selected',
-          severity: 'error'
-        });
-        setIsBulkSaving(false);
-        return;
-      }
-      
+      const selectedRows = filteredRows.filter(row => rowSelectionModel.includes(row.id));
       let operationCount = 0;
       
       // Create a batch
       const batch = writeBatch(db);
       
       if (isSavedWordsTab) {
-        // In Saved Words tab, remove the keywords using their document IDs
+        // In Saved Words tab, remove the keywords
         for (const row of selectedRows) {
-          // The document ID should be in the row.id field (if loaded from Firestore)
-          if (!row || !row.id) {
-            console.error('Saved keyword missing document ID:', row);
-            continue;
+          if (row.id) {
+            const ref = doc(db, 'users', user.uid, 'brands', activeBrandId, 'savedKeywords', row.id);
+            batch.delete(ref);
           }
-          
-          const ref = doc(db, 'users', user.uid, 'brands', activeBrandId, 'savedKeywords', row.id);
-          batch.delete(ref);
-          if (typeof onRemoveKeyword === 'function') {
-            onRemoveKeyword(row);
-          }
-          operationCount++;
         }
       } else {
         // In Research tab, add new keywords (skip existing ones)
         for (const row of selectedRows) {
-          if (!row || !row.keyword) {
-            console.error('Invalid row for saving:', row);
-            continue;
-          }
-          
-          const alreadySaved = Array.isArray(savedKeywords) 
-            ? savedKeywords.some(k => k && k.keyword === row.keyword)
-            : false;
-            
+          const alreadySaved = savedKeywords.some((k) => k.keyword === row.keyword);
           if (!alreadySaved) {
-            const keywordId = `keyword_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-            const ref = doc(db, 'users', user.uid, 'brands', activeBrandId, 'savedKeywords', keywordId);
+            const docId = `keyword_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+            const ref = doc(db, 'users', user.uid, 'brands', activeBrandId, 'savedKeywords', docId);
             batch.set(ref, {
               ...row,
+              id: docId,
               brandId: activeBrandId,
-              savedAt: new Date().toISOString(),
+              savedAt: new Date().toISOString()
             });
-            if (typeof onSaveKeyword === 'function') {
-              onSaveKeyword(row);
-            }
-            operationCount++;
           }
         }
       }
       
       // Commit the batch
       await batch.commit();
+      
+      // Update client state
+      if (isSavedWordsTab) {
+        selectedRows.forEach(row => onRemoveKeyword?.(row));
+        operationCount = selectedRows.length;
+      } else {
+        const newlyAdded = selectedRows.filter(row => 
+          !savedKeywords.some((k) => k.keyword === row.keyword)
+        );
+        newlyAdded.forEach(row => onSaveKeyword?.(row));
+        operationCount = newlyAdded.length;
+      }
       
       // Clear selection before updating rows to prevent the error
       setRowSelectionModel([]);
@@ -295,11 +290,77 @@ export default function KeywordDataGrid({
       }
     } catch (err) {
       console.error('Error in bulk operation:', err);
-      setSnackbar({
-        open: true,
-        message: `Error ${isSavedWordsTab ? 'removing' : 'saving'} keywords. Please try again.`,
-        severity: 'error'
-      });
+      
+      // If batch fails, try individual operations
+      try {
+        const selectedRows = filteredRows.filter(row => rowSelectionModel.includes(row.id));
+        let operationCount = 0;
+        
+        if (isSavedWordsTab) {
+          // In Saved Words tab, remove the keywords one by one
+          for (const row of selectedRows) {
+            if (row.id) {
+              try {
+                await deleteDoc(
+                  doc(db, 'users', user.uid, 'brands', activeBrandId, 'savedKeywords', row.id)
+                );
+                onRemoveKeyword?.(row);
+                operationCount++;
+              } catch (individualErr) {
+                console.error(`Error removing keyword: ${row.keyword}`, individualErr);
+              }
+            }
+          }
+        } else {
+          // In Research tab, add new keywords one by one
+          for (const row of selectedRows) {
+            const alreadySaved = savedKeywords.some((k) => k.keyword === row.keyword);
+            if (!alreadySaved) {
+              try {
+                const docId = `keyword_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+                await setDoc(
+                  doc(db, 'users', user.uid, 'brands', activeBrandId, 'savedKeywords', docId),
+                  {
+                    ...row,
+                    id: docId,
+                    brandId: activeBrandId,
+                    savedAt: new Date().toISOString()
+                  }
+                );
+                onSaveKeyword?.(row);
+                operationCount++;
+              } catch (individualErr) {
+                console.error(`Error saving keyword: ${row.keyword}`, individualErr);
+              }
+            }
+          }
+        }
+        
+        // Clear selection
+        setRowSelectionModel([]);
+        
+        // Show success message if any operation succeeded
+        if (operationCount > 0) {
+          setSnackbar({
+            open: true,
+            message: `Successfully ${isSavedWordsTab ? 'removed' : 'added'} ${operationCount} keywords`,
+            severity: 'success'
+          });
+        } else {
+          setSnackbar({
+            open: true,
+            message: `Error ${isSavedWordsTab ? 'removing' : 'saving'} keywords. Please try again.`,
+            severity: 'error'
+          });
+        }
+      } catch (fallbackErr) {
+        console.error('Error in fallback operation:', fallbackErr);
+        setSnackbar({
+          open: true,
+          message: `Error ${isSavedWordsTab ? 'removing' : 'saving'} keywords. Please try again.`,
+          severity: 'error'
+        });
+      }
     } finally {
       setIsBulkSaving(false);
     }
@@ -326,9 +387,7 @@ export default function KeywordDataGrid({
         width: 70,
         sortable: false,
         renderCell: (params) => {
-          const isSaved = Array.isArray(savedKeywords) 
-            ? savedKeywords.some(k => k && k.keyword === params.row.keyword)
-            : false;
+          const isSaved = savedKeywords.some((k) => k.keyword === params.row.keyword);
           return (
             <IconButton
               size="small"
@@ -578,11 +637,6 @@ export default function KeywordDataGrid({
         autoHideDuration={6000} 
         onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-        slotProps={{ 
-          clickAwayListener: { 
-            disableReactTree: true 
-          } 
-        }}
       >
         <Alert 
           onClose={() => setSnackbar(prev => ({ ...prev, open: false }))} 

@@ -50,11 +50,12 @@ export function getDateRangeByLabel(label) {
 export async function fetchCountries() {
   const res = await fetch(`${process.env.REACT_APP_API_URL}/dataforseo/locations/countries`);
   const data = await res.json();
-  return Array.isArray(data.countries) ? data.countries : [];
+  return data.tasks?.[0]?.result || [];
 }
 
 export async function fetchLanguages() {
   const res = await fetch(`${process.env.REACT_APP_API_URL}/dataforseo/languages`);
   const data = await res.json();
+  console.log('Fetched languages data:', data);
   return data.tasks?.[0]?.result || [];
 } 

@@ -17,6 +17,7 @@ import {
   InputLabel,
   Button,
   CircularProgress,
+  Alert,
 } from '@mui/material';
 
 import debounce from 'lodash.debounce';
@@ -38,7 +39,8 @@ export default function LanguageProductTable({
   setRefresh, 
   languageCode,
   isMainTab,
-  onDeleteLanguage
+  onDeleteLanguage,
+  brandId
 }) {
   const [user] = useAuthState(auth);
   const [rows, setRows] = useState([]);
@@ -104,10 +106,10 @@ export default function LanguageProductTable({
   };
 
   const fetchData = useCallback(async () => {
-    if (!user) return;
+    if (!user || !brandId) return;
 
     try {
-      const productsCollection = collection(db, 'users', user.uid, 'products');
+      const productsCollection = collection(db, 'users', user.uid, 'brands', brandId, 'products');
       const productsSnapshot = await getDocs(productsCollection);
       const products = productsSnapshot.docs.map((docSnap) => {
         const data = docSnap.data();
@@ -134,11 +136,11 @@ export default function LanguageProductTable({
       console.error('Error fetching products:', err);
       setError(err.message);
     }
-  }, [user, languageCode, isMainTab]);
+  }, [user, brandId, languageCode, isMainTab]);
 
   useEffect(() => {
     fetchData();
-  }, [user, refresh, fetchData]);
+  }, [user, brandId, refresh, fetchData]);
 
   // Debounced filter logic
   const debouncedFilter = useMemo(() =>
@@ -173,25 +175,25 @@ export default function LanguageProductTable({
   }, [searchTerm, translatedFilter, rows, debouncedFilter]);
 
   const handleTranslatedChange = useCallback(async (id, checked) => {
-    if (!user) return;
+    if (!user || !brandId) return;
 
     try {
-      const productDocRef = doc(db, 'users', user.uid, 'products', String(id));
+      const productDocRef = doc(db, 'users', user.uid, 'brands', brandId, 'products', String(id));
       await updateDoc(productDocRef, { translated: checked });
       setRefresh((prev) => !prev);
     } catch (err) {
       console.error('Error updating product:', err);
     }
-  }, [user, setRefresh]);
+  }, [user, brandId, setRefresh]);
 
   const handleStartTranslation = useCallback(async (productIds) => {
-    if (!user) return;
+    if (!user || !brandId) return;
     
     try {
       const batch = writeBatch(db);
       
       productIds.forEach(productId => {
-        const productRef = doc(db, 'users', user.uid, 'products', productId);
+        const productRef = doc(db, 'users', user.uid, 'brands', brandId, 'products', productId);
         batch.update(productRef, {
           [`${languageCode}_name`]: '',
           [`${languageCode}_description`]: '',
@@ -200,25 +202,21 @@ export default function LanguageProductTable({
       });
 
       await batch.commit();
-      setRefresh(prev => !prev);
-    } catch (error) {
-      console.error('Error starting translation:', error);
+      setRefresh((prev) => !prev);
+    } catch (err) {
+      console.error('Error clearing translations:', err);
     }
-  }, [user, languageCode, setRefresh]);
+  }, [user, brandId, languageCode, setRefresh]);
 
   const handleAutoTranslate = useCallback(async (productId, originalName, originalDescription) => {
-    if (!user) return;
-
+    if (!user || !brandId || !languageCode) return;
+    
+    setTranslatingProductId(productId);
+    setTranslationStatus('Translating...');
+    
     try {
-      setTranslatingProductId(productId);
-      setTranslationStatus('Sending translation to the translation agent...');
-
-      const languageName = languages.find(lang => lang.code === languageCode)?.name || languageCode;
-
-      console.log('Sending for translation:', {
-        name: originalName,
-        description: originalDescription
-      });
+      const foundLang = languages.find(lang => lang.code === languageCode);
+      const targetLanguage = foundLang ? foundLang.name : languageCode;
 
       const response = await fetch(`${process.env.REACT_APP_API_URL}/translations/translate-content`, {
         method: 'POST',
@@ -230,40 +228,35 @@ export default function LanguageProductTable({
             name: originalName,
             description: originalDescription
           },
-          targetLanguage: languageName,
-          languageCode: languageCode
+          languageCode: languageCode,
+          targetLanguage: targetLanguage
         }),
       });
 
       const data = await response.json();
-      console.log('Translation response:', data);
       
       if (data.result === 'Success') {
         setTranslationStatus('Translation success!');
-        const productRef = doc(db, 'users', user.uid, 'products', productId);
+        const productRef = doc(db, 'users', user.uid, 'brands', brandId, 'products', productId);
         await updateDoc(productRef, {
           [`${languageCode}_name`]: data.translatedContent.name,
-          [`${languageCode}_description`]: data.translatedContent.description,
-          translated: true
+          [`${languageCode}_description`]: data.translatedContent.description
         });
-
-        setTimeout(() => {
-          setTranslationStatus('');
-          setTranslatingProductId(null);
-        }, 3000);
-
-        await fetchData();
         setRefresh(prev => !prev);
+      } else {
+        setTranslationStatus('Translation failed: ' + (data.message || 'Unknown error'));
       }
     } catch (error) {
-      console.error('Error auto-translating:', error);
-      setTranslationStatus('Translation failed');
+      console.error('Error translating content:', error);
+      setTranslationStatus('Translation error: ' + error.message);
+    } finally {
+      // Clear status after 3 seconds
       setTimeout(() => {
         setTranslationStatus('');
         setTranslatingProductId(null);
       }, 3000);
     }
-  }, [user, languageCode, setRefresh, fetchData]);
+  }, [user, brandId, languageCode, setRefresh]);
 
   // Update columns definition based on language
   const columns = useMemo(() => {
@@ -407,7 +400,7 @@ export default function LanguageProductTable({
                   );
                 } else {
                   // If turning off, remove translations
-                  const productRef = doc(db, 'users', user.uid, 'products', params.row.id);
+                  const productRef = doc(db, 'users', user.uid, 'brands', brandId, 'products', params.row.id);
                   updateDoc(productRef, {
                     [`${languageCode}_name`]: '',
                     [`${languageCode}_description`]: '',
@@ -426,16 +419,16 @@ export default function LanguageProductTable({
 
   // Add handler for cell editing
   const handleCellEdit = async (params) => {
-    if (!user) return;
+    if (!user || !brandId) return;
 
     try {
-      const productDocRef = doc(db, 'users', user.uid, 'products', String(params.id));
+      const productDocRef = doc(db, 'users', user.uid, 'brands', brandId, 'products', String(params.id));
       await updateDoc(productDocRef, {
         [params.field]: params.value
       });
       setRefresh(prev => !prev);
     } catch (err) {
-      console.error('Error updating translation:', err);
+      console.error('Error updating product:', err);
     }
   };
 
@@ -453,19 +446,21 @@ export default function LanguageProductTable({
     if (isMainTab) return null;
 
     const handleBatchTranslate = async (checked) => {
-      if (selectedRows.length === 0) return;
+      if (selectedRows.length === 0 || !user || !brandId) return;
 
       if (checked) {
+        // Get original product data for selected rows
+        try {
+          for (const id of selectedRows) {
+            const selectedRow = rows.find(r => r.id === id);
+            if (!selectedRow) continue;
+            
+            setTranslatingProductId(id);
         setTranslationStatus(`Translating ${selectedRows.length} products...`);
         
-        for (const id of selectedRows) {
-          const row = rows.find(r => r.id === id);
-          if (row) {
-            try {
-              setTranslatingProductId(id);
-              const languageName = languages.find(lang => lang.code === languageCode)?.name || languageCode;
-
-              // Remove HTML stripping - send original content
+            const foundLang = languages.find(lang => lang.code === languageCode);
+            const targetLanguage = foundLang ? foundLang.name : languageCode;
+            
               const response = await fetch(`${process.env.REACT_APP_API_URL}/translations/translate-content`, {
                 method: 'POST',
                 headers: {
@@ -473,47 +468,56 @@ export default function LanguageProductTable({
                 },
                 body: JSON.stringify({
                   content: {
-                    name: row.original_name,
-                    description: row.original_description // Send original HTML
+                  name: selectedRow.original_name,
+                  description: selectedRow.original_description
                   },
-                  targetLanguage: languageName,
-                  languageCode: languageCode
+                languageCode: languageCode,
+                targetLanguage: targetLanguage
                 }),
               });
 
               const data = await response.json();
               
               if (data.result === 'Success') {
-                const productRef = doc(db, 'users', user.uid, 'products', id);
+              const productRef = doc(db, 'users', user.uid, 'brands', brandId, 'products', id);
                 await updateDoc(productRef, {
                   [`${languageCode}_name`]: data.translatedContent.name,
-                  [`${languageCode}_description`]: data.translatedContent.description, // Use HTML as-is
-                  translated: true
-                });
-              }
-            } catch (error) {
-              console.error(`Error translating product ${id}:`, error);
+                [`${languageCode}_description`]: data.translatedContent.description
+              });
+            } else {
+              console.error('Translation failed for product:', id);
             }
           }
+          
+          setRefresh(prev => !prev);
+          setTranslationStatus('Translation complete!');
+        } catch (err) {
+          console.error('Error batch translating:', err);
+          setTranslationStatus('Translation error');
+        } finally {
+          setTimeout(() => {
+            setTranslationStatus('');
+            setTranslatingProductId(null);
+          }, 3000);
         }
       } else {
-        // If turning off translations, use batch update
+        // If turning off, clear all translations for selected items
+        try {
         const batch = writeBatch(db);
         selectedRows.forEach(id => {
-          const productRef = doc(db, 'users', user.uid, 'products', id);
+            const productRef = doc(db, 'users', user.uid, 'brands', brandId, 'products', id);
           batch.update(productRef, {
             [`${languageCode}_name`]: '',
-            [`${languageCode}_description`]: '',
-            translated: false
+              [`${languageCode}_description`]: ''
+            });
           });
-        });
+          
         await batch.commit();
+          setRefresh(prev => !prev);
+        } catch (err) {
+          console.error('Error clearing translations:', err);
+        }
       }
-
-      // Only refresh once after all operations are complete
-      setTranslationStatus('');
-      setTranslatingProductId(null);
-      setRefresh(prev => !prev);
     };
 
     return (
@@ -540,6 +544,7 @@ export default function LanguageProductTable({
             selectedRows={selectedRows}
             languageCode={languageCode}
             isMainTab={isMainTab}
+            brandId={brandId}
           />
         </Box>
       </GridToolbarContainer>
@@ -552,25 +557,27 @@ export default function LanguageProductTable({
   }, [languageCode]);
 
   const deleteLanguageTranslations = async (languageToDelete) => {
-    if (!user) return;
+    if (!user || !brandId) return;
     
     try {
-      const productsCollection = collection(db, 'users', user.uid, 'products');
+      const productsCollection = collection(db, 'users', user.uid, 'brands', brandId, 'products');
       const productsSnapshot = await getDocs(productsCollection);
       
       const batch = writeBatch(db);
-      productsSnapshot.docs.forEach((doc) => {
-        batch.update(doc.ref, {
+      
+      productsSnapshot.docs.forEach(doc => {
+        const productRef = doc.ref;
+        const updates = {
           [`${languageToDelete}_name`]: deleteField(),
           [`${languageToDelete}_description`]: deleteField()
-        });
+        };
+        batch.update(productRef, updates);
       });
       
       await batch.commit();
-      setRefresh(prev => !prev);
       return true;
     } catch (error) {
-      console.error('Error deleting translations:', error);
+      console.error('Error deleting language translations:', error);
       return false;
     }
   };

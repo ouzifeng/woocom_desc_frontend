@@ -7,12 +7,17 @@ import Drawer, { drawerClasses } from '@mui/material/Drawer';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
-import NotificationsRoundedIcon from '@mui/icons-material/NotificationsRounded';
+import CloseIcon from '@mui/icons-material/Close';
 import MenuButton from './MenuButton';
 import MenuContent from './MenuContent';
 import CardAlert from './CardAlert';
+import Tooltip from '@mui/material/Tooltip';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from '../../../firebase';
 
 function SideMenuMobile({ open, toggleDrawer }) {
+  const [user] = useAuthState(auth);
+  
   return (
     <Drawer
       anchor="right"
@@ -39,16 +44,27 @@ function SideMenuMobile({ open, toggleDrawer }) {
           >
             <Avatar
               sizes="small"
-              alt="Riley Carter"
-              src="/static/images/avatar/7.jpg"
+              alt={user?.email || "User"}
+              src={user?.photoURL}
               sx={{ width: 24, height: 24 }}
             />
-            <Typography component="p" variant="h6">
-              Riley Carter
-            </Typography>
+            <Tooltip title={user?.email || "User"}>
+              <Typography 
+                component="p" 
+                variant="h6"
+                sx={{
+                  maxWidth: '150px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {user?.email || "User"}
+              </Typography>
+            </Tooltip>
           </Stack>
-          <MenuButton showBadge>
-            <NotificationsRoundedIcon />
+          <MenuButton onClick={toggleDrawer(false)}>
+            <CloseIcon />
           </MenuButton>
         </Stack>
         <Divider />
@@ -69,7 +85,7 @@ function SideMenuMobile({ open, toggleDrawer }) {
 
 SideMenuMobile.propTypes = {
   open: PropTypes.bool,
-  toggleDrawer: PropTypes.func.isRequired,
+  toggleDrawer: PropTypes.func.isRequired
 };
 
 export default SideMenuMobile;

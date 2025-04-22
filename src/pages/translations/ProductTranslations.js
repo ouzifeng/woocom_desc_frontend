@@ -28,6 +28,8 @@ import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import Button from '@mui/material/Button';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import { useBrand } from '../../contexts/BrandContext';
+import Alert from '@mui/material/Alert';
 
 function TabPanel(props) {
   const { children, value, index, ...other } = props;
@@ -51,6 +53,7 @@ function TabPanel(props) {
 
 export default function ProductTranslations(props) {
   const [user] = useAuthState(auth);
+  const { activeBrandId } = useBrand();
   const [loading, setLoading] = React.useState(true);
   const [tabValue, setTabValue] = React.useState(0);
   const [refresh, setRefresh] = React.useState(false);
@@ -65,11 +68,11 @@ export default function ProductTranslations(props) {
   // Load user's language preferences from Firestore
   React.useEffect(() => {
     const loadLanguagePreferences = async () => {
-      if (!user) return;
+      if (!user || !activeBrandId) return;
 
       setLoading(true);
       try {
-        const userPrefsRef = doc(db, 'users', user.uid, 'settings', 'translations');
+        const userPrefsRef = doc(db, 'users', user.uid, 'brands', activeBrandId, 'settings', 'translations');
         const prefsDoc = await getDoc(userPrefsRef);
         
         if (prefsDoc.exists() && prefsDoc.data().languages) {
@@ -87,7 +90,7 @@ export default function ProductTranslations(props) {
     };
 
     loadLanguagePreferences();
-  }, [user]);
+  }, [user, activeBrandId]);
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
@@ -102,7 +105,7 @@ export default function ProductTranslations(props) {
   };
 
   const handleLanguageSelect = async (language) => {
-    if (!user) return;
+    if (!user || !activeBrandId) return;
     
     // Close the menu
     handleClose();
@@ -121,7 +124,7 @@ export default function ProductTranslations(props) {
 
     try {
       // Update Firestore with the new language
-      const userPrefsRef = doc(db, 'users', user.uid, 'settings', 'translations');
+      const userPrefsRef = doc(db, 'users', user.uid, 'brands', activeBrandId, 'settings', 'translations');
       const newTabs = [...tabs, newLanguage];
       
       await setDoc(userPrefsRef, {
@@ -145,18 +148,18 @@ export default function ProductTranslations(props) {
   };
 
   const handleDeleteConfirm = async () => {
-    if (!user || !tabToDelete) return;
+    if (!user || !activeBrandId || !tabToDelete) return;
 
     try {
       // Start a batch write
       const batch = writeBatch(db);
 
       // 1. Remove language fields from all products
-      const productsCollection = collection(db, 'users', user.uid, 'products');
+      const productsCollection = collection(db, 'users', user.uid, 'brands', activeBrandId, 'products');
       const productsSnapshot = await getDocs(productsCollection);
 
       productsSnapshot.docs.forEach((productDoc) => {
-        const productRef = doc(db, 'users', user.uid, 'products', productDoc.id);
+        const productRef = doc(db, 'users', user.uid, 'brands', activeBrandId, 'products', productDoc.id);
         batch.update(productRef, {
           [`${tabToDelete.code}_name`]: deleteField(),
           [`${tabToDelete.code}_description`]: deleteField()
@@ -164,7 +167,7 @@ export default function ProductTranslations(props) {
       });
 
       // 2. Remove language from user preferences
-      const userPrefsRef = doc(db, 'users', user.uid, 'settings', 'translations');
+      const userPrefsRef = doc(db, 'users', user.uid, 'brands', activeBrandId, 'settings', 'translations');
       const newTabs = tabs.filter((_, index) => index !== tabToDelete.index);
       
       batch.set(userPrefsRef, {
@@ -229,63 +232,74 @@ export default function ProductTranslations(props) {
                   Translate your product descriptions into multiple languages
                 </Typography>
 
-                <Box sx={{ borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center' }}>
-                  <Tabs 
-                    value={tabValue} 
-                    onChange={handleTabChange}
-                    aria-label="translation tabs"
-                    sx={{ flex: 1 }}
-                  >
-                    {tabs.map((tab, index) => (
-                      <Tab 
-                        key={tab.code}
-                        label={
-                          <Box sx={{ display: 'flex', alignItems: 'center', paddingLeft: '10px', paddingRight: '10px' }}>
-                            {tab.name}
-                            {tab.isDeletable && (
-                              <IconButton
-                                size="small"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteTabClick(tab.code, index);
-                                }}
-                                sx={{ ml: 1 }}
-                              >
-                                <CloseIcon fontSize="small" />
-                              </IconButton>
-                            )}
-                          </Box>
-                        }
-                      />
-                    ))}
-                  </Tabs>
-                  <IconButton 
-                    onClick={handleAddClick}
-                    sx={{ ml: 1, mb: 1 }}
-                    size="small"
-                  >
-                    <AddIcon />
-                  </IconButton>
-                </Box>
+                {!activeBrandId && (
+                  <Alert severity="warning" sx={{ mb: 3 }}>
+                    Please select a brand to manage translations
+                  </Alert>
+                )}
 
-                <LanguageOptions
-                  anchorEl={anchorEl}
-                  open={Boolean(anchorEl)}
-                  onClose={handleClose}
-                  onSelect={handleLanguageSelect}
-                />
+                {activeBrandId && (
+                  <>
+                    <Box sx={{ borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center' }}>
+                      <Tabs 
+                        value={tabValue} 
+                        onChange={handleTabChange}
+                        aria-label="translation tabs"
+                        sx={{ flex: 1 }}
+                      >
+                        {tabs.map((tab, index) => (
+                          <Tab 
+                            key={tab.code}
+                            label={
+                              <Box sx={{ display: 'flex', alignItems: 'center', paddingLeft: '10px', paddingRight: '10px' }}>
+                                {tab.name}
+                                {tab.isDeletable && (
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteTabClick(tab.code, index);
+                                    }}
+                                    sx={{ ml: 1 }}
+                                  >
+                                    <CloseIcon fontSize="small" />
+                                  </IconButton>
+                                )}
+                              </Box>
+                            }
+                          />
+                        ))}
+                      </Tabs>
+                      <IconButton 
+                        onClick={handleAddClick}
+                        sx={{ ml: 1, mb: 1 }}
+                        size="small"
+                      >
+                        <AddIcon />
+                      </IconButton>
+                    </Box>
 
-                {tabs.map((tab, index) => (
-                  <TabPanel key={tab.code} value={tabValue} index={index}>
-                    <LanguageProductTable 
-                      refresh={refresh}
-                      setRefresh={setRefresh}
-                      setSelectedRows={setSelectedRows}
-                      languageCode={tab.code}
-                      isMainTab={tab.code === 'main'}
+                    <LanguageOptions
+                      anchorEl={anchorEl}
+                      open={Boolean(anchorEl)}
+                      onClose={handleClose}
+                      onSelect={handleLanguageSelect}
                     />
-                  </TabPanel>
-                ))}
+
+                    {tabs.map((tab, index) => (
+                      <TabPanel key={tab.code} value={tabValue} index={index}>
+                        <LanguageProductTable 
+                          refresh={refresh}
+                          setRefresh={setRefresh}
+                          setSelectedRows={setSelectedRows}
+                          languageCode={tab.code}
+                          isMainTab={tab.code === 'main'}
+                          brandId={activeBrandId}
+                        />
+                      </TabPanel>
+                    ))}
+                  </>
+                )}
               </Grid>
             </Grid>
           </Stack>

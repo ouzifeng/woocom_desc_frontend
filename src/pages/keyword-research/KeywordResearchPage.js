@@ -30,6 +30,15 @@ import { fetchCountries, fetchLanguages } from './utils';   // Or place them her
 import SearchControls from './components/SearchControls';
 import KeywordDataGrid from './components/KeywordDataGrid';
 import Alert from '@mui/material/Alert';
+import {
+  Tooltip,
+  Drawer,
+  List,
+  ListItem,
+  ListItemText,
+} from '@mui/material';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import InstructionsDrawer from './components/InstructionsDrawer';
 
 // ----------------------------------------------------------------
 // Simple TabPanel helper
@@ -54,13 +63,14 @@ function TabPanel(props) {
 
 // ----------------------------------------------------------------
 // Caching constants for countries/languages
-const COUNTRIES_CACHE_KEY = 'keyword-research-countries-cache';
-const LANGUAGES_CACHE_KEY = 'keyword-research-languages-cache';
-const CACHE_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+// const COUNTRIES_CACHE_KEY = 'keyword-research-countries-cache';
+// const LANGUAGES_CACHE_KEY = 'keyword-research-languages-cache';
+// const CACHE_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
 export default function KeywordResearchPage(props) {
   const [user] = useAuthState(auth);
   const { activeBrandId } = useBrand();
+  const [instructionsOpen, setInstructionsOpen] = useState(false);
 
   // ------------------ State ------------------
   const [keywords, setKeywords] = useState('');
@@ -105,28 +115,14 @@ export default function KeywordResearchPage(props) {
   const [savedKeywords, setSavedKeywords] = useState([]);
 
   // ----------------------------------------------------------------
-  // Load countries/languages on mount
+  // Load countries/languages on mount - simplified without caching
   useEffect(() => {
     async function loadCountries() {
       setCountriesLoading(true);
       try {
-        // Check local cache
-        const cachedData = localStorage.getItem(COUNTRIES_CACHE_KEY);
-        if (cachedData) {
-          const { data, timestamp } = JSON.parse(cachedData);
-          if (Date.now() - timestamp < CACHE_EXPIRY) {
-            setCountries(data);
-            setCountriesLoading(false);
-            return;
-          }
-        }
-        // Fetch if no cache or expired
+        // Directly fetch without checking cache
         const data = await fetchCountries();
         setCountries(data || []);
-        localStorage.setItem(
-          COUNTRIES_CACHE_KEY,
-          JSON.stringify({ data, timestamp: Date.now() })
-        );
       } catch (err) {
         console.error('Error fetching countries:', err);
       } finally {
@@ -137,23 +133,9 @@ export default function KeywordResearchPage(props) {
     async function loadLanguages() {
       setLanguagesLoading(true);
       try {
-        // Check local cache
-        const cachedData = localStorage.getItem(LANGUAGES_CACHE_KEY);
-        if (cachedData) {
-          const { data, timestamp } = JSON.parse(cachedData);
-          if (Date.now() - timestamp < CACHE_EXPIRY) {
-            setLanguages(data);
-            setLanguagesLoading(false);
-            return;
-          }
-        }
-        // Fetch if no cache or expired
+        // Directly fetch without checking cache
         const data = await fetchLanguages();
         setLanguages(data || []);
-        localStorage.setItem(
-          LANGUAGES_CACHE_KEY,
-          JSON.stringify({ data, timestamp: Date.now() })
-        );
       } catch (err) {
         console.error('Error fetching languages:', err);
       } finally {
@@ -529,16 +511,27 @@ export default function KeywordResearchPage(props) {
             <Header />
             <Grid container spacing={3}>
               <Grid item xs={12} md={12}>
-                <Typography variant="h4" component="h1">
-                  Keyword Research
-                </Typography>
-                <Typography
-                  variant="body1"
-                  color="text.secondary"
-                  sx={{ mt: 1, mb: 3 }}
-                >
-                  Research and find keywords for your business
-                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Box>
+                    <Typography variant="h4" component="h1">
+                      Keyword Research
+                    </Typography>
+                    <Typography
+                      variant="body1"
+                      color="text.secondary"
+                      sx={{ mt: 1, mb: 3 }}
+                    >
+                      Research and find keywords for your business
+                    </Typography>
+                  </Box>
+                  <IconButton 
+                    onClick={() => setInstructionsOpen(true)}
+                    color="primary"
+                    sx={{ mt: -2 }}
+                  >
+                    <HelpOutlineIcon />
+                  </IconButton>
+                </Box>
               </Grid>
 
               {!activeBrandId && (
@@ -557,46 +550,11 @@ export default function KeywordResearchPage(props) {
                       onChange={handleTabChange}
                       aria-label="keyword research tabs"
                     >
-                      {/* Render the "real" research tabs */}
                       {tabs.map((tab) => (
                         <Tab 
                           key={tab.id}
                           label={
-                            editingTabId === tab.id ? (
-                              <ClickAwayListener onClickAway={handleTabNameSave}>
-                                <TextField
-                                  size="small"
-                                  value={editingTabName}
-                                  onChange={handleTabNameChange}
-                                  onKeyDown={(e) => {
-                                    // Stop propagation for all keys to prevent tab switching
-                                    e.stopPropagation();
-                                    
-                                    if (e.key === 'Enter') {
-                                      e.preventDefault();
-                                      handleTabNameSave();
-                                    }
-                                    if (e.key === 'Escape') {
-                                      e.preventDefault();
-                                      setEditingTabId(null);
-                                      setEditingTabName('');
-                                    }
-                                  }}
-                                  onClick={(e) => e.stopPropagation()}
-                                  autoFocus
-                                  sx={{
-                                    '& .MuiInputBase-root': {
-                                      height: '24px',
-                                      fontSize: '0.875rem',
-                                      backgroundColor: 'white',
-                                    },
-                                    '& input': {
-                                      userSelect: 'none'
-                                    }
-                                  }}
-                                />
-                              </ClickAwayListener>
-                            ) : (
+                            <Tooltip title="Double click to rename this research tab">
                               <Box 
                                 sx={{ 
                                   display: 'flex', 
@@ -607,7 +565,7 @@ export default function KeywordResearchPage(props) {
                               >
                                 {tab.label}
                                 {tab.isDeletable && (
-                                  <span  // Use span instead of Box to avoid button nesting
+                                  <span
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleDeleteTab(tabs.indexOf(tab));
@@ -622,26 +580,30 @@ export default function KeywordResearchPage(props) {
                                   </span>
                                 )}
                               </Box>
-                            )
+                            </Tooltip>
                           }
                         />
                       ))}
-                      {/* The plus tab (index == tabs.length) */}
                       <Tab 
                         icon={
-                          <span onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleAddTab();
-                          }}>
-                            <AddIcon />
-                          </span>
+                          <Tooltip title="Add a new research tab">
+                            <span onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleAddTab();
+                            }}>
+                              <AddIcon />
+                            </span>
+                          </Tooltip>
                         }
                         sx={{ minWidth: '50px' }}
                       />
-                      {/* Saved Words tab (index == tabs.length+1) */}
                       <Tab
-                        label="Saved Words"
+                        label={
+                          <Tooltip title="View all your saved keywords">
+                            <span>Saved Words</span>
+                          </Tooltip>
+                        }
                         sx={{
                           borderLeft: 1,
                           borderColor: 'divider',
@@ -701,6 +663,10 @@ export default function KeywordResearchPage(props) {
           </Stack>
         </Box>
       </Box>
+      <InstructionsDrawer 
+        open={instructionsOpen} 
+        onClose={() => setInstructionsOpen(false)} 
+      />
     </AppTheme>
   );
 }

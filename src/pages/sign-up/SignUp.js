@@ -125,6 +125,30 @@ export default function SignUp(props) {
     return isValid;
   };
 
+  // Add this function to send user data to Brevo
+  const addUserToBrevo = async (userEmail, userFirstName) => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/brevo/add-contact`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: userEmail,
+          firstName: userFirstName,
+          lastName: '',
+          brandName: 'Brand 1'
+        }),
+      });
+      
+      const data = await response.json();
+      console.log('User added to Brevo:', data);
+    } catch (error) {
+      // Don't block the signup process if Brevo fails
+      console.error('Error adding user to Brevo:', error);
+    }
+  };
+
   const handleGoogleSignUp = async () => {
     const provider = new GoogleAuthProvider();
     try {
@@ -167,6 +191,9 @@ export default function SignUp(props) {
 
       // Save the active brand ID to localStorage
       localStorage.setItem('activeBrandId', brandId);
+
+      // Add user to Brevo
+      await addUserToBrevo(user.email, user.displayName);
 
       console.log('Firestore documents created for Google user:', user.uid);
 
@@ -227,6 +254,9 @@ export default function SignUp(props) {
 
       // Save the active brand ID to localStorage
       localStorage.setItem('activeBrandId', brandId);
+
+      // Add user to Brevo
+      await addUserToBrevo(email, firstName);
 
       console.log('Firestore documents created for user:', user.uid);
 

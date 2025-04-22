@@ -11,6 +11,8 @@ import MenuItem from '@mui/material/MenuItem';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Switch from '@mui/material/Switch';
 import Button from '@mui/material/Button';
+import Tooltip from '@mui/material/Tooltip';
+import SearchIcon from '@mui/icons-material/Search';
 
 export default function SearchControls({
   keywords,
@@ -57,105 +59,83 @@ export default function SearchControls({
       </Box>
 
       {/* Search filters row */}
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        flexWrap: 'wrap',
-        gap: 2,
-        mb: 2 
-      }}>
-        <TextField
-          label="Enter keywords (comma separated, max 20)"
-          value={keywords}
-          onChange={(e) => setKeywords(e.target.value)}
-          placeholder="e.g., japanese knives, gyuto knife"
-          size="small"
-          sx={{ flexGrow: 1 }}
-        />
-
-        <FormControl size="small" sx={{ minWidth: 120 }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <TextField
+            fullWidth
+            label="Keywords"
+            value={keywords}
+            onChange={(e) => setKeywords(e.target.value)}
+            placeholder="Enter keywords (comma separated)"
+            size="small"
+          />
           <Autocomplete
             options={countries}
-            loading={countriesLoading}
+            getOptionLabel={(option) => option?.location_name || ''}
             value={country}
-            onChange={(e, val) => setCountry(val)}
-            getOptionLabel={(option) => option.location_name || ''}
-            size="small"
-            sx={{ width: 200 }}
+            onChange={(_, newValue) => setCountry(newValue)}
             renderInput={(params) => (
               <TextField
                 {...params}
                 label="Country"
                 size="small"
-                InputProps={{
-                  ...params.InputProps,
-                  endAdornment: (
-                    <>
-                      {countriesLoading && <CircularProgress size={20} />}
-                      {params.InputProps.endAdornment}
-                    </>
-                  ),
-                }}
+                fullWidth
               />
             )}
+            sx={{ minWidth: 200 }}
+            isOptionEqualToValue={(option, value) => option?.location_code === value?.location_code}
           />
-        </FormControl>
-
-        <FormControl size="small" sx={{ minWidth: 120 }}>
           <Autocomplete
             options={languages}
-            loading={languagesLoading}
+            getOptionLabel={(option) => option?.language_name || ''}
             value={language}
-            onChange={(e, val) => setLanguage(val)}
-            getOptionLabel={(option) => option.language_name || ''}
-            size="small"
-            sx={{ width: 200 }}
+            onChange={(_, newValue) => setLanguage(newValue)}
             renderInput={(params) => (
               <TextField
                 {...params}
                 label="Language"
                 size="small"
-                InputProps={{
-                  ...params.InputProps,
-                  endAdornment: (
-                    <>
-                      {languagesLoading && <CircularProgress size={20} />}
-                      {params.InputProps.endAdornment}
-                    </>
-                  ),
-                }}
+                fullWidth
               />
             )}
+            sx={{ minWidth: 200 }}
+            isOptionEqualToValue={(option, value) => option?.language_code === value?.language_code}
+            getOptionKey={(option) => option?.language_code || Math.random().toString()}
           />
-        </FormControl>
-
-        <FormControl size="small" sx={{ minWidth: 120 }}>
-          <InputLabel>Date Range</InputLabel>
-          <Select
-            value={rangeLabel}
-            onChange={(e) => setRangeLabel(e.target.value)}
-            label="Date Range"
-          >
-            <MenuItem value="30d">Last 30 days</MenuItem>
-            <MenuItem value="ytd">Year to Date</MenuItem>
-            <MenuItem value="1y">1 Year</MenuItem>
-            <MenuItem value="5y">5 Years</MenuItem>
-          </Select>
-        </FormControl>
-      </Box>
-
-      {/* Partners switch */}
-      <Box sx={{ mb: 2 }}>
-        <FormControlLabel
-          control={
-            <Switch
-              checked={includePartners}
-              onChange={(e) => setIncludePartners(e.target.checked)}
-              size="small"
+          <FormControl size="small" sx={{ minWidth: 200 }}>
+            <InputLabel>Date Range</InputLabel>
+            <Select
+              value={rangeLabel}
+              label="Date Range"
+              onChange={(e) => setRangeLabel(e.target.value)}
+            >
+              <MenuItem value="last_30_days">Last 30 Days</MenuItem>
+              <MenuItem value="last_90_days">Last 90 Days</MenuItem>
+              <MenuItem value="last_12_months">Last 12 Months</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Tooltip title="Include data from Google's search partner network to get a broader view of search activity.">
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={includePartners}
+                  onChange={(e) => setIncludePartners(e.target.checked)}
+                />
+              }
+              label="Include Google Search Partners"
             />
-          }
-          label="Include Google Search Partners"
-        />
+          </Tooltip>
+          <Button
+            variant="contained"
+            onClick={handleSearch}
+            disabled={!keywords.trim()}
+            startIcon={<SearchIcon />}
+          >
+            Search
+          </Button>
+        </Box>
       </Box>
     </>
   );

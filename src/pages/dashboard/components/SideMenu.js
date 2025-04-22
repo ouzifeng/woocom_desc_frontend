@@ -8,7 +8,6 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import MenuIcon from '@mui/icons-material/Menu';
-import Logo from '@mui/icons-material/Web'; // Placeholder logo icon
 import MenuContent from './MenuContent';
 import OptionsMenu from './OptionsMenu';
 import PropTypes from 'prop-types';
@@ -39,13 +38,14 @@ const closedMixin = (theme) => ({
   },
 });
 
-const DrawerHeader = styled('div')(({ theme }) => ({
+const DrawerHeader = styled('div')(({ theme, open }) => ({
   display: 'flex',
   alignItems: 'center',
-  justifyContent: 'space-between', // Changed to space-between for logo and menu
-  padding: theme.spacing(0, 1),
+  justifyContent: open ? 'space-between' : 'center',
+  padding: open ? theme.spacing(0, 1) : theme.spacing(1, 0),
   // necessary for content to be below app bar
   ...theme.mixins.toolbar,
+  position: 'relative',
 }));
 
 const Drawer = styled(MuiDrawer, { shouldForwardProp: (prop) => prop !== 'open' })(
@@ -78,37 +78,48 @@ export default function SideMenu({ user = null }) {
 
   return (
     <Drawer variant="permanent" open={open}>
-      <DrawerHeader>
-        <Box 
-          sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            ml: open ? 1 : 'auto',
-            mr: open ? 'auto' : 'auto'
-          }}
-        >
-          <Logo 
-            sx={{ 
-              fontSize: 28, 
-              color: 'primary.main',
-              display: !open ? 'none' : 'block'
-            }} 
-          />
-          {open && (
-            <Typography 
-              variant="h6" 
+      <DrawerHeader open={open}>
+        {open ? (
+          <>
+            <Box 
               sx={{ 
-                ml: 1, 
-                fontWeight: 'bold' 
+                display: 'flex',
+                alignItems: 'center',
+                flex: 1,
               }}
             >
-              Ecommander
-            </Typography>
-          )}
-        </Box>
-        <IconButton onClick={handleDrawerToggle}>
-          <MenuIcon />
-        </IconButton>
+              <Box
+                component="img"
+                src="/ecommander_logo.png"
+                alt="eCommander Logo"
+                sx={{
+                  height: '35px',
+                  width: '150px',
+                  objectFit: 'contain',
+                  ml: 1,
+                }}
+              />
+            </Box>
+            <IconButton onClick={handleDrawerToggle}>
+              <MenuIcon />
+            </IconButton>
+          </>
+        ) : (
+          <>
+            <IconButton 
+              onClick={handleDrawerToggle}
+              sx={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                padding: 0.5,
+              }}
+            >
+              <MenuIcon />
+            </IconButton>
+          </>
+        )}
       </DrawerHeader>
       <Divider />
       <Box

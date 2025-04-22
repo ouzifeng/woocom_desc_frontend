@@ -1,27 +1,20 @@
 import * as React from 'react';
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { Button, Box } from '@mui/material';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../../../firebase';
 import { collection, getDocs } from 'firebase/firestore';
-import { CSVLink } from 'react-csv';
 
-export default function DownloadTranslationsCSVButton({ selectedRows, languageCode, isMainTab }) {
+export default function DownloadTranslationsCSVButton({ selectedRows, languageCode, isMainTab, brandId }) {
   const [user] = useAuthState(auth);
   const [loading, setLoading] = useState(false);
-  const [csvData, setCsvData] = useState([]);
-  const csvLinkRef = useRef();
 
-  // Escape HTML for safe CSV export - same as original
-  const cleanHTML = (html) => {
-    if (!html) return '';
-    return (
-      html
-        .replace(/"/g, '""')         // Escape internal quotes
-        .replace(/\r?\n|\r/g, ' ')   // Replace newlines with space
-        .replace(/\s+/g, ' ')        // Collapse multiple spaces
-        .trim()
-    );
+  // Properly escape HTML content for CSV
+  const escapeForCSV = (content) => {
+    if (!content) return '';
+    
+    // Double quotes need to be escaped with double quotes for CSV
+    return content.replace(/"/g, '""');
   };
 
   const handleDownload = async () => {
@@ -29,30 +22,50 @@ export default function DownloadTranslationsCSVButton({ selectedRows, languageCo
     setLoading(true);
 
     try {
-      const productsCollection = collection(db, 'users', user.uid, 'products');
+      // Fetch products
+      const productsCollection = collection(db, 'users', user.uid, 'brands', brandId, 'products');
       const productsSnapshot = await getDocs(productsCollection);
       const products = productsSnapshot.docs.map((docSnap) => ({
         id: docSnap.id,
         ...docSnap.data(),
       }));
 
+      // Filter selected products
       const filteredProducts = selectedRows.length > 0
         ? products.filter((product) => selectedRows.includes(product.id))
         : products;
 
-      // Format data with translated fields
-      const formattedData = filteredProducts.map((product) => ({
-        product_id: product.id,
-        name: `"${((product[`${languageCode}_name`] || '').replace(/"/g, '""'))}"`,
-        description: `"${cleanHTML(product[`${languageCode}_description`] || '')}"`,
-      }));
-
-      setCsvData(formattedData);
-      setTimeout(() => {
-        csvLinkRef.current.link.click();
-      }, 0);
+      // Create CSV content manually - this is critical for preserving HTML
+      let csvContent = '\uFEFF'; // UTF-8 BOM for proper encoding
+      
+      // Add headers - REMOVED original columns
+      csvContent += '"Product ID","' + 
+                  `${languageCode.toUpperCase()} Name","${languageCode.toUpperCase()} Description"\r\n`;
+      
+      // Add each row with proper escaping - REMOVED original columns
+      filteredProducts.forEach(product => {
+        const productId = product.id;
+        const translatedName = escapeForCSV(product[`${languageCode}_name`] || '');
+        const translatedDesc = escapeForCSV(product[`${languageCode}_description`] || '');
+        
+        csvContent += `"${productId}","${translatedName}","${translatedDesc}"\r\n`;
+      });
+      
+      // Create a Blob with the CSV content
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      
+      // Create and trigger download link
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `products_${languageCode}_html.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
     } catch (err) {
-      console.error('Error preparing CSV:', err);
+      console.error('Error preparing CSV file:', err);
     } finally {
       setLoading(false);
     }
@@ -70,15 +83,8 @@ export default function DownloadTranslationsCSVButton({ selectedRows, languageCo
         onClick={handleDownload}
         disabled={loading}
       >
-        {loading ? 'Preparing...' : `Download ${languageCode.toUpperCase()} CSV`}
+        {loading ? 'Preparing...' : `Download ${languageCode.toUpperCase()} HTML`}
       </Button>
-      <CSVLink
-        data={csvData}
-        filename={`products_${languageCode}.csv`}
-        enclosingCharacter={''}
-        ref={csvLinkRef}
-        style={{ display: 'none' }}
-      />
     </Box>
   );
 } 

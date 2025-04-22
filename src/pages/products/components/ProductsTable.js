@@ -53,17 +53,31 @@ export default function ProductsTable() {
     rowCount: 0,
   });
 
-  const [statusFilter, setStatusFilter] = useState('');
-  const [improvedFilter, setImprovedFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState(() => {
+    const savedFilters = JSON.parse(localStorage.getItem('productFilters') || '{}');
+    return savedFilters.status || '';
+  });
+  const [improvedFilter, setImprovedFilter] = useState(() => {
+    const savedFilters = JSON.parse(localStorage.getItem('productFilters') || '{}');
+    return savedFilters.improved || '';
+  });
 
   const navigate = useNavigate();
 
   const handleStatusChange = (e) => {
-    setStatusFilter(e.target.value);
+    const newStatus = e.target.value;
+    setStatusFilter(newStatus);
+    const savedFilters = JSON.parse(localStorage.getItem('productFilters') || '{}');
+    savedFilters.status = newStatus;
+    localStorage.setItem('productFilters', JSON.stringify(savedFilters));
   };
 
   const handleImprovedFilterChange = (e) => {
-    setImprovedFilter(e.target.value);
+    const newImproved = e.target.value;
+    setImprovedFilter(newImproved);
+    const savedFilters = JSON.parse(localStorage.getItem('productFilters') || '{}');
+    savedFilters.improved = newImproved;
+    localStorage.setItem('productFilters', JSON.stringify(savedFilters));
   };
 
   const fetchData = useCallback(async () => {
