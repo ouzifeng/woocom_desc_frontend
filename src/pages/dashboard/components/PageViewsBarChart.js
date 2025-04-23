@@ -4,6 +4,7 @@ import { Card, CardContent, Typography, Stack, Chip } from '@mui/material';
 import { BarChart } from '@mui/x-charts/BarChart';
 import { auth } from '../../../firebase';
 import { useBrand } from '../../../contexts/BrandContext';
+import { API_BASE_URL, getCacheKey, getCachedData, setCachedData, getAuthHeaders } from './MainGrid';
 
 // Helper function to parse dates safely
 const parseDate = (dateStr) => {
@@ -62,61 +63,70 @@ const formatDateRange = (startDate, endDate) => {
 export default function PageViewsBarChart({ startDate, endDate }) {
   const theme = useTheme();
   const { activeBrandId } = useBrand();
-  const [labels, setLabels] = React.useState([]);
-  const [views, setViews] = React.useState([]);
+  const [data, setData] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(null);
 
-  const getAuthHeader = async () => {
-    const user = auth.currentUser;
-    if (!user) return null;
-    const token = await user.getIdToken();
-    return {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    };
+  // Clear data when brand changes
+  React.useEffect(() => {
+    setData([]);
+    setLoading(true);
+    setError(null);
+  }, [activeBrandId]);
+
+  const fetchPageViews = async () => {
+    if (!activeBrandId) {
+      setError('Please select a brand first');
+      setLoading(false);
+      setData([]);
+      return;
+    }
+
+    const cacheKey = getCacheKey('page_views', activeBrandId, startDate, endDate);
+    const cachedData = getCachedData(cacheKey);
+
+    if (cachedData) {
+      setData(cachedData);
+      setLoading(false);
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      setError(null);
+      const headers = await getAuthHeaders();
+      if (!headers) {
+        throw new Error('Not authenticated');
+      }
+
+      const res = await fetch(`${API_BASE_URL}/analytics/dashboard/trends?startDate=${startDate}&endDate=${endDate}&brandId=${activeBrandId}`, {
+        headers
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to fetch page views');
+      }
+
+      const json = await res.json();
+      const pageViewsData = json.trends || [];
+      
+      // Cache the data
+      setCachedData(cacheKey, pageViewsData);
+      
+      setData(pageViewsData);
+    } catch (err) {
+      console.error('Error loading page views:', err);
+      setError(err.message || 'Failed to load page views');
+      setData([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   React.useEffect(() => {
-    const fetchData = async () => {
-      if (!activeBrandId) {
-        setError('Please select a brand first');
-        setLoading(false);
-        return;
-      }
-      
-      try {
-        setLoading(true);
-        setError(null);
-        const headers = await getAuthHeader();
-        const apiUrl = `${process.env.NODE_ENV === 'production' 
-          ? 'https://us-central1-apps-84c5e.cloudfunctions.net/api' 
-          : 'http://localhost:5000'}/analytics/dashboard/trends?startDate=${startDate}&endDate=${endDate}&brandId=${activeBrandId}`;
-        
-        const res = await fetch(apiUrl, { headers });
-
-        if (!res.ok) {
-          const errorData = await res.json();
-          throw new Error(errorData.error || 'Failed to fetch page views data');
-        }
-
-        const data = await res.json();
-        const trends = data.trends || [];
-
-        setLabels(trends.map(t => formatDate(t.date)));
-        setViews(trends.map(t => parseInt(t.pageViews || 0, 10)));
-      } catch (err) {
-        console.error('Error loading page views:', err);
-        setError(err.message || 'Failed to load page views data');
-        setLabels([]);
-        setViews([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     if (activeBrandId) {
-      fetchData();
+      fetchPageViews();
     }
   }, [startDate, endDate, activeBrandId]);
 
@@ -126,7 +136,8 @@ export default function PageViewsBarChart({ startDate, endDate }) {
     theme.palette.primary.light,
   ];
 
-  const totalViews = views.reduce((sum, val) => sum + val, 0);
+  // Calculate total views from the pageViews field in the trends data
+  const totalViews = data.reduce((sum, item) => sum + (parseInt(item.pageViews || 0, 10)), 0);
 
   if (loading) return <Typography>Loading...</Typography>;
   
@@ -143,7 +154,7 @@ export default function PageViewsBarChart({ startDate, endDate }) {
     );
   }
   
-  if (views.length === 0) {
+  if (data.length === 0) {
     return (
       <Card variant="outlined" sx={{ width: '100%' }}>
         <CardContent>
@@ -178,7 +189,7 @@ export default function PageViewsBarChart({ startDate, endDate }) {
           colors={colorPalette}
           xAxis={[{ 
             scaleType: 'band', 
-            data: labels,
+            data: data.map(d => formatDate(d.date)),
             tickLabelStyle: {
               angle: 45,
               textAnchor: 'start',
@@ -189,7 +200,7 @@ export default function PageViewsBarChart({ startDate, endDate }) {
             {
               id: 'page-views',
               label: 'Page Views',
-              data: views,
+              data: data.map(d => parseInt(d.pageViews || 0, 10)),
             }
           ]}
           height={250}

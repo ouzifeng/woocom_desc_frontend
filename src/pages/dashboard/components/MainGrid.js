@@ -15,10 +15,73 @@ import TopProductsChart from './TopProductsChart';
 import RevenueTrendChart from './RevenueTrendChart';
 import { useBrand } from '../../../contexts/BrandContext';
 import TopSellingProducts from './TopSellingProducts';
+import AverageOrderValue from './AverageOrderValue';
+import ConversionRate from './ConversionRate';
+import TrafficChannelsChart from './TrafficChannelsChart';
+import DeviceBreakdownTable from './DeviceBreakDownTable';
+import TopLocationsTable from './TopLocationsTable';
+import GoogleAdsKeywordsTable from './GoogleAdsKeyWordsTable';
+import GoogleAdsSearchQueriesTable from './GoogleAdsSearchQueriesTable';
+import BounceRateCard from './BounceRateCard';
+import { useStoreConnection } from '../../../contexts/StoreConnectionContext';
+import Button from '@mui/material/Button';
+import { useNavigate } from 'react-router-dom';
 
-const API_BASE_URL = process.env.NODE_ENV === 'production'
+export const API_BASE_URL = process.env.NODE_ENV === 'production'
   ? 'https://us-central1-apps-84c5e.cloudfunctions.net/api'
-  : 'http://localhost:5000'
+  : 'http://localhost:5000';
+
+export const CACHE_DURATION = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
+
+// Shared cache utilities
+export const getCacheKey = (type, brandId, startDate, endDate) => {
+  return `${type}_${brandId}_${startDate}_${endDate}`;
+};
+
+export const isValidCache = (timestamp) => {
+  return Date.now() - timestamp < CACHE_DURATION;
+};
+
+export const getCachedData = (cacheKey) => {
+  try {
+    const cached = localStorage.getItem(cacheKey);
+    if (!cached) return null;
+
+    const { data, timestamp } = JSON.parse(cached);
+    if (!isValidCache(timestamp)) {
+      localStorage.removeItem(cacheKey);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.warn('Error reading from cache:', error);
+    return null;
+  }
+};
+
+export const setCachedData = (cacheKey, data) => {
+  try {
+    const cacheData = {
+      data,
+      timestamp: Date.now()
+    };
+    localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+  } catch (error) {
+    console.warn('Error writing to cache:', error);
+  }
+};
+
+// Helper function to get auth headers
+export const getAuthHeaders = async () => {
+  const user = auth.currentUser;
+  if (!user) return null;
+  const token = await user.getIdToken();
+  return {
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  };
+};
 
 // Currency options
 const currencyOptions = [
@@ -47,6 +110,57 @@ export default function MainGrid() {
   const [comparisonPeriod, setComparisonPeriod] = React.useState('');
   const [selectedCurrency, setSelectedCurrency] = React.useState('USD');
   const { activeBrandId } = useBrand();
+  const { hasGoogleAnalytics, loading: gaLoading } = useStoreConnection();
+  const navigate = useNavigate();
+
+  // Helper function to get cache key for overview
+  const getOverviewCacheKey = (brandId, startDate, endDate) => {
+    return `overview_data_${brandId}_${startDate}_${endDate}`;
+  };
+
+  // Helper function to check if cache is valid
+  const isValidCache = (timestamp) => {
+    return Date.now() - timestamp < CACHE_DURATION;
+  };
+
+  // Helper function to get cached data
+  const getCachedData = (cacheKey) => {
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (!cached) return null;
+
+      const { data, timestamp } = JSON.parse(cached);
+      if (!isValidCache(timestamp)) {
+        localStorage.removeItem(cacheKey);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.warn('Error reading from cache:', error);
+      return null;
+    }
+  };
+
+  // Helper function to set cached data
+  const setCachedData = (cacheKey, data) => {
+    try {
+      const cacheData = {
+        data,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+    } catch (error) {
+      console.warn('Error writing to cache:', error);
+    }
+  };
+
+  // Clear overview data when brand changes
+  React.useEffect(() => {
+    console.log('Brand changed to:', activeBrandId);
+    setOverview(null);
+    setLoading(true);
+  }, [activeBrandId]);
 
   // Load saved currency preference on mount
   React.useEffect(() => {
@@ -87,19 +201,28 @@ export default function MainGrid() {
       if (!activeBrandId) {
         console.error('No active brand selected');
         setLoading(false);
+        setOverview(null);
+        return;
+      }
+
+      const cacheKey = getCacheKey('overview', activeBrandId, startDate, endDate);
+      const cachedData = getCachedData(cacheKey);
+
+      if (cachedData) {
+        console.log('Using cached overview data:', cachedData);
+        setOverview(cachedData);
+        setLoading(false);
         return;
       }
       
       setLoading(true);
-      const user = auth.currentUser;
-      const token = await user.getIdToken();
-
-      console.log("NODE_ENV:", process.env.NODE_ENV); // Check if it's 'development'
-      console.log("API URL:", API_BASE_URL); // Check if it points to the correct local API
-
+      const headers = await getAuthHeaders();
+      if (!headers) {
+        throw new Error('Not authenticated');
+      }
 
       const res = await fetch(`${API_BASE_URL}/analytics/dashboard/overview?startDate=${startDate}&endDate=${endDate}&brandId=${activeBrandId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers
       });
 
       if (!res.ok) {
@@ -108,9 +231,13 @@ export default function MainGrid() {
       }
 
       const data = await res.json();
+      console.log('Received overview data:', data);
+
+      setCachedData(cacheKey, data);
       setOverview(data);
     } catch (err) {
       console.error('Failed to fetch overview:', err);
+      setOverview(null);
     } finally {
       setLoading(false);
     }
@@ -179,6 +306,31 @@ export default function MainGrid() {
     trendLabel: card.trendLabel,
     rawTrend: overview[card.title.toLowerCase().replace(' ', '')]?.trend
   })));
+
+  if (gaLoading) {
+    return (
+      <Box sx={{ width: '100%', minHeight: 400, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (!hasGoogleAnalytics) {
+    return (
+      <Box sx={{ width: '100%', minHeight: 400, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <Typography variant="h5" sx={{ mb: 2 }}>
+          Google Analytics Required
+        </Typography>
+        <Typography sx={{ mb: 3, maxWidth: 400, textAlign: 'center' }}>
+          To access the dashboard features, you need to connect your Google Analytics account.<br/>
+          This will allow us to provide you with valuable insights and analytics about your store's performance.
+        </Typography>
+        <Button variant="contained" color="primary" onClick={() => navigate('/settings')}>
+          Connect Google Analytics
+        </Button>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ width: '100%', maxWidth: { sm: '100%', md: '1700px' }, mx: 'auto' }}>
@@ -251,23 +403,76 @@ export default function MainGrid() {
           <Grid item xs={12} md={6}><SessionsChart startDate={startDate} endDate={endDate} /></Grid>
           <Grid item xs={12} md={6}><PageViewsBarChart startDate={startDate} endDate={endDate} /></Grid>
 
+          {/* Row 4: Commerce & Conversion */}
           <Grid item xs={12} md={4}>
+            <AverageOrderValue 
+              aov={overview && overview.conversions && overview.revenue ? (parseInt(overview.conversions.value || 0, 10) > 0 ? parseFloat(overview.revenue.value || 0) / parseInt(overview.conversions.value || 0, 10) : 0) : 0}
+              totalOrders={overview?.conversions?.value || 0}
+              totalRevenue={overview?.revenue?.value || 0}
+              startDate={startDate} 
+              endDate={endDate} 
+              selectedCurrency={selectedCurrency} 
+            />
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <ConversionRate 
+              conversionRate={overview && overview.conversions && overview.users ? (parseInt(overview.users.value || 0, 10) > 0 ? (parseInt(overview.conversions.value || 0, 10) / parseInt(overview.users.value || 0, 10)) * 100 : 0) : 0}
+              conversions={overview?.conversions?.value || 0}
+              visitors={overview?.users?.value || 0}
+              startDate={startDate} 
+              endDate={endDate} 
+            />
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <BounceRateCard 
+              bounceRate={overview && overview.bounceRate ? parseFloat(overview.bounceRate.value || 0) : 0}
+              startDate={startDate} 
+              endDate={endDate} 
+            />
+          </Grid>
+
+          {/* Row 5: Audience & Geography */}
+          <Grid item xs={12} md={6}>
+            <TopLocationsTable 
+              startDate={startDate} 
+              endDate={endDate} 
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <DeviceBreakdownTable 
+              startDate={startDate} 
+              endDate={endDate} 
+            />
+          </Grid>
+
+          {/* Row 6: Acquisition & Channels */}
+          <Grid item xs={12} md={6}>
+            <TrafficChannelsChart 
+              startDate={startDate} 
+              endDate={endDate} 
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
             <TopSellingProducts 
               startDate={startDate} 
               endDate={endDate} 
               selectedCurrency={selectedCurrency} 
             />
           </Grid>
-          <Grid item xs={12} md={4}>{dummyChart('Conversion Funnel')}</Grid>
-          <Grid item xs={12} md={4}>{dummyChart('Traffic Channels')}</Grid>
 
-          <Grid item xs={12} md={4}>{dummyChart('Devices')}</Grid>
-          <Grid item xs={12} md={4}>{dummyChart('Avg Order Value')}</Grid>
-          <Grid item xs={12} md={4}>{dummyChart('Refund Rate')}</Grid>
-
-          <Grid item xs={12} md={6}>{dummyChart('Bounce Rate')}</Grid>
-          <Grid item xs={12} md={6}>{dummyChart('Cart Abandonment')}</Grid>
-
+          {/* Row 7: Google Ads */}
+          <Grid item xs={12} md={6}>
+            <GoogleAdsKeywordsTable 
+              startDate={startDate} 
+              endDate={endDate} 
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <GoogleAdsSearchQueriesTable 
+              startDate={startDate} 
+              endDate={endDate} 
+            />
+          </Grid>
         </Grid>
       )}
 

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button, Typography } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useStoreConnection } from '../contexts/StoreConnectionContext';
@@ -6,14 +6,24 @@ import { useStoreConnection } from '../contexts/StoreConnectionContext';
 const GoogleAnalyticsWarningModal = () => {
   const { hasGoogleAnalytics, loading } = useStoreConnection();
   const navigate = useNavigate();
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = useState(false);
+  const [delayComplete, setDelayComplete] = useState(false);
 
   useEffect(() => {
-    // Only set open state after loading is complete
-    if (!loading) {
+    // Add a delay to prevent flash of modal when GA is connected
+    const timer = setTimeout(() => {
+      setDelayComplete(true);
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    // Only set open state after loading is complete AND delay has finished
+    if (!loading && delayComplete) {
       setOpen(!hasGoogleAnalytics);
     }
-  }, [hasGoogleAnalytics, loading]);
+  }, [hasGoogleAnalytics, loading, delayComplete]);
 
   const handleClose = () => {
     setOpen(false);
@@ -24,8 +34,8 @@ const GoogleAnalyticsWarningModal = () => {
     handleClose();
   };
 
-  // Don't render anything while loading
-  if (loading) {
+  // Don't render anything while loading or during delay
+  if (loading || !delayComplete) {
     return null;
   }
 

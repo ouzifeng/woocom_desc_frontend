@@ -87,7 +87,7 @@ export default function SettingsPage(props) {
                   Store Settings
                 </Typography>
                 <Button 
-                  variant="outlined" 
+                  variant="contained" 
                   onClick={toggleDrawer(true)}
                   sx={{ ml: 2 }}
                 >

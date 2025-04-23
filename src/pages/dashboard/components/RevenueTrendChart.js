@@ -4,10 +4,7 @@ import { Card, CardContent, Typography, Stack, Chip } from '@mui/material';
 import { LineChart } from '@mui/x-charts/LineChart';
 import { auth } from '../../../firebase';
 import { useBrand } from '../../../contexts/BrandContext';
-
-const API_BASE_URL = process.env.NODE_ENV === 'production'
-  ? 'https://us-central1-apps-84c5e.cloudfunctions.net/api'
-  : 'http://localhost:5000';
+import { API_BASE_URL, getCacheKey, getCachedData, setCachedData, getAuthHeaders } from './MainGrid';
 
 // Helper function to parse dates safely
 const parseDate = (dateStr) => {
@@ -71,9 +68,29 @@ export default function RevenueTrendChart({ startDate, endDate, selectedCurrency
   const [total, setTotal] = React.useState(0);
   const [error, setError] = React.useState(null);
 
+  // Clear data when brand changes
+  React.useEffect(() => {
+    setData([]);
+    setTotal(0);
+    setLoading(true);
+    setError(null);
+  }, [activeBrandId]);
+
   const getTrends = async () => {
     if (!activeBrandId) {
       setError('Please select a brand first');
+      setLoading(false);
+      setData([]);
+      setTotal(0);
+      return;
+    }
+
+    const cacheKey = getCacheKey('revenue_trends', activeBrandId, startDate, endDate);
+    const cachedData = getCachedData(cacheKey);
+
+    if (cachedData) {
+      setData(cachedData.chartData);
+      setTotal(cachedData.totalRevenue);
       setLoading(false);
       return;
     }
@@ -81,16 +98,14 @@ export default function RevenueTrendChart({ startDate, endDate, selectedCurrency
     try {
       setLoading(true);
       setError(null);
-      const user = auth.currentUser;
-      const token = await user.getIdToken();
+      const headers = await getAuthHeaders();
+      if (!headers) {
+        throw new Error('Not authenticated');
+      }
+
       const res = await fetch(
         `${API_BASE_URL}/analytics/dashboard/trends?startDate=${startDate}&endDate=${endDate}&brandId=${activeBrandId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
+        { headers }
       );
       
       if (!res.ok) {
@@ -106,6 +121,12 @@ export default function RevenueTrendChart({ startDate, endDate, selectedCurrency
       }));
 
       const totalRevenue = chartData.reduce((sum, d) => sum + d.value, 0);
+
+      // Cache the data
+      setCachedData(cacheKey, {
+        chartData,
+        totalRevenue
+      });
 
       setData(chartData);
       setTotal(totalRevenue);

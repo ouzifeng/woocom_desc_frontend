@@ -6,16 +6,15 @@ import Stack from '@mui/material/Stack';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
-import { DataGrid } from '@mui/x-data-grid';
+import { DataGrid, GridOverlay } from '@mui/x-data-grid';
 import CircularProgress from '@mui/material/CircularProgress';
-import TextField from '@mui/material/TextField';
 import AppNavbar from '../dashboard/components/AppNavbar';
 import Header from '../dashboard/components/Header';
 import SideMenu from '../dashboard/components/SideMenu';
 import AppTheme from '../shared-theme/AppTheme';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../../firebase';
-import { collection, getDocs, doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, deleteDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { Paper } from '@mui/material';
 import { Alert } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
@@ -23,10 +22,8 @@ import StarIcon from '@mui/icons-material/Star';
 import FolderIcon from '@mui/icons-material/Folder';
 import ArticleIcon from '@mui/icons-material/Article';
 import Chip from '@mui/material/Chip';
-import Card from '@mui/material/Card';
 import { useNavigate } from 'react-router-dom';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import IconButton from '@mui/material/IconButton';
 import DeleteIcon from '@mui/icons-material/Delete';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
@@ -35,6 +32,24 @@ import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import { useBrand } from '../../contexts/BrandContext';
 import { useToast } from '../../components/ToasterAlert';
+import ContentStrategyInstructions from './ContentStrategyInstructions';
+
+function CustomLoadingOverlay() {
+  return (
+    <GridOverlay
+      sx={{
+        backgroundColor: 'rgba(255, 255, 255, 0.8)', // Dim the background
+      }}
+    >
+      <Stack alignItems="center" spacing={2}>
+        <CircularProgress />
+        <Typography sx={{ color: '#ooo', fontWeight: 600, fontSize: 18 }}>
+          This can take a couple of minutes to complete.
+        </Typography>
+      </Stack>
+    </GridOverlay>
+  );
+}
 
 export default function ContentStrategy(props) {
   const [user] = useAuthState(auth);
@@ -54,6 +69,9 @@ export default function ContentStrategy(props) {
   const [selectedRows, setSelectedRows] = React.useState([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [rowSelectionModel, setRowSelectionModel] = React.useState([]);
+  const [instructionsOpen, setInstructionsOpen] = React.useState(false);
+  const [keywordsOpen, setKeywordsOpen] = React.useState(false);
+  const [savedKeywords, setSavedKeywords] = React.useState([]);
 
   // Initial state for the DataGrid
   const initialState = {
@@ -408,8 +426,7 @@ export default function ContentStrategy(props) {
       const savedKeywords = keywordsSnapshot.docs.map(doc => doc.data().keyword);
       
       if (savedKeywords.length === 0) {
-        setError('No saved keywords found. Please save some keywords first.');
-        showToast('No saved keywords found. Please save some keywords first.', 'error');
+        setError('To generate a content strategy, you need to save some keywords first. This is done on the Keyword Research page, found in the sidebar menu.');
         return;
       }
 
@@ -442,6 +459,18 @@ export default function ContentStrategy(props) {
           strategy: data.strategy,
           timestamp: new Date().toISOString()
         });
+
+        // Deduct 5 credits from the user
+        try {
+          const userDocRef = doc(db, 'users', user.uid);
+          const userDoc = await getDoc(userDocRef);
+          if (userDoc.exists() && typeof userDoc.data().credits === 'number') {
+            const newCredits = Math.max(0, userDoc.data().credits - 5);
+            await updateDoc(userDocRef, { credits: newCredits });
+          }
+        } catch (creditErr) {
+          console.error('Failed to deduct credits:', creditErr);
+        }
 
         // Save to cache
         const cacheKey = `contentStrategy_${activeBrandId}`;
@@ -561,6 +590,18 @@ export default function ContentStrategy(props) {
     }
   };
 
+  const handleOpenKeywords = async () => {
+    if (!user || !activeBrandId) return;
+    setKeywordsOpen(true);
+    try {
+      const keywordsSnapshot = await getDocs(collection(db, 'users', user.uid, 'brands', activeBrandId, 'savedKeywords'));
+      setSavedKeywords(keywordsSnapshot.docs.map(doc => doc.data().keyword));
+    } catch (err) {
+      showToast('Failed to load keywords', 'error');
+      setSavedKeywords([]);
+    }
+  };
+
   return (
     <AppTheme {...props}>
       <CssBaseline enableColorScheme />
@@ -588,11 +629,20 @@ export default function ContentStrategy(props) {
           >
             <Header />
             <Grid container spacing={3}>
-              <Grid item xs={12}>
+              <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Typography variant="h4" gutterBottom>
                   Content Strategy Generator
                 </Typography>
-                
+                <Box>
+                  <Button variant="contained" sx={{ mr: 1 }} onClick={() => setInstructionsOpen(true)}>
+                    Instructions
+                  </Button>
+                  <Button variant="outlined" onClick={handleOpenKeywords}>
+                    Keywords
+                  </Button>
+                </Box>
+              </Grid>
+              <Grid item xs={12}>
                 <Typography variant="body1" paragraph>
                   Generate a content strategy with one pillar article and its supporting content. Each generation will create:
                 </Typography>
@@ -647,6 +697,9 @@ export default function ContentStrategy(props) {
                     rows={sortedRows}
                     columns={columns}
                     loading={loading}
+                    slots={{
+                      loadingOverlay: CustomLoadingOverlay,
+                    }}
                     checkboxSelection
                     disableRowSelectionOnClick
                     rowSelectionModel={rowSelectionModel}
@@ -687,6 +740,26 @@ export default function ContentStrategy(props) {
               </Grid>
             </Grid>
           </Stack>
+          {/* Instructions Drawer */}
+          <ContentStrategyInstructions open={instructionsOpen} onClose={() => setInstructionsOpen(false)} />
+          {/* Keywords Modal */}
+          <Dialog open={keywordsOpen} onClose={() => setKeywordsOpen(false)}>
+            <DialogTitle>Saved Keywords</DialogTitle>
+            <DialogContent>
+              <DialogContentText>
+                These are the keywords currently being used for your content strategy:
+              </DialogContentText>
+              <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {savedKeywords.length === 0 ? (
+                  <Typography color="text.secondary">No keywords found.</Typography>
+                ) : (
+                  savedKeywords.map((kw, idx) => (
+                    <Chip key={idx} label={kw} />
+                  ))
+                )}
+              </Box>
+            </DialogContent>
+          </Dialog>
         </Box>
       </Box>
 

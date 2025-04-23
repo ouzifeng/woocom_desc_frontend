@@ -125,11 +125,7 @@ export default function CsvImport() {
         <Alert severity="warning" sx={{ mb: 2 }}>
           Please select a brand before importing products.
         </Alert>
-      ) : (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          Products will be imported to: <strong>{activeBrand.name}</strong>
-        </Alert>
-      )}
+      ) : null}
       
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>

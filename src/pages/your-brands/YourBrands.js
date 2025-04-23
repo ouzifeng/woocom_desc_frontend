@@ -6,7 +6,6 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
-import { styled } from '@mui/material/styles';
 import { alpha } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Grid from '@mui/material/Grid';
@@ -25,8 +24,17 @@ import EditIcon from '@mui/icons-material/Edit';
 import PeopleIcon from '@mui/icons-material/People';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import CircularProgress from '@mui/material/CircularProgress';
-import RefreshIcon from '@mui/icons-material/Refresh';
 import { useBrand } from '../../contexts/BrandContext';
+import InstructionsDrawer from './InstructionsDrawer';
+import DeleteIcon from '@mui/icons-material/Delete';
+import { useToast } from '../../components/ToasterAlert';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogActions from '@mui/material/DialogActions';
+import { db } from '../../firebase';
+import { doc, deleteDoc } from 'firebase/firestore';
 
 export default function YourBrands(props) {
   const [user] = useAuthState(auth);
@@ -36,6 +44,10 @@ export default function YourBrands(props) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [confirmationMessage, setConfirmationMessage] = useState('');
   const [localError, setLocalError] = useState(null);
+  const [instructionsOpen, setInstructionsOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [brandToDelete, setBrandToDelete] = useState(null);
+  const { showToast } = useToast();
 
   // For debugging
   useEffect(() => {
@@ -125,6 +137,29 @@ export default function YourBrands(props) {
     window.location.reload();
   };
 
+  const handleDeleteBrand = (brandId) => {
+    const brand = userBrands.find(b => b.id === brandId);
+    setBrandToDelete(brand);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteBrand = async () => {
+    if (!brandToDelete || brandToDelete.id === activeBrandId) {
+      setDeleteDialogOpen(false);
+      showToast('Cannot delete the active brand. Switch to another brand first.', 'error');
+      return;
+    }
+    try {
+      await deleteDoc(doc(db, 'users', user.uid, 'brands', brandToDelete.id));
+      showToast('Brand deleted successfully', 'success');
+    } catch (err) {
+      showToast('Failed to delete brand: ' + err.message, 'error');
+    } finally {
+      setDeleteDialogOpen(false);
+      setBrandToDelete(null);
+    }
+  };
+
   return (
     <AppTheme {...props}>
       <CssBaseline enableColorScheme />
@@ -160,15 +195,30 @@ export default function YourBrands(props) {
                 >
                   Create New Brand
                 </Button>
-                <IconButton 
-                  onClick={handleRefresh} 
-                  aria-label="refresh brands"
-                  color="primary"
+                <Button
+                  variant="outlined"
+                  onClick={() => setInstructionsOpen(true)}
+                  sx={{ mr: 1 }}
                 >
-                  <RefreshIcon />
-                </IconButton>
+                  Instructions
+                </Button>
               </Box>
             </Box>
+            <InstructionsDrawer open={instructionsOpen} onClose={() => setInstructionsOpen(false)} />
+            <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+              <DialogTitle>Delete Brand</DialogTitle>
+              <DialogContent>
+                <DialogContentText>
+                  Are you sure you want to delete the brand "{brandToDelete?.name}"? This action cannot be undone.
+                </DialogContentText>
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+                <Button onClick={confirmDeleteBrand} color="error" autoFocus>
+                  Delete
+                </Button>
+              </DialogActions>
+            </Dialog>
 
             {confirmationMessage && (
               <Alert 
@@ -270,13 +320,25 @@ export default function YourBrands(props) {
                               </Button>
                             </Box>
                           ) : (
-                            <IconButton 
-                              aria-label="edit" 
-                              onClick={() => handleEditBrand(brand)}
-                              size="small"
-                            >
-                              <EditIcon fontSize="small" />
-                            </IconButton>
+                            <>
+                              <IconButton 
+                                aria-label="edit" 
+                                onClick={() => handleEditBrand(brand)}
+                                size="small"
+                              >
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                              {brand.id !== activeBrandId && (
+                                <IconButton
+                                  aria-label="delete"
+                                  onClick={() => handleDeleteBrand(brand.id)}
+                                  size="small"
+                                  color="error"
+                                >
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
+                              )}
+                            </>
                           )
                         }
                         subheader={

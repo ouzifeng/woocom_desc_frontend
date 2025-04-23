@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import * as React from 'react';
 import {
   Card, CardContent, Typography,
   Table, TableBody, TableCell,
@@ -7,6 +7,7 @@ import {
 } from '@mui/material';
 import { auth } from '../../../firebase';
 import { useBrand } from '../../../contexts/BrandContext';
+import { API_BASE_URL, getCacheKey, getCachedData, setCachedData, getAuthHeaders } from './MainGrid';
 
 // Helper to decode HTML entities like &quot; and &amp;
 const decodeHtml = (html) => {
@@ -15,58 +16,71 @@ const decodeHtml = (html) => {
   return txt.value;
 };
 
-const API_BASE_URL = process.env.NODE_ENV === 'production'
-  ? 'https://us-central1-apps-84c5e.cloudfunctions.net/api'
-  : 'http://localhost:5000';
-
 export default function TopSellingProductsTable({ startDate, endDate, selectedCurrency }) {
   const { activeBrandId } = useBrand();
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [data, setData] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState(null);
 
-  const getTopProducts = async () => {
+  // Clear data when brand changes
+  React.useEffect(() => {
+    setData([]);
+    setLoading(true);
+    setError(null);
+  }, [activeBrandId]);
+
+  const fetchTopProducts = async () => {
     if (!activeBrandId) {
       setError('Please select a brand first');
       setLoading(false);
+      setData([]);
       return;
     }
 
+    const cacheKey = getCacheKey('top_products', activeBrandId, startDate, endDate);
+    const cachedData = getCachedData(cacheKey);
+
+    if (cachedData) {
+      setData(cachedData);
+      setLoading(false);
+      return;
+    }
+    
     try {
       setLoading(true);
       setError(null);
-      const user = auth.currentUser;
-      const token = await user.getIdToken();
+      const headers = await getAuthHeaders();
+      if (!headers) {
+        throw new Error('Not authenticated');
+      }
 
-      const res = await fetch(
-        `${API_BASE_URL}/analytics/dashboard/top-products?startDate=${startDate}&endDate=${endDate}&brandId=${activeBrandId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      const res = await fetch(`${API_BASE_URL}/analytics/dashboard/top-products?startDate=${startDate}&endDate=${endDate}&brandId=${activeBrandId}`, {
+        headers
+      });
 
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.error || 'Failed to fetch top products');
       }
 
-      const data = await res.json();
-      setProducts(data.products || []);
+      const json = await res.json();
+      
+      // Cache the data
+      setCachedData(cacheKey, json.products);
+      
+      setData(json.products);
     } catch (err) {
-      console.error('Error loading product data:', err);
-      setError(err.message || 'Failed to load product data');
-      setProducts([]);
+      console.error('Error loading top products:', err);
+      setError(err.message || 'Failed to load top products');
+      setData([]);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (activeBrandId) {
-      getTopProducts();
+      fetchTopProducts();
     }
   }, [startDate, endDate, activeBrandId]);
 
@@ -92,7 +106,7 @@ export default function TopSellingProductsTable({ startDate, endDate, selectedCu
     );
   }
 
-  if (products.length === 0) {
+  if (data.length === 0) {
     return (
       <Card variant="outlined" sx={{ width: '100%' }}>
         <CardContent>
@@ -129,7 +143,7 @@ export default function TopSellingProductsTable({ startDate, endDate, selectedCu
               </TableRow>
             </TableHead>
             <TableBody>
-              {products.map((product, i) => (
+              {data.map((product, i) => (
                 <TableRow key={product.itemName}>
                   <TableCell>{decodeHtml(product.itemName)}</TableCell>
                   <TableCell align="right">{product.itemsPurchased}</TableCell>

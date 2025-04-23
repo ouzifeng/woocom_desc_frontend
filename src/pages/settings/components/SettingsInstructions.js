@@ -8,6 +8,7 @@ import {
   Box,
   IconButton,
   Divider,
+  Link
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 
@@ -28,34 +29,70 @@ export default function SettingsInstructions({ drawerOpen, toggleDrawer }) {
         </IconButton>
       </Box>
       <Divider sx={{ mb: 2 }} />
-      
       <List>
         <ListItem>
           <ListItemText
             primary="WooCommerce Connection"
-            secondary="1. Download the WooCommerce plugin
-2. Install and activate it on your WordPress site
-3. Enter your store URL and API credentials
-4. Test the connection to ensure it's working"
+            secondary={
+              <>
+                <ol style={{ paddingLeft: 18 }}>
+                  <li>Download the Ecommander WooCommerce plugin from the Integrations page.</li>
+                  <li>Go to your WordPress admin &rarr; <strong>Plugins</strong> &rarr; <strong>Add New Plugin</strong>.</li>
+                  <li>Click <strong>Upload Plugin</strong> and select the downloaded plugin file.</li>
+                  <li>Click <strong>Activate</strong> after upload completes.</li>
+                  <li>Find <strong>Ecommander</strong> in the left-hand WordPress menu and click it.</li>
+                  <li>Follow the on-screen instructions. You will be redirected back to Ecommander and your WordPress store will be connected.</li>
+                </ol>
+              </>
+            }
           />
         </ListItem>
         <Divider sx={{ my: 1 }} />
         <ListItem>
           <ListItemText
             primary="Shopify Connection"
-            secondary="1. Enter your Shopify store URL
-2. Install the Shopify app
-3. Authorize the connection
-4. Test the connection to ensure it's working"
+            secondary={
+              <>
+                <ol style={{ paddingLeft: 18 }}>
+                  <li>Enter your Shopify store URL in the field provided.</li>
+                  <li>You will be prompted to install the Ecommander app in Shopify.</li>
+                  <li>Accept the permissions and connect the app.</li>
+                  <li>You will be redirected back to Ecommander with your Shopify store connected.</li>
+                </ol>
+              </>
+            }
           />
         </ListItem>
         <Divider sx={{ my: 1 }} />
         <ListItem>
           <ListItemText
             primary="Google Analytics"
-            secondary="1. Enter your Google Analytics tracking ID
-2. Save the settings
-3. Verify the connection in your Google Analytics dashboard"
+            secondary={
+              <>
+                <ol style={{ paddingLeft: 18 }}>
+                  <li>Click the <strong>Connect Google Analytics</strong> button.</li>
+                  <li>Follow the on-screen instructions to sign in and authorize access.</li>
+                  <li>Once connected, choose your <strong>Account</strong> and then your <strong>Property</strong>.</li>
+                  <li>Press <strong>Save</strong> to store your selection.</li>
+                  <li>Optionally, press <strong>Test</strong> to verify the connection. The number of visitors in the last 24 hours will be shown.</li>
+                </ol>
+              </>
+            }
+          />
+        </ListItem>
+        <Divider sx={{ my: 1 }} />
+        <ListItem>
+          <ListItemText
+            primary="CSV Import"
+            secondary={
+              <>
+                <ol style={{ paddingLeft: 18 }}>
+                  <li>Download the sample CSV file from the Import section.</li>
+                  <li>Fill in your product data following the sample format.</li>
+                  <li>Upload the completed CSV file to import your products into Ecommander.</li>
+                </ol>
+              </>
+            }
           />
         </ListItem>
       </List>

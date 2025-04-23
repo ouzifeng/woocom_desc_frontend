@@ -5,6 +5,7 @@ import { Card, CardContent, Typography, Stack, Chip } from '@mui/material';
 import { LineChart } from '@mui/x-charts/LineChart';
 import { auth } from '../../../firebase';
 import { useBrand } from '../../../contexts/BrandContext';
+import { API_BASE_URL, getCacheKey, getCachedData, setCachedData, getAuthHeaders } from './MainGrid';
 
 // Helper function to parse dates safely
 const parseDate = (dateStr) => {
@@ -83,36 +84,48 @@ export default function SessionsChart({ startDate, endDate }) {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState(null);
 
-  const API_BASE_URL = process.env.NODE_ENV === 'production'
-    ? 'https://us-central1-apps-84c5e.cloudfunctions.net/api'
-    : 'http://localhost:5000';
-
-  const getAuthHeader = async () => {
-    const user = auth.currentUser;
-    if (!user) return null;
-    const token = await user.getIdToken();
-    return {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    };
-  };
+  // Clear data when brand changes
+  React.useEffect(() => {
+    setSessionsData([]);
+    setLoading(true);
+    setError(null);
+  }, [activeBrandId]);
 
   const fetchSessionsData = async () => {
     if (!activeBrandId) {
       setError('Please select a brand first');
+      setLoading(false);
+      setSessionsData([]);
+      return;
+    }
+
+    const cacheKey = getCacheKey('sessions', activeBrandId, startDate, endDate);
+    const cachedData = getCachedData(cacheKey);
+
+    if (cachedData) {
+      setSessionsData(cachedData);
+      setLoading(false);
       return;
     }
     
     try {
       setLoading(true);
       setError(null);
-      const headers = await getAuthHeader();
+      const headers = await getAuthHeaders();
+      if (!headers) {
+        throw new Error('Not authenticated');
+      }
+
       const response = await fetch(`${API_BASE_URL}/analytics/dashboard/trends?startDate=${startDate}&endDate=${endDate}&brandId=${activeBrandId}`, { headers });
       const data = await response.json();
 
       if (!response.ok) throw new Error(data.error || 'Failed to fetch session data');
 
       const sessions = data.trends || [];
+      
+      // Cache the data
+      setCachedData(cacheKey, sessions);
+      
       setSessionsData(sessions);
     } catch (err) {
       setError(err.message);
