@@ -101,6 +101,11 @@ export function StoreConnectionProvider({ children }) {
   };
 
   useEffect(() => {
+    if (!activeBrandId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true); // Ensure loading is set to true immediately on brand change
     const checkConnectionStatus = async () => {
       try {
         const user = auth.currentUser;
@@ -122,11 +127,7 @@ export function StoreConnectionProvider({ children }) {
       }
     };
 
-    if (activeBrandId) {
-      checkConnectionStatus();
-    } else {
-      setLoading(false);
-    }
+    checkConnectionStatus();
   }, [activeBrandId]);
 
   const value = {

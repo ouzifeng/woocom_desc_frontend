@@ -29,7 +29,8 @@ export default function SearchControls({
   setRangeLabel,
   includePartners,
   setIncludePartners,
-  handleSearch
+  handleSearch,
+  onSuggestClick
 }) {
   return (
     <>
@@ -54,6 +55,13 @@ export default function SearchControls({
             }}
           >
             Search Keywords
+          </Button>
+          <Button
+            variant="outlined"
+            color="secondary"
+            onClick={onSuggestClick}
+          >
+            Suggest Keywords
           </Button>
         </Box>
       </Box>
@@ -127,14 +135,6 @@ export default function SearchControls({
               label="Include Google Search Partners"
             />
           </Tooltip>
-          <Button
-            variant="contained"
-            onClick={handleSearch}
-            disabled={!keywords.trim()}
-            startIcon={<SearchIcon />}
-          >
-            Search
-          </Button>
         </Box>
       </Box>
     </>

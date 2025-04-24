@@ -28,6 +28,8 @@ import TableCell from '@mui/material/TableCell';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 import { useBrand } from '../../contexts/BrandContext';
 import Alert from '@mui/material/Alert';
+import { useToast } from '../../components/ToasterAlert';
+import ContentPageInstructions from './ContentPageInstructions';
 
 // Loading component
 const LoadingFallback = () => (
@@ -39,19 +41,29 @@ const LoadingFallback = () => (
 export default function ContentPage() {
   const { id } = useParams();
   const [user] = useAuthState(auth);
-  const { activeBrandId } = useBrand();
+  const { activeBrandId, loading: brandLoading } = useBrand();
   const [content, setContent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editorContent, setEditorContent] = useState('');
   const [saving, setSaving] = useState(false);
-  const [notificationMessage, setNotificationMessage] = useState('');
   const [generating, setGenerating] = useState(false);
   const [outlineGenerated, setOutlineGenerated] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisResults, setAnalysisResults] = useState(null);
+  const { showToast } = useToast();
+  const [instructionsOpen, setInstructionsOpen] = useState(false);
 
   useEffect(() => {
+    if (brandLoading) {
+      setLoading(true);
+      return;
+    }
+    if (!activeBrandId) {
+      setError('Please select a brand first');
+      setLoading(false);
+      return;
+    }
     const fetchContent = async () => {
       if (user && id && activeBrandId) {
         try {
@@ -94,13 +106,18 @@ export default function ContentPage() {
         }
       } else {
         setLoading(false);
-        if (!activeBrandId) {
-          setError('Please select a brand first');
-        }
       }
     };
     fetchContent();
-  }, [user, id, activeBrandId]);
+  }, [user, id, activeBrandId, brandLoading]);
+
+  // Clear error if brand becomes available after initial error
+  useEffect(() => {
+    if (activeBrandId && error === 'Please select a brand first') {
+      setError(null);
+      // Optionally, you could re-fetch content here if needed
+    }
+  }, [activeBrandId]);
 
   const handleSave = async () => {
     if (!user || !id || !activeBrandId) return;
@@ -120,11 +137,11 @@ export default function ContentPage() {
       const savedDoc = await getDoc(contentDocRef);
       console.log('Saved document:', savedDoc.data());
       
-      setNotificationMessage('Content saved successfully!');
-      setTimeout(() => setNotificationMessage(''), 3000);
+      showToast('Content saved successfully!', 'success');
     } catch (err) {
       console.error('Error saving content:', err);
       setError('Failed to save content');
+      showToast('Failed to save content', 'error');
     } finally {
       setSaving(false);
     }
@@ -152,13 +169,15 @@ export default function ContentPage() {
       if (outlineData.result === 'Success') {
         setEditorContent(outlineData.outline);
         setOutlineGenerated(true);
-        setNotificationMessage('Outline generated successfully!');
+        showToast('Outline generated successfully!', 'success');
       } else {
         setError('Failed to generate outline');
+        showToast('Failed to generate outline', 'error');
       }
     } catch (err) {
       console.error('Error generating outline:', err);
       setError('Failed to generate outline');
+      showToast('Failed to generate outline', 'error');
     } finally {
       setGenerating(false);
     }
@@ -186,13 +205,27 @@ export default function ContentPage() {
       const contentData = await contentResponse.json();
       if (contentData.result === 'Success') {
         setEditorContent(contentData.content);
-        setNotificationMessage('Content generated successfully!');
+        showToast('Content generated successfully!', 'success');
+        // Deduct 5 credits from the user
+        try {
+          const userDocRef = doc(db, 'users', user.uid);
+          const userDoc = await getDoc(userDocRef);
+          if (userDoc.exists() && typeof userDoc.data().credits === 'number') {
+            const newCredits = Math.max(0, userDoc.data().credits - 5);
+            await updateDoc(userDocRef, { credits: newCredits });
+          }
+        } catch (creditErr) {
+          console.error('Failed to deduct credits:', creditErr);
+          showToast('Failed to deduct credits after generation', 'warning');
+        }
       } else {
         setError('Failed to generate content');
+        showToast('Failed to generate content', 'error');
       }
     } catch (err) {
       console.error('Error generating content:', err);
       setError('Failed to generate content');
+      showToast('Failed to generate content', 'error');
     } finally {
       setGenerating(false);
     }
@@ -260,7 +293,7 @@ export default function ContentPage() {
                     >
                       <CircularProgress size={60} />
                       <Typography variant="h6" sx={{ mt: 2 }}>
-                        {outlineGenerated ? 'Generating Content...' : 'Generating Outline...'}
+                        {outlineGenerated ? 'Generating Content. This can take a few minutes...' : 'Generating Outline. This can take a few minutes...'}
                       </Typography>
                     </Box>
                   )}
@@ -321,22 +354,6 @@ export default function ContentPage() {
                       </Button>
                     </Box>
                   </Box>
-
-                  {notificationMessage && (
-                    <Typography 
-                      variant="body2" 
-                      color="textSecondary" 
-                      sx={{ 
-                        mb: 2,
-                        p: 1,
-                        bgcolor: 'success.light',
-                        color: 'success.contrastText',
-                        borderRadius: 1
-                      }}
-                    >
-                      {notificationMessage}
-                    </Typography>
-                  )}
 
                   <Editor
                     tinymceScriptSrc="https://cdn.jsdelivr.net/npm/tinymce@5.10.2/tinymce.min.js"
@@ -428,6 +445,13 @@ export default function ContentPage() {
               </Box>
             </Grid>
             <Grid item xs={12} md={2}>
+              <Button
+                variant="outlined"
+                onClick={() => setInstructionsOpen(true)}
+                sx={{ mb: 2, width: '50%', mt: 3}}
+              >
+                Instructions
+              </Button>
               <Card sx={{ 
                 p: 2, 
                 border: '1px solid #ccc', 
@@ -504,13 +528,15 @@ export default function ContentPage() {
                         const data = await response.json();
                         if (data.result === 'Success') {
                           setAnalysisResults(data);
-                          setNotificationMessage('Analysis completed successfully!');
+                          showToast('Analysis completed successfully!', 'success');
                         } else {
                           setError('Failed to analyze content');
+                          showToast('Failed to analyze content', 'error');
                         }
                       } catch (err) {
                         console.error('Error analyzing content:', err);
                         setError('Failed to analyze content');
+                        showToast('Failed to analyze content', 'error');
                       } finally {
                         setAnalyzing(false);
                       }
@@ -523,6 +549,7 @@ export default function ContentPage() {
               </Card>
             </Grid>
           </Grid>
+          <ContentPageInstructions open={instructionsOpen} onClose={() => setInstructionsOpen(false)} />
         </Box>
       </Box>
     </AppTheme>

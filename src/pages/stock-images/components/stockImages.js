@@ -23,6 +23,7 @@ import { auth } from '../../../firebase';
 import { useToast } from '../../../components/ToasterAlert';
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
 import ImageIcon from '@mui/icons-material/Image';
+import PhotoLibraryIcon from '@mui/icons-material/PhotoLibrary';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -84,10 +85,20 @@ export default function StockImages() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [contentType, setContentType] = useState('images');
+  const [provider, setProvider] = useState('pexels');
 
   const handleContentTypeChange = (event, newContentType) => {
     if (newContentType !== null) {
       setContentType(newContentType);
+      setContent([]);
+      setCurrentPage(1);
+      setTotalPages(1);
+    }
+  };
+
+  const handleProviderChange = (event, newProvider) => {
+    if (newProvider !== null) {
+      setProvider(newProvider);
       setContent([]);
       setCurrentPage(1);
       setTotalPages(1);
@@ -123,7 +134,12 @@ export default function StockImages() {
 
     try {
       setIsLoading(true);
-      const endpoint = contentType === 'images' ? 'pexels/search' : 'pexels/videos/search';
+      let endpoint = '';
+      if (provider === 'pexels') {
+        endpoint = contentType === 'images' ? 'pexels/search' : 'pexels/videos/search';
+      } else if (provider === 'unsplash') {
+        endpoint = 'pexels/unsplash/search';
+      }
       const response = await fetch(
         `${API_URL}/${endpoint}?query=${encodeURIComponent(searchQuery)}&page=${page}&per_page=20`,
         {
@@ -134,24 +150,28 @@ export default function StockImages() {
       );
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch ${contentType}`);
+        throw new Error(`Failed to fetch ${provider} ${contentType}`);
       }
 
       const data = await response.json();
-      console.log(`${contentType} search response:`, data);
-      
-      const items = contentType === 'images' ? data.photos : data.videos;
-      const total = data.total_results || 0;
-      
-      console.log(`Total ${contentType}:`, total);
-      console.log(`Current page ${contentType}:`, data.page);
-      
+      let items = [];
+      let total = 0;
+      let pageNum = 1;
+      if (provider === 'pexels') {
+        items = contentType === 'images' ? data.photos : data.videos;
+        total = data.total_results || 0;
+        pageNum = data.page || 1;
+      } else if (provider === 'unsplash') {
+        items = data.photos;
+        total = data.total || 0;
+        pageNum = data.page || 1;
+      }
       setContent(items || []);
       setTotalPages(Math.ceil(total / 20));
-      setCurrentPage(data.page || 1);
+      setCurrentPage(pageNum);
     } catch (error) {
-      console.error(`Error searching ${contentType}:`, error);
-      showToast(`Failed to search ${contentType}`, 'error');
+      console.error(`Error searching ${provider} ${contentType}:`, error);
+      showToast(`Failed to search ${provider} ${contentType}`, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -175,21 +195,37 @@ export default function StockImages() {
                   Stock {contentType === 'images' ? 'Images' : 'Videos'}
                 </Typography>
                 <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                  Search and browse high-quality license free stock {contentType}. Powered by <a href="https://pexels.com" target="_blank" rel="noopener noreferrer">Pexels</a>
+                  Search and browse millions of high-quality license free stock {contentType}. Powered by <a href="https://pexels.com" target="_blank" rel="noopener noreferrer">Pexels</a> and <a href="https://unsplash.com" target="_blank" rel="noopener noreferrer">Unsplash</a>.
                 </Typography>
                 
                 <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+                  <ToggleButtonGroup
+                    value={provider}
+                    exclusive
+                    onChange={handleProviderChange}
+                    aria-label="provider"
+                  >
+                    <ToggleButton value="pexels" aria-label="pexels">
+                      <ImageIcon sx={{ mr: 1 }} />
+                      Pexels
+                    </ToggleButton>
+                    <ToggleButton value="unsplash" aria-label="unsplash">
+                      <PhotoLibraryIcon sx={{ mr: 1 }} />
+                      Unsplash
+                    </ToggleButton>
+                  </ToggleButtonGroup>
                   <ToggleButtonGroup
                     value={contentType}
                     exclusive
                     onChange={handleContentTypeChange}
                     aria-label="content type"
+                    sx={{ ml: 2 }}
                   >
                     <ToggleButton value="images" aria-label="images">
                       <ImageIcon sx={{ mr: 1 }} />
                       Images
                     </ToggleButton>
-                    <ToggleButton value="videos" aria-label="videos">
+                    <ToggleButton value="videos" aria-label="videos" disabled={provider === 'unsplash'}>
                       <VideoLibraryIcon sx={{ mr: 1 }} />
                       Videos
                     </ToggleButton>
@@ -231,10 +267,25 @@ export default function StockImages() {
                             borderRadius: '4px',
                             overflow: 'hidden'
                           }}>
-                            {contentType === 'images' ? (
+                            {provider === 'pexels' && contentType === 'images' ? (
                               <img
                                 src={item.src.large2x}
                                 alt={item.alt || 'Stock image'}
+                                loading="lazy"
+                                onLoad={() => handleContentLoad(item.id)}
+                                style={{ 
+                                  width: '100%', 
+                                  height: '100%', 
+                                  objectFit: 'cover',
+                                  cursor: 'pointer',
+                                  opacity: loadedContent[item.id] ? 1 : 0,
+                                  transition: 'opacity 0.3s ease'
+                                }}
+                              />
+                            ) : provider === 'unsplash' ? (
+                              <img
+                                src={item.url}
+                                alt={item.alt || 'Unsplash image'}
                                 loading="lazy"
                                 onLoad={() => handleContentLoad(item.id)}
                                 style={{ 
@@ -292,10 +343,9 @@ export default function StockImages() {
                                 transition: 'opacity 0.3s ease'
                               }}
                             >
-                              {contentType === 'images' 
-                                ? `${item.width} × ${item.height}`
-                                : `${Math.floor(item.duration)}s`
-                              }
+                              {provider === 'pexels' && contentType === 'images' ? `${item.width} × ${item.height}` :
+                               provider === 'unsplash' ? `${item.width} × ${item.height}` :
+                               `${Math.floor(item.duration)}s`}
                             </Box>
                           </Box>
                         </ImageListItem>
@@ -369,7 +419,7 @@ export default function StockImages() {
               gap: '4px'
             }}
           >
-            {contentType === 'images' ? (
+            {provider === 'pexels' && contentType === 'images' ? (
               <>
                 <Typography variant="body2">
                   Dimensions: {selectedContent?.width} × {selectedContent?.height}
@@ -384,6 +434,27 @@ export default function StockImages() {
                   }}
                 >
                   Download
+                </a>
+              </>
+            ) : provider === 'unsplash' ? (
+              <>
+                <Typography variant="body2">
+                  Dimensions: {selectedContent?.width} × {selectedContent?.height}
+                </Typography>
+                <Typography variant="body2">
+                  {selectedContent?.attribution}
+                </Typography>
+                <a
+                  href={selectedContent?.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    color: '#fff',
+                    textDecoration: 'none',
+                    '&:hover': { textDecoration: 'underline' }
+                  }}
+                >
+                  View on Unsplash
                 </a>
               </>
             ) : (
@@ -405,9 +476,15 @@ export default function StockImages() {
               </>
             )}
           </Box>
-          {contentType === 'images' ? (
+          {provider === 'pexels' && contentType === 'images' ? (
             <img
               src={selectedContent?.src.original}
+              alt="Preview"
+              style={{ width: '100%', height: 'auto', maxHeight: '80vh', objectFit: 'contain' }}
+            />
+          ) : provider === 'unsplash' ? (
+            <img
+              src={selectedContent?.url}
               alt="Preview"
               style={{ width: '100%', height: 'auto', maxHeight: '80vh', objectFit: 'contain' }}
             />

@@ -38,7 +38,6 @@ export default function InstructionsDrawer({ open, onClose }) {
         </IconButton>
         <Typography variant="h6">Keyword Research Guide</Typography>
       </Box>
-
       <List>
         <ListItem>
           <ListItemText
@@ -48,7 +47,7 @@ export default function InstructionsDrawer({ open, onClose }) {
                 <Typography variant="subtitle1">Keyword Input</Typography>
               </Box>
             }
-            secondary="Enter up to 20 keywords separated by commas. Each keyword will be researched individually. Use specific, relevant keywords for your business."
+            secondary="Enter up to 20 keywords separated by commas. Each keyword will be researched individually. Use specific, relevant keywords for your business. Each search will deduct 10 credits from your account."
           />
         </ListItem>
 

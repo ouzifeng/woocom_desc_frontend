@@ -22,6 +22,8 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DashboardGAProvider } from './DashboardGAProvider';
 import { useStoreConnection } from '../../contexts/StoreConnectionContext';
+import { useBrand } from '../../contexts/BrandContext';
+import LoadingSpinner from '../../components/LoadingSpinner';
 
 const xThemeComponents = {
   ...chartsCustomizations,
@@ -32,7 +34,8 @@ const xThemeComponents = {
 
 export default function Dashboard(props) {
   const [user] = useAuthState(auth);
-  const { checkGoogleAnalyticsConnection } = useStoreConnection();
+  const { loading: storeLoading, checkGoogleAnalyticsConnection } = useStoreConnection();
+  const { loading: brandLoading } = useBrand();
 
   React.useEffect(() => {
     const checkConnection = async () => {
@@ -43,6 +46,10 @@ export default function Dashboard(props) {
 
     checkConnection();
   }, [user, checkGoogleAnalyticsConnection]);
+
+  if (storeLoading || brandLoading) {
+    return <LoadingSpinner />;
+  }
 
   return (
     <DashboardGAProvider>

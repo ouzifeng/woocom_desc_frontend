@@ -14,9 +14,9 @@ import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import TextField from '@mui/material/TextField';
 import ClickAwayListener from '@mui/material/ClickAwayListener';
-import { doc, collection, setDoc, deleteDoc, getDocs, query } from 'firebase/firestore';
+import { doc, collection, setDoc, deleteDoc, getDocs, query, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
-
+import Button from '@mui/material/Button';
 import AppNavbar from '../dashboard/components/AppNavbar';
 import Header from '../dashboard/components/Header';
 import SideMenu from '../dashboard/components/SideMenu';
@@ -24,6 +24,7 @@ import AppTheme from '../shared-theme/AppTheme';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '../../firebase';
 import { useBrand } from '../../contexts/BrandContext';
+import { useToast } from '../../components/ToasterAlert';
 
 import { formatRows, getDateRangeByLabel } from './utils'; // Helpers used by parent
 import { fetchCountries, fetchLanguages } from './utils';   // Or place them here
@@ -39,6 +40,11 @@ import {
 } from '@mui/material';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import InstructionsDrawer from './components/InstructionsDrawer';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import { styled } from '@mui/material/styles';
 
 // ----------------------------------------------------------------
 // Simple TabPanel helper
@@ -67,10 +73,37 @@ function TabPanel(props) {
 // const LANGUAGES_CACHE_KEY = 'keyword-research-languages-cache';
 // const CACHE_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
+// StyledTextField for better multiline UX
+const StyledTextField = styled(TextField)(({ theme }) => ({
+  '& .MuiInputBase-root': {
+    padding: '12px 16px',
+    height: 'auto'
+  },
+  '& .MuiInputBase-input': {
+    padding: '0',
+    height: 'auto !important',
+    minHeight: '80px'
+  },
+  '& .MuiOutlinedInput-root': {
+    height: 'auto'
+  },
+  '& .MuiInputBase-multiline': {
+    padding: '0'
+  },
+  '& textarea': {
+    overflow: 'hidden !important',
+    resize: 'none',
+    height: 'auto !important',
+    boxSizing: 'border-box',
+    padding: '16px !important'
+  }
+}));
+
 export default function KeywordResearchPage(props) {
   const [user] = useAuthState(auth);
   const { activeBrandId } = useBrand();
   const [instructionsOpen, setInstructionsOpen] = useState(false);
+  const { showToast } = useToast();
 
   // ------------------ State ------------------
   const [keywords, setKeywords] = useState('');
@@ -113,6 +146,11 @@ export default function KeywordResearchPage(props) {
 
   // Add to existing state
   const [savedKeywords, setSavedKeywords] = useState([]);
+
+  const [suggestModalOpen, setSuggestModalOpen] = useState(false);
+  const [suggestInput, setSuggestInput] = useState('');
+  const [suggestLoading, setSuggestLoading] = useState(false);
+  const [suggestError, setSuggestError] = useState('');
 
   // ----------------------------------------------------------------
   // Load countries/languages on mount - simplified without caching
@@ -235,28 +273,40 @@ export default function KeywordResearchPage(props) {
       console.error('No active brand selected');
       return;
     }
-
-    // If user clicked the "Saved Words" tab (the last tab),
-    // or the plus tab, do nothing:
-    if (tabValue >= tabs.length) return;
-
-    const keywordArray = keywords
-      .split(',')
-      .map((k) => k.trim())
-      .filter(Boolean)
-      .slice(0, 20);
-
-    const payload = {
-      keywords: keywordArray,
-      location_code: country?.location_code || null,
-      language_code: language?.language_code || null,
-      search_partners: includePartners,
-      date_from: dateFrom.format('YYYY-MM-DD'),
-      date_to: dateTo.format('YYYY-MM-DD'),
-    };
-
+    if (!user) {
+      showToast('You must be logged in to perform a keyword search.', 'error');
+      return;
+    }
     setLoading(true);
     try {
+      // Check credits before searching
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userDocRef);
+      if (!userDoc.exists() || typeof userDoc.data().credits !== 'number' || userDoc.data().credits < 10) {
+        showToast('You do not have enough credits to perform a keyword search. (10 credits required)', 'error');
+        setLoading(false);
+        return;
+      }
+
+      // If user clicked the "Saved Words" tab (the last tab),
+      // or the plus tab, do nothing:
+      if (tabValue >= tabs.length) return;
+
+      const keywordArray = keywords
+        .split(',')
+        .map((k) => k.trim())
+        .filter(Boolean)
+        .slice(0, 20);
+
+      const payload = {
+        keywords: keywordArray,
+        location_code: country?.location_code || null,
+        language_code: language?.language_code || null,
+        search_partners: includePartners,
+        date_from: dateFrom.format('YYYY-MM-DD'),
+        date_to: dateTo.format('YYYY-MM-DD'),
+      };
+
       const res = await fetch(
         `${process.env.REACT_APP_API_URL}/dataforseo/keywords`,
         {
@@ -267,6 +317,14 @@ export default function KeywordResearchPage(props) {
       );
       const data = await res.json();
       if (data.result && Array.isArray(data.result)) {
+        // Deduct 10 credits after successful search
+        try {
+          const newCredits = Math.max(0, userDoc.data().credits - 10);
+          await updateDoc(userDocRef, { credits: newCredits });
+        } catch (creditErr) {
+          console.error('Failed to deduct credits:', creditErr);
+          showToast('Failed to deduct credits after search', 'warning');
+        }
         const formatted = formatRows(data.result);
 
         // Update only the current tab's data in local state
@@ -481,6 +539,43 @@ export default function KeywordResearchPage(props) {
     }
   };
 
+  const handleOpenSuggest = () => {
+    setSuggestInput('');
+    setSuggestError('');
+    setSuggestModalOpen(true);
+  };
+  const handleCloseSuggest = () => {
+    setSuggestModalOpen(false);
+    setSuggestInput('');
+    setSuggestError('');
+  };
+  const handleSuggestSubmit = async () => {
+    if (!suggestInput.trim()) {
+      setSuggestError('Please enter a description.');
+      return;
+    }
+    setSuggestLoading(true);
+    setSuggestError('');
+    try {
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/openai/keyword-suggestion`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: suggestInput })
+      });
+      const data = await res.json();
+      if (data.result === 'Success' && Array.isArray(data.keywords)) {
+        setKeywords(data.keywords.join(', '));
+        handleCloseSuggest();
+      } else {
+        setSuggestError(data.message || 'Failed to generate keywords.');
+      }
+    } catch (err) {
+      setSuggestError('Failed to generate keywords.');
+    } finally {
+      setSuggestLoading(false);
+    }
+  };
+
   // ----------------------------------------------------------------
   // Render
   return (
@@ -524,13 +619,14 @@ export default function KeywordResearchPage(props) {
                       Research and find keywords for your business
                     </Typography>
                   </Box>
-                  <IconButton 
+                  <Button 
                     onClick={() => setInstructionsOpen(true)}
-                    color="primary"
+                    variant="outlined"
+                  color="primary"
                     sx={{ mt: -2 }}
                   >
-                    <HelpOutlineIcon />
-                  </IconButton>
+                    Instructions
+                  </Button>
                 </Box>
               </Grid>
 
@@ -632,6 +728,7 @@ export default function KeywordResearchPage(props) {
                         includePartners={includePartners}
                         setIncludePartners={setIncludePartners}
                         handleSearch={handleSearch}
+                        onSuggestClick={handleOpenSuggest}
                       />
                       <Box sx={{ mt: 3 }}>
                         <KeywordDataGrid 
@@ -667,6 +764,47 @@ export default function KeywordResearchPage(props) {
         open={instructionsOpen} 
         onClose={() => setInstructionsOpen(false)} 
       />
+      <Dialog
+        open={suggestModalOpen}
+        onClose={handleCloseSuggest}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 3, p: 2 }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, fontSize: 22, pb: 0 }}>
+          Suggest Keywords
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ mt: 2, mb: 2, fontSize: 16 }}>
+            What is your business selling?
+          </Typography>
+          <StyledTextField
+            autoFocus
+            fullWidth
+            value={suggestInput}
+            onChange={e => setSuggestInput(e.target.value)}
+            label="What products do you sell"
+            placeholder="e.g. Japanese knives, kids toys, books, fitness equipment"
+            disabled={suggestLoading}
+            multiline
+            minRows={2}
+            sx={{ mt: 1, mb: 2 }}
+          />
+          {suggestError && (
+            <Typography color="error" sx={{ mt: 1 }}>{suggestError}</Typography>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={handleCloseSuggest} disabled={suggestLoading} variant="outlined">
+            Cancel
+          </Button>
+          <Button onClick={handleSuggestSubmit} disabled={suggestLoading} variant="contained">
+            {suggestLoading ? 'Generating...' : 'Generate'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </AppTheme>
   );
 }
