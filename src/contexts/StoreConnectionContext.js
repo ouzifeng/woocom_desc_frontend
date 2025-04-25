@@ -127,7 +127,7 @@ export function StoreConnectionProvider({ children }) {
       }
     };
 
-    checkConnectionStatus();
+      checkConnectionStatus();
   }, [activeBrandId]);
 
   const value = {

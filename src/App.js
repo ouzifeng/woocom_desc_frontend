@@ -4,9 +4,16 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from './firebase';
 import LoadingSpinner from './components/LoadingSpinner';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
-import { ToastProvider } from './components/ToasterAlert';
+import { ToastProvider, useToast } from './components/ToasterAlert';
 import { StoreConnectionProvider } from './contexts/StoreConnectionContext';
 import { BrandProvider } from './contexts/BrandContext';
+import { useEffect, useState } from 'react';
+import { db } from './firebase';
+import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
+import Alert from '@mui/material/Alert';
+import Stack from '@mui/material/Stack';
+import Button from '@mui/material/Button';
+import GlobalInviteBanner from './components/GlobalInviteBanner';
 
 
 // Eagerly loaded components (keep authentication and core components)
@@ -31,6 +38,7 @@ const TranslationProductPage = React.lazy(() => import('./pages/translations/com
 const Checkout = React.lazy(() => import('./pages/checkout/Checkout'));
 const WooCommerceConnectRoute = React.lazy(() => import('./pages/settings/WooCommerceConnectRoute'));
 const YourBrands = React.lazy(() => import('./pages/your-brands/YourBrands'));
+const AcceptInvite = React.lazy(() => import('./pages/AcceptInvite'));
 
 
 function App() {
@@ -44,6 +52,8 @@ function App() {
     <Router>
       <ThemeProvider theme={createTheme()}>
         <ToastProvider>
+          {/* Global Invite Notification Banner */}
+          <GlobalInviteBanner />
           <StoreConnectionProvider>
             <BrandProvider>
               <React.Suspense fallback={<LoadingSpinner />}>
@@ -52,6 +62,7 @@ function App() {
                   <Route path="/sign-up" element={!user ? <SignUp /> : <Navigate to="/settings" />} />
 
                   <Route path="/woocommerce/receive" element={<WooCommerceConnectRoute />} />
+                  <Route path="/accept-invite" element={<AcceptInvite />} />
                   
                   {/* Redirect root to dashboard */}
                   <Route path="/" element={<Navigate to="/dashboard" />} />

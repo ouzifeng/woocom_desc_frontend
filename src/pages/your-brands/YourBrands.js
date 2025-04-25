@@ -35,6 +35,7 @@ import DialogContentText from '@mui/material/DialogContentText';
 import DialogActions from '@mui/material/DialogActions';
 import { db } from '../../firebase';
 import { doc, deleteDoc } from 'firebase/firestore';
+import ManageMembersDrawer from './ManageMembersDrawer';
 
 export default function YourBrands(props) {
   const [user] = useAuthState(auth);
@@ -48,6 +49,8 @@ export default function YourBrands(props) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [brandToDelete, setBrandToDelete] = useState(null);
   const { showToast } = useToast();
+  const [manageMembersOpen, setManageMembersOpen] = useState(false);
+  const [selectedBrandForMembers, setSelectedBrandForMembers] = useState(null);
 
   // For debugging
   useEffect(() => {
@@ -350,7 +353,7 @@ export default function YourBrands(props) {
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                           <PeopleIcon sx={{ mr: 1, color: 'text.secondary' }} />
                           <Typography variant="body2" color="text.secondary">
-                            {brand.members?.length || 1} Member{(brand.members?.length || 1) > 1 ? 's' : ''}
+                            {1 + (brand.members?.length || 0)} Member{1 + (brand.members?.length || 0) > 1 ? 's' : ''}
                           </Typography>
                         </Box>
                         
@@ -366,7 +369,11 @@ export default function YourBrands(props) {
                       <CardActions>
                         <Button 
                           size="small" 
-                          startIcon={<PersonAddIcon />}
+                          startIcon={<PersonAddIcon />} 
+                          onClick={() => {
+                            setSelectedBrandForMembers(brand);
+                            setManageMembersOpen(true);
+                          }}
                         >
                           Manage Members
                         </Button>
@@ -420,6 +427,13 @@ export default function YourBrands(props) {
           </Box>
         </Box>
       </Box>
+      {userBrands.length > 0 && (
+        <ManageMembersDrawer
+          open={manageMembersOpen}
+          onClose={() => setManageMembersOpen(false)}
+          brand={selectedBrandForMembers}
+        />
+      )}
     </AppTheme>
   );
 } 
