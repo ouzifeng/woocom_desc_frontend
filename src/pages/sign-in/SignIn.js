@@ -16,11 +16,12 @@ import { styled } from '@mui/material/styles';
 import ForgotPassword from './components/ForgotPassword';
 import AppTheme from '../shared-theme/AppTheme';
 import ColorModeSelect from '../shared-theme/ColorModeSelect';
-import { GoogleIcon, SitemarkIcon } from './components/CustomIcons';
+import { GoogleIcon } from './components/CustomIcons';
 import { auth, googleProvider, db } from '../../firebase';
 import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import { collection, query, getDocs } from 'firebase/firestore';
+import { useToast } from '../../components/ToasterAlert';
 
 const Card = styled(MuiCard)(({ theme }) => ({
   display: 'flex',
@@ -73,6 +74,7 @@ export default function SignIn(props) {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const navigate = useNavigate();
+  const { showToast } = useToast();
 
   const handleClickOpen = () => {
     setOpen(true);
@@ -123,6 +125,39 @@ export default function SignIn(props) {
       
       navigate('/dashboard');
     } catch (error) {
+      // Firebase Auth error handling
+      if (error.code === 'auth/user-not-found') {
+        setEmailError(true);
+        setEmailErrorMessage('No account found with this email.');
+        showToast('No account found with this email.', 'error');
+      } else if (error.code === 'auth/wrong-password') {
+        setPasswordError(true);
+        setPasswordErrorMessage('Incorrect password.');
+        showToast('Incorrect password.', 'error');
+      } else if (error.code === 'auth/invalid-email') {
+        setEmailError(true);
+        setEmailErrorMessage('Invalid email address.');
+        showToast('Invalid email address.', 'error');
+      } else if (error.code === 'auth/too-many-requests') {
+        showToast('Too many failed attempts. Please try again later.', 'error');
+      } else if (
+        error.message === 'INVALID_LOGIN_CREDENTIALS' ||
+        (error.error && error.error.message === 'INVALID_LOGIN_CREDENTIALS')
+      ) {
+        setEmailError(true);
+        setPasswordError(true);
+        setEmailErrorMessage('Invalid email or password.');
+        setPasswordErrorMessage('Invalid email or password.');
+        showToast('Invalid email or password.', 'error');
+      } else if (error.code === 'auth/invalid-credential') {
+        setEmailError(true);
+        setPasswordError(true);
+        setEmailErrorMessage('Invalid email or password.');
+        setPasswordErrorMessage('Invalid email or password.');
+        showToast('Invalid email or password.', 'error');
+      } else {
+        showToast('Sign in failed. Please try again.', 'error');
+      }
       console.error('Error signing in with email and password', error);
     }
   };
@@ -137,6 +172,22 @@ export default function SignIn(props) {
       
       navigate('/dashboard');
     } catch (error) {
+      if (error.code === 'auth/popup-closed-by-user') {
+        showToast('Google sign-in was closed before completion.', 'warning');
+      } else if (error.code === 'auth/popup-blocked') {
+        showToast('Popup was blocked. Please allow popups and try again.', 'error');
+      } else if (error.code === 'auth/account-exists-with-different-credential') {
+        showToast('An account already exists with a different sign-in method.', 'error');
+      } else if (
+        error.message === 'INVALID_LOGIN_CREDENTIALS' ||
+        (error.error && error.error.message === 'INVALID_LOGIN_CREDENTIALS')
+      ) {
+        showToast('Invalid Google credentials. Please try again.', 'error');
+      } else if (error.code === 'auth/invalid-credential') {
+        showToast('Invalid Google credentials. Please try again.', 'error');
+      } else {
+        showToast('Google sign-in failed. Please try again.', 'error');
+      }
       console.error('Error signing in with Google', error);
     }
   };
@@ -174,7 +225,7 @@ export default function SignIn(props) {
       <SignInContainer direction="column" justifyContent="space-between">
         <ColorModeSelect sx={{ position: 'fixed', top: '1rem', right: '1rem' }} />
         <Card variant="outlined">
-          <SitemarkIcon />
+          <img src="/ecommander_logo.png" alt="Ecommander Logo" style={{ width: 135, height: 25, alignSelf: 'center' }} />
           <Typography
             component="h1"
             variant="h4"

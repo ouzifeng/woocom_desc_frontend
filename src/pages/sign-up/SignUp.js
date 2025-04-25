@@ -13,12 +13,17 @@ import MuiCard from '@mui/material/Card';
 import { styled } from '@mui/material/styles';
 import AppTheme from '../shared-theme/AppTheme';
 import ColorModeSelect from '../shared-theme/ColorModeSelect';
-import { GoogleIcon, SitemarkIcon } from './components/CustomIcons';
+import { GoogleIcon } from './components/CustomIcons';
 import { auth } from '../../firebase';
 import { createUserWithEmailAndPassword, fetchSignInMethodsForEmail } from 'firebase/auth';
 import { getFirestore, doc, setDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { useToast } from '../../components/ToasterAlert';
+import InputAdornment from '@mui/material/InputAdornment';
+import IconButton from '@mui/material/IconButton';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
 
 
 const Card = styled(MuiCard)(({ theme }) => ({
@@ -76,8 +81,11 @@ export default function SignUp(props) {
   const [confirmPassword, setConfirmPassword] = React.useState('');
   const [confirmPasswordError, setConfirmPasswordError] = React.useState(false);
   const [confirmPasswordErrorMessage, setConfirmPasswordErrorMessage] = React.useState('');
+  const [showPassword, setShowPassword] = React.useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
   const navigate = useNavigate();
   const db = getFirestore();
+  const { showToast } = useToast();
 
   const validateInputs = () => {
     const email = document.getElementById('email');
@@ -199,6 +207,27 @@ export default function SignUp(props) {
 
       navigate('/settings');
     } catch (error) {
+      if (error.code === 'auth/email-already-in-use') {
+        setEmailError(true);
+        setEmailErrorMessage('Email already exists.');
+        showToast('Email already exists.', 'error');
+      } else if (error.code === 'auth/invalid-email') {
+        setEmailError(true);
+        setEmailErrorMessage('Invalid email address.');
+        showToast('Invalid email address.', 'error');
+      } else if (error.code === 'auth/weak-password') {
+        setPasswordError(true);
+        setPasswordErrorMessage('Password is too weak.');
+        showToast('Password is too weak.', 'error');
+      } else if (error.code === 'auth/popup-closed-by-user') {
+        showToast('Google sign-up was closed before completion.', 'warning');
+      } else if (error.code === 'auth/popup-blocked') {
+        showToast('Popup was blocked. Please allow popups and try again.', 'error');
+      } else if (error.code === 'auth/account-exists-with-different-credential') {
+        showToast('An account already exists with a different sign-up method.', 'error');
+      } else {
+        showToast('Google sign-up failed. Please try again.', 'error');
+      }
       console.error('Error signing up with Google', error);
     }
   };
@@ -213,6 +242,7 @@ export default function SignUp(props) {
       if (signInMethods.length > 0) {
         setEmailError(true);
         setEmailErrorMessage('Email already in use.');
+        showToast('Email already in use.', 'error');
         return;
       }
 
@@ -262,11 +292,22 @@ export default function SignUp(props) {
 
       navigate('/settings');
     } catch (error) {
-      console.error('Error signing up with email and password', error);
       if (error.code === 'auth/email-already-in-use') {
         setEmailError(true);
         setEmailErrorMessage('Email already exists.');
+        showToast('Email already exists.', 'error');
+      } else if (error.code === 'auth/invalid-email') {
+        setEmailError(true);
+        setEmailErrorMessage('Invalid email address.');
+        showToast('Invalid email address.', 'error');
+      } else if (error.code === 'auth/weak-password') {
+        setPasswordError(true);
+        setPasswordErrorMessage('Password is too weak.');
+        showToast('Password is too weak.', 'error');
+      } else {
+        showToast('Sign up failed. Please try again.', 'error');
       }
+      console.error('Error signing up with email and password', error);
     }
   };
 
@@ -276,7 +317,7 @@ export default function SignUp(props) {
       <ColorModeSelect sx={{ position: 'fixed', top: '1rem', right: '1rem' }} />
       <SignUpContainer direction="column" justifyContent="space-between">
         <Card variant="outlined">
-          <SitemarkIcon />
+          <img src="/ecommander_logo.png" alt="Ecommander Logo" style={{ width: '50%', alignSelf: 'center' }} />
           <Typography
             component="h1"
             variant="h4"
@@ -328,7 +369,7 @@ export default function SignUp(props) {
                 fullWidth
                 name="password"
                 placeholder="••••••"
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 id="password"
                 autoComplete="new-password"
                 variant="outlined"
@@ -337,7 +378,25 @@ export default function SignUp(props) {
                 color={passwordError ? 'error' : 'primary'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        onClick={() => setShowPassword((show) => !show)}
+                        edge="end"
+                        size="small"
+                        sx={{ p: 0.5 }}
+                      >
+                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
               />
+              <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.5 }}>
+                Password must be at least 6 characters long.
+              </Typography>
             </FormControl>
             <FormControl>
               <FormLabel htmlFor="confirm-password">Confirm Password</FormLabel>
@@ -346,7 +405,7 @@ export default function SignUp(props) {
                 fullWidth
                 name="confirm-password"
                 placeholder="••••••"
-                type="password"
+                type={showConfirmPassword ? 'text' : 'password'}
                 id="confirm-password"
                 autoComplete="new-password"
                 variant="outlined"
@@ -355,6 +414,21 @@ export default function SignUp(props) {
                 color={confirmPasswordError ? 'error' : 'primary'}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                        onClick={() => setShowConfirmPassword((show) => !show)}
+                        edge="end"
+                        size="small"
+                        sx={{ p: 0.5 }}
+                      >
+                        {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
               />
             </FormControl>
             <Button
