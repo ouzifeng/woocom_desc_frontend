@@ -39,6 +39,7 @@ const Checkout = React.lazy(() => import('./pages/checkout/Checkout'));
 const WooCommerceConnectRoute = React.lazy(() => import('./pages/settings/WooCommerceConnectRoute'));
 const YourBrands = React.lazy(() => import('./pages/your-brands/YourBrands'));
 const AcceptInvite = React.lazy(() => import('./pages/AcceptInvite'));
+const ProductImages = React.lazy(() => import('./pages/product-images/ProductImages'));
 
 
 function App() {
@@ -87,6 +88,7 @@ function App() {
                       <Route path="/your-brands" element={<YourBrands />} />
                       <Route path="/settings" element={<Settings />} />
                       <Route path="/checkout" element={<Checkout />} />
+                      <Route path="/product-images" element={<ProductImages />} />
                     </>
                   ) : (
                     <Route path="*" element={<Navigate to="/sign-in" />} />

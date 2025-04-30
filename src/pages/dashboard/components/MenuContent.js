@@ -33,6 +33,7 @@ import { useBrand } from '../../../contexts/BrandContext';
 import CircularProgress from '@mui/material/CircularProgress';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
+import CollectionsIcon from '@mui/icons-material/Collections';
 
 const mainListItems = [
   
@@ -43,6 +44,7 @@ const mainListItems = [
   { text: 'Keyword Research', icon: <SearchRoundedIcon />, link: '/keyword-research' },
   { text: 'Image Generation', icon: <ImageRoundedIcon />, link: '/image-creation' },
   { text: 'Stock Images', icon: <ImageRoundedIcon />, link: '/stock-images' },
+  { text: 'Product Images', icon: <CollectionsIcon />, link: '/product-images' },
 ];
 
 const secondaryListItems = [

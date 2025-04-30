@@ -19,6 +19,7 @@
     "@tinymce/tinymce-react": "^6.0.0",
     "axios": "^1.8.2",
     "dayjs": "^1.11.13",
+    "fabric": "^4.6.0",
     "firebase": "^11.4.0",
     "http-proxy-middleware": "^3.0.3",
     "lodash.debounce": "^4.0.8",
