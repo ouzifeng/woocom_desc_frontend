@@ -12,12 +12,14 @@ import TranslateRoundedIcon from '@mui/icons-material/TranslateRounded';
 import ArticleRoundedIcon from '@mui/icons-material/ArticleRounded';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import ImageRoundedIcon from '@mui/icons-material/ImageRounded';
-import PeopleRoundedIcon from '@mui/icons-material/PeopleRounded';
 import BusinessRoundedIcon from '@mui/icons-material/BusinessRounded';
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
 import InfoRoundedIcon from '@mui/icons-material/InfoRounded';
 import HelpRoundedIcon from '@mui/icons-material/HelpRounded';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
+import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import Chip from '@mui/material/Chip';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { useAuthState } from 'react-firebase-hooks/auth';
@@ -33,7 +35,6 @@ import { useBrand } from '../../../contexts/BrandContext';
 import CircularProgress from '@mui/material/CircularProgress';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
-import CollectionsIcon from '@mui/icons-material/Collections';
 
 const mainListItems = [
   
@@ -42,9 +43,10 @@ const mainListItems = [
   { text: 'Product Translations', icon: <TranslateRoundedIcon />, link: '/translations' },
   { text: 'Content Strategy', icon: <ArticleRoundedIcon />, link: '/strategy' },
   { text: 'Keyword Research', icon: <SearchRoundedIcon />, link: '/keyword-research' },
-  { text: 'Image Generation', icon: <ImageRoundedIcon />, link: '/image-creation' },
+  { text: 'AI Image Generation', icon: <SmartToyIcon />, link: '/image-creation' },
   { text: 'Stock Images', icon: <ImageRoundedIcon />, link: '/stock-images' },
-  { text: 'Product Images', icon: <CollectionsIcon />, link: '/product-images' },
+  { text: 'Product Images', icon: <AddPhotoAlternateIcon />, link: '/product-images' },
+  { text: 'Upscale Images', icon: <ZoomInIcon />, link: '/upscale-images' },
 ];
 
 const secondaryListItems = [

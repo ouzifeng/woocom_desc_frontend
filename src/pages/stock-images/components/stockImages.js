@@ -73,6 +73,25 @@ const LoadingSpinnerSVG = () => (
   </svg>
 );
 
+// Simple function to track Unsplash downloads
+const trackUnsplashDownload = async (downloadLocation, userToken) => {
+  try {
+    const response = await fetch(`${API_URL}/pexels/unsplash/track-download`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${userToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ downloadLocation })
+    });
+    if (!response.ok) {
+      console.error('Failed to track Unsplash download');
+    }
+  } catch (error) {
+    console.error('Error tracking Unsplash download:', error);
+  }
+};
+
 export default function StockImages() {
   const [user] = useAuthState(auth);
   const { showToast } = useToast();
@@ -86,6 +105,9 @@ export default function StockImages() {
   const [totalPages, setTotalPages] = useState(1);
   const [contentType, setContentType] = useState('images');
   const [provider, setProvider] = useState('pexels');
+
+  // Define app name for UTM tracking
+  const appName = 'ecommander';
 
   const handleContentTypeChange = (event, newContentType) => {
     if (newContentType !== null) {
@@ -162,10 +184,11 @@ export default function StockImages() {
         total = data.total_results || 0;
         pageNum = data.page || 1;
       } else if (provider === 'unsplash') {
-        items = data.photos;
+        items = data.photos || [];
         total = data.total || 0;
         pageNum = data.page || 1;
       }
+      
       setContent(items || []);
       setTotalPages(Math.ceil(total / 20));
       setCurrentPage(pageNum);
@@ -179,6 +202,13 @@ export default function StockImages() {
 
   const handlePageChange = (event, value) => {
     handleSearch(null, value);
+  };
+
+  // Function to generate UTM URL
+  const getUtmUrl = (url) => {
+    if (!url) return '#';
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}utm_source=${appName}&utm_medium=referral`;
   };
 
   return (
@@ -195,7 +225,7 @@ export default function StockImages() {
                   Stock {contentType === 'images' ? 'Images' : 'Videos'}
                 </Typography>
                 <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                  Search and browse millions of high-quality license free stock {contentType}. Powered by <a href="https://pexels.com" target="_blank" rel="noopener noreferrer">Pexels</a> and <a href="https://unsplash.com" target="_blank" rel="noopener noreferrer">Unsplash</a>.
+                  Search and browse millions of high-quality license free stock {contentType}. Powered by <a href={getUtmUrl("https://pexels.com")} target="_blank" rel="noopener noreferrer">Pexels</a> and <a href={getUtmUrl("https://unsplash.com")} target="_blank" rel="noopener noreferrer">Unsplash</a>.
                 </Typography>
                 
                 <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
@@ -284,7 +314,7 @@ export default function StockImages() {
                               />
                             ) : provider === 'unsplash' ? (
                               <img
-                                src={item.url}
+                                src={item.urls.regular}
                                 alt={item.alt || 'Unsplash image'}
                                 loading="lazy"
                                 onLoad={() => handleContentLoad(item.id)}
@@ -351,6 +381,13 @@ export default function StockImages() {
                         </ImageListItem>
                       ))}
                     </ImageList>
+                    
+                    {provider === 'unsplash' && content.length > 0 && (
+                      <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mt: 2 }}>
+                        All photos provided by <a href={getUtmUrl("https://unsplash.com")} target="_blank" rel="noopener noreferrer">Unsplash</a>
+                      </Typography>
+                    )}
+                    
                     {content.length > 0 && (
                       <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
                         <Pagination
@@ -442,19 +479,46 @@ export default function StockImages() {
                   Dimensions: {selectedContent?.width} × {selectedContent?.height}
                 </Typography>
                 <Typography variant="body2">
-                  {selectedContent?.attribution}
+                  Photo by <a 
+                    href={getUtmUrl(selectedContent?.user?.links?.html)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      color: '#fff',
+                      textDecoration: 'underline',
+                    }}
+                  >
+                    {selectedContent?.user?.name}
+                  </a> on <a
+                    href={getUtmUrl("https://unsplash.com")}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      color: '#fff',
+                      textDecoration: 'underline',
+                    }}
+                  >
+                    Unsplash
+                  </a>
                 </Typography>
                 <a
-                  href={selectedContent?.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href={selectedContent?.urls?.full}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    // Track download when user clicks the download button
+                    if (selectedContent?.links?.download_location) {
+                      trackUnsplashDownload(selectedContent.links.download_location, user.accessToken);
+                    }
+                    // Open in new tab
+                    window.open(selectedContent?.urls?.full, '_blank');
+                  }}
                   style={{
                     color: '#fff',
                     textDecoration: 'none',
                     '&:hover': { textDecoration: 'underline' }
                   }}
                 >
-                  View on Unsplash
+                  Download
                 </a>
               </>
             ) : (
@@ -484,8 +548,8 @@ export default function StockImages() {
             />
           ) : provider === 'unsplash' ? (
             <img
-              src={selectedContent?.url}
-              alt="Preview"
+              src={selectedContent?.urls?.regular}
+              alt={selectedContent?.alt || "Preview"}
               style={{ width: '100%', height: 'auto', maxHeight: '80vh', objectFit: 'contain' }}
             />
           ) : (
@@ -495,6 +559,46 @@ export default function StockImages() {
               controls
               style={{ width: '100%', height: 'auto', maxHeight: '80vh' }}
             />
+          )}
+          
+          {provider === 'unsplash' && (
+            <Box
+              sx={{
+                position: 'absolute',
+                bottom: 8,
+                left: 8,
+                right: 8,
+                bgcolor: 'rgba(0,0,0,0.4)',
+                color: '#fff',
+                padding: '8px',
+                borderRadius: '4px',
+                textAlign: 'center'
+              }}
+            >
+              <Typography variant="body2">
+                Photo by <a 
+                  href={getUtmUrl(selectedContent?.user?.links?.html)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    color: '#fff',
+                    textDecoration: 'underline',
+                  }}
+                >
+                  {selectedContent?.user?.name}
+                </a> on <a
+                  href={getUtmUrl("https://unsplash.com")}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    color: '#fff',
+                    textDecoration: 'underline',
+                  }}
+                >
+                  Unsplash
+                </a>
+              </Typography>
+            </Box>
           )}
         </Box>
       </Modal>

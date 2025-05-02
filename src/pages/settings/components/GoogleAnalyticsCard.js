@@ -14,13 +14,13 @@ import {
   InputLabel,
   FormControl,
   CircularProgress,
-  Alert,
-  Snackbar
+  Alert
 } from '@mui/material';
-import { Google as GoogleIcon, Analytics as AnalyticsIcon, CheckCircle } from '@mui/icons-material';
+import { Google as GoogleIcon, Analytics as AnalyticsIcon } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import { auth } from '../../../firebase';
 import { useBrand } from '../../../contexts/BrandContext';
+import { useToast } from '../../../components/ToasterAlert';
 
 const SettingsCard = styled(Card)(({ theme }) => ({
   display: 'flex',
@@ -43,6 +43,7 @@ const API_BASE_URL = process.env.NODE_ENV === 'production'
 
 export default function GoogleAnalyticsCard() {
   const { activeBrandId } = useBrand();
+  const { showToast } = useToast();
   const [open, setOpen] = React.useState(false);
   const [isConnected, setIsConnected] = React.useState(false);
   const [accounts, setAccounts] = React.useState([]);
@@ -54,7 +55,6 @@ export default function GoogleAnalyticsCard() {
   const [testing, setTesting] = React.useState(false);
   const [error, setError] = React.useState(null);
   const [visitors, setVisitors] = React.useState(null);
-  const [snackbar, setSnackbar] = React.useState({ open: false, message: '', severity: 'success' });
 
   const getAuthHeader = async () => {
     const user = auth.currentUser;
@@ -104,7 +104,7 @@ export default function GoogleAnalyticsCard() {
       }
     } catch (err) {
       setError(err.message);
-      setSnackbar({ open: true, message: err.message, severity: 'error' });
+      showToast(err.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -127,7 +127,7 @@ export default function GoogleAnalyticsCard() {
       setSelectedProperty('');
     } catch (err) {
       setError(err.message);
-      setSnackbar({ open: true, message: err.message, severity: 'error' });
+      showToast(err.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -157,7 +157,7 @@ export default function GoogleAnalyticsCard() {
       window.location.href = data.url;
     } catch (err) {
       setError(err.message);
-      setSnackbar({ open: true, message: err.message, severity: 'error' });
+      showToast(err.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -184,7 +184,7 @@ export default function GoogleAnalyticsCard() {
       setSelectedProperty('');
     } catch (err) {
       setError(err.message);
-      setSnackbar({ open: true, message: err.message, severity: 'error' });
+      showToast(err.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -210,9 +210,9 @@ export default function GoogleAnalyticsCard() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save selection');
-      setSnackbar({ open: true, message: 'Saved successfully!', severity: 'success' });
+      showToast('Account Saved', 'success');
     } catch (err) {
-      setSnackbar({ open: true, message: err.message, severity: 'error' });
+      showToast(err.message, 'error');
     } finally {
       setSaving(false);
     }
@@ -231,9 +231,9 @@ export default function GoogleAnalyticsCard() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Test failed');
       setVisitors(data.visitors);
-      setSnackbar({ open: true, message: `Visitors yesterday: ${data.visitors}`, severity: 'info' });
+      showToast(`Visitors yesterday: ${data.visitors}`, 'info');
     } catch (err) {
-      setSnackbar({ open: true, message: err.message, severity: 'error' });
+      showToast(err.message, 'error');
     } finally {
       setTesting(false);
     }
@@ -306,9 +306,6 @@ export default function GoogleAnalyticsCard() {
               <Button onClick={handleDisconnect} color="error">Disconnect</Button>
             </Box>
 
-            {visitors !== null && (
-              <Alert severity="info">Visitors yesterday: {visitors}</Alert>
-            )}
           </>
         ) : (
           <Button variant="contained" onClick={() => setOpen(true)} startIcon={<GoogleIcon />}>Connect Google Analytics</Button>

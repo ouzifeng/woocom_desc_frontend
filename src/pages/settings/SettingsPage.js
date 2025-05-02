@@ -95,28 +95,23 @@ export default function SettingsPage(props) {
                 </Button>
               </Box>
               <StoreConnectionStatus />
-              <Grid container spacing={3}>
-                <Grid item xs={12} md={3} sx={{ height: CARD_HEIGHT }}>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={4} sx={{ height: CARD_HEIGHT }}>
                   <Box sx={{ height: '100%' }}>
                     <WooCommerceSettingsCard />
                   </Box>
                 </Grid>
-                <Grid item xs={12} md={3} sx={{ height: CARD_HEIGHT }}>
+                <Grid item xs={12} md={4} sx={{ height: CARD_HEIGHT }}>
                   <Box sx={{ height: '100%' }}>
                     <CsvImport />
                   </Box>
                 </Grid>
-                <Grid item xs={12} md={3} sx={{ height: CARD_HEIGHT }}>
+                <Grid item xs={12} md={4} sx={{ height: CARD_HEIGHT }}>
                   <Box sx={{ height: '100%' }}>
                     <GoogleAnalyticsCard />
                   </Box>
                 </Grid>
-                <Grid item xs={12} md={3} sx={{ height: CARD_HEIGHT }}>
-                  <Box sx={{ height: '100%' }}>
-                    <Outlet />
-                  </Box>
-                </Grid>
-                <Grid item xs={12} md={3} sx={{ height: CARD_HEIGHT }}>
+                <Grid item xs={12} md={4} sx={{ height: CARD_HEIGHT }}>
                   <Box sx={{ height: '100%' }}>
                     <ShopifySettingsCard />
                   </Box>

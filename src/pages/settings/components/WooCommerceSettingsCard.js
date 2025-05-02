@@ -14,6 +14,7 @@ import { styled } from '@mui/material/styles';
 import { auth } from '../../../firebase';
 import { useStoreConnection } from '../../../contexts/StoreConnectionContext';
 import { useBrand } from '../../../contexts/BrandContext';
+import { useToast } from '../../../components/ToasterAlert';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -43,6 +44,7 @@ export default function WooCommerceSettingsCard() {
   const user = auth.currentUser;
   const { connectedPlatform, setConnectedPlatform } = useStoreConnection();
   const { activeBrandId } = useBrand();
+  const { showToast } = useToast();
 
   const fetchConnectionStatus = async () => {
     if (!activeBrandId) {
@@ -128,12 +130,15 @@ export default function WooCommerceSettingsCard() {
       const data = await res.json();
       if (data.result === 'Success') {
         setTestResult('success');
+        showToast('Connection is valid', 'success');
       } else {
         setTestResult('fail');
+        showToast('Connection test failed', 'error');
       }
     } catch (err) {
       console.error('Test connection failed:', err);
       setTestResult('fail');
+      showToast('Connection test failed', 'error');
     }
   };
 
@@ -202,8 +207,6 @@ export default function WooCommerceSettingsCard() {
         </Typography>
 
         {error && <Alert severity="error">{error}</Alert>}
-        {testResult === 'success' && <Alert severity="success">Connection is valid.</Alert>}
-        {testResult === 'fail' && <Alert severity="error">Connection test failed.</Alert>}
 
         {renderActionButtons()}
       </Stack>

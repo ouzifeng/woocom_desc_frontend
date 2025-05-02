@@ -15,6 +15,7 @@ import { styled } from '@mui/material/styles';
 import { auth } from '../../../firebase';
 import { useStoreConnection } from '../../../contexts/StoreConnectionContext';
 import { useBrand } from '../../../contexts/BrandContext';
+import { useToast } from '../../../components/ToasterAlert';
 
 const API_URL = process.env.REACT_APP_API_URL || (
   process.env.NODE_ENV === 'production' 
@@ -50,6 +51,7 @@ export default function ShopifySettingsCard() {
   const user = auth.currentUser;
   const { connectedPlatform, setConnectedPlatform } = useStoreConnection();
   const { activeBrandId } = useBrand();
+  const { showToast } = useToast();
 
   const cleanUrl = (url) => {
     // Remove protocol and www
@@ -184,12 +186,15 @@ export default function ShopifySettingsCard() {
       console.log(`Shopify test result for brand ${activeBrandId}:`, data.result);
       if (data.result === 'Success') {
         setTestResult('success');
+        showToast('Connection is valid', 'success');
       } else {
         setTestResult('fail');
+        showToast('Connection test failed', 'error');
       }
     } catch (err) {
       console.error('Test connection failed:', err);
       setTestResult('fail');
+      showToast('Connection test failed', 'error');
     }
   };
 
@@ -246,15 +251,7 @@ export default function ShopifySettingsCard() {
             >
               {testResult === 'testing' ? 'Testing…' : 'Test Connection'}
             </Button>
-            <Button
-              variant="outlined"
-              color="primary"
-              href="https://admin.shopify.com/store/YOUR_STORE_NAME/apps"
-              target="_blank"
-              fullWidth
-            >
-              Open Shopify App
-            </Button>
+
           </>
         ) : (
           <>
@@ -317,8 +314,6 @@ export default function ShopifySettingsCard() {
         </Typography>
 
         {error && <Alert severity="error">{error}</Alert>}
-        {testResult === 'success' && <Alert severity="success">Connection is valid.</Alert>}
-        {testResult === 'fail' && <Alert severity="error">Connection test failed.</Alert>}
 
         {renderActionButtons()}
       </Stack>

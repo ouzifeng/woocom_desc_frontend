@@ -1,116 +1,100 @@
 // src/components/MaskEditor.js
-import React, { useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
+import { Canvas, Image as FabricImage, PencilBrush } from 'fabric';  // ← named imports
 import Button from '@mui/material/Button';
-import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
-import CircularProgress from '@mui/material/CircularProgress';
-import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth } from '../../../firebase';
-import { useBrand } from '../../../contexts/BrandContext';
 
 export default function MaskEditor({ imageUrl, apiUrl, onResult }) {
-  const [user] = useAuthState(auth);
-  const { activeBrandId } = useBrand();
-  const [processedUrl, setProcessedUrl] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const canvasRef = useRef(null);
+  const [canvas, setCanvas] = useState(null);
+  const [mode, setMode] = useState('erase'); // 'erase' or 'restore'
+  const [maskLoaded, setMaskLoaded] = useState(false);
 
-  // Remove background (simplified approach)
-  const handleRemoveBg = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const idToken = user ? await user.getIdToken() : null;
-      
-      // Save the image to Firebase Storage first
-      const saveRes = await fetch(`${apiUrl}/runware/save-user-image`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {})
-        },
-        body: JSON.stringify({ imageUrl, brandId: activeBrandId, userId: user?.uid })
-      });
-      if (!saveRes.ok) throw new Error('Failed to save image: ' + saveRes.status);
-      const saveData = await saveRes.json();
-      const fbUrl = saveData.url;
+  // 1️⃣ Initialize Fabric Canvas and pull down auto-mask
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    const c = new Canvas(canvasRef.current, {
+      width: 400,
+      height: 400,
+      isDrawingMode: false,
+    });
+    setCanvas(c);
 
-      // Remove background using the Firebase Storage URL
-      const res = await fetch(`${apiUrl}/runware/remove-background`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {})
-        },
-        body: JSON.stringify({ imageUrl: fbUrl, brandId: activeBrandId, userId: user?.uid })
-      });
-      if (!res.ok) throw new Error('Failed to remove background: ' + res.status);
-      const data = await res.json();
-      setProcessedUrl(data.url);
-      
-      // Automatically set the result since we're not editing
-      if (onResult) onResult(data.url);
-      
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    fetch(`${apiUrl}/runware/get-mask`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageUrl }),
+    })
+      .then(r => r.json())
+      .then(({ maskUrl }) => {
+        // Background = original
+        FabricImage.fromURL(imageUrl, imgOrig => {
+          imgOrig.selectable = imgOrig.evented = false;
+          imgOrig.scaleToWidth(c.width);
+          c.setBackgroundImage(imgOrig, c.renderAll.bind(c));
+        });
+        // Top layer = mask as destination-in
+        FabricImage.fromURL(maskUrl, imgMask => {
+          imgMask.selectable = imgMask.evented = false;
+          imgMask.globalCompositeOperation = 'destination-in';
+          imgMask.scaleToWidth(c.width);
+          c.add(imgMask).renderAll();
+          setMaskLoaded(true);
+        });
+      })
+      .catch(console.error);
+
+    return () => c.dispose();
+  }, [imageUrl, apiUrl]);
+
+  // 2️⃣ Enable drawing brush when mask’s loaded
+  useEffect(() => {
+    if (!canvas || !maskLoaded) return;
+    canvas.isDrawingMode = true;
+    const brush = new PencilBrush(canvas);
+    brush.width = 20;
+    brush.color = mode === 'erase' ? 'black' : 'white';
+    canvas.freeDrawingBrush = brush;
+  }, [canvas, mode, maskLoaded]);
+
+  // 3️⃣ Send edited mask back for compositing
+  const handleApply = () => {
+    const maskDataUrl = canvas.toDataURL({ format: 'png' });
+    fetch(`${apiUrl}/runware/apply-mask`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageUrl, maskDataUrl }),
+    })
+      .then(r => r.json())
+      .then(({ resultDataUrl }) => onResult(resultDataUrl))
+      .catch(console.error);
   };
 
   return (
-    <Box sx={{ width: '100%' }}>
-      {!processedUrl ? (
-        <Button 
-          variant="contained" 
-          color="primary" 
-          onClick={handleRemoveBg} 
-          disabled={loading}
-          fullWidth
-          size="large"
-          sx={{ height: 56 }}
+    <div>
+      <canvas ref={canvasRef} style={{ border: '1px solid #ccc' }} />
+      <div style={{ marginTop: 10 }}>
+        <Button
+          variant={mode === 'erase' ? 'contained' : 'outlined'}
+          onClick={() => setMode('erase')}
         >
-          {loading ? (
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <CircularProgress size={24} sx={{ mr: 1 }} color="inherit" />
-              Processing...
-            </Box>
-          ) : 'Remove Background'}
+          Erase
         </Button>
-      ) : (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {/* Display the result */}
-          <Box sx={{ display: 'flex', gap: 3, mb: 3, flexWrap: 'wrap', justifyContent: 'center' }}>
-            <Box>
-              <Typography variant="subtitle1" sx={{ mb: 1 }}>Original</Typography>
-              <img src={imageUrl} alt="Original" style={{ maxWidth: 250, maxHeight: 250, border: '1px solid #ddd', borderRadius: 4 }} />
-            </Box>
-            <Box>
-              <Typography variant="subtitle1" sx={{ mb: 1 }}>Background Removed</Typography>
-              <img 
-                src={processedUrl} 
-                alt="Processed" 
-                style={{ maxWidth: 250, maxHeight: 250, border: '1px solid #ddd', borderRadius: 4 }} 
-              />
-            </Box>
-          </Box>
-          
-          {/* Reset button to try again */}
-          <Button
-            variant="outlined"
-            onClick={() => setProcessedUrl(null)}
-            sx={{ alignSelf: 'center' }}
-          >
-            Remove Background Again
-          </Button>
-        </Box>
-      )}
-
-      {error && (
-        <Box sx={{ mt: 2, p: 2, bgcolor: '#ffebee', color: '#d32f2f', borderRadius: 1 }}>
-          <Typography variant="body2">{error}</Typography>
-        </Box>
-      )}
-    </Box>
+        <Button
+          variant={mode === 'restore' ? 'contained' : 'outlined'}
+          onClick={() => setMode('restore')}
+          sx={{ ml: 1 }}
+        >
+          Restore
+        </Button>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={handleApply}
+          sx={{ ml: 2 }}
+        >
+          Apply & Download
+        </Button>
+      </div>
+    </div>
   );
 }

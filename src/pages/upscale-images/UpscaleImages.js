@@ -15,12 +15,12 @@ import { useBrand } from '../../contexts/BrandContext';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { useToast } from '../../components/ToasterAlert';
 
-// Import our new components
-import ImageProcessingPanel from './components/ImageProcessingPanel';
-import ProductsTable from './components/ProductsTable';
+// Import our components
+import ImageUpscalePanel from './components/ImageUpscalePanel';
+import ProductsTable from '../product-images/components/ProductsTable';
 import InstructionsDrawer from './components/InstructionsDrawer';
 
-export default function ProductImages() {
+export default function UpscaleImages() {
   // Auth and brand context
   const [user] = useAuthState(auth);
   const { activeBrandId } = useBrand();
@@ -28,9 +28,9 @@ export default function ProductImages() {
   
   // State variables
   const [selectedProduct, setSelectedProduct] = useState(null);
-  const [removing, setRemoving] = useState(false);
-  const [removedUrl, setRemovedUrl] = useState(null);
-  const [removeError, setRemoveError] = useState(null);
+  const [upscaling, setUpscaling] = useState(false);
+  const [upscaledUrl, setUpscaledUrl] = useState(null);
+  const [upscaleError, setUpscaleError] = useState(null);
   const [uploadedImage, setUploadedImage] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [useOriginalImage, setUseOriginalImage] = useState(true);
@@ -39,6 +39,10 @@ export default function ProductImages() {
   const [saveError, setSaveError] = useState(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  
+  // Upscale settings
+  const [upscaleFactor, setUpscaleFactor] = useState(2);
+  const [outputFormat, setOutputFormat] = useState('WEBP');
   
   // Track modified products for CSV export
   const [modifiedProducts, setModifiedProducts] = useState([]);
@@ -57,12 +61,14 @@ export default function ProductImages() {
     if (!products || !products.length) return '';
     
     // Common headers for both platforms
-    const headers = ['ID', 'Image URL', 'Product Name'];
+    const headers = ['ID', 'Image URL', 'Product Name', 'Original Dimensions', 'Upscaled Dimensions'];
     const rows = products.map(product => {
       return [
         product.id,
-        product.processedImage,
-        product.name || ''
+        product.upscaledImage,
+        product.name || '',
+        product.originalDimensions || '',
+        product.upscaledDimensions || ''
       ];
     });
     
@@ -87,7 +93,7 @@ export default function ProductImages() {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     
     link.setAttribute('href', url);
-    link.setAttribute('download', `processed-images-${timestamp}.csv`);
+    link.setAttribute('download', `upscaled-images-${timestamp}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -102,7 +108,7 @@ export default function ProductImages() {
     setModifiedProducts([]);
     
     if (user && activeBrandId) {
-      const modifiedKey = `modified-products-${user.uid}-${activeBrandId}`;
+      const modifiedKey = `upscaled-products-${user.uid}-${activeBrandId}`;
       localStorage.removeItem(modifiedKey);
       
       if (count > 0) {
@@ -115,20 +121,20 @@ export default function ProductImages() {
   useEffect(() => {
     if (!user || !activeBrandId) return;
     
-    const cacheKey = `product-images-cache-${user.uid}-${activeBrandId}`;
+    const cacheKey = `upscale-images-cache-${user.uid}-${activeBrandId}`;
     const cachedData = localStorage.getItem(cacheKey);
     
     if (cachedData) {
       try {
-        const { product, processedImageUrl } = JSON.parse(cachedData);
+        const { product, upscaledImageUrl } = JSON.parse(cachedData);
         
         if (product) {
           console.log('Restored cached product:', product.id);
           setSelectedProduct(product);
           
-          if (processedImageUrl) {
-            console.log('Restored cached processed image');
-            setRemovedUrl(processedImageUrl);
+          if (upscaledImageUrl) {
+            console.log('Restored cached upscaled image');
+            setUpscaledUrl(upscaledImageUrl);
           }
         }
       } catch (err) {
@@ -137,7 +143,7 @@ export default function ProductImages() {
     }
     
     // Load previously modified products from localStorage
-    const modifiedKey = `modified-products-${user.uid}-${activeBrandId}`;
+    const modifiedKey = `upscaled-products-${user.uid}-${activeBrandId}`;
     const modifiedData = localStorage.getItem(modifiedKey);
     
     if (modifiedData) {
@@ -151,26 +157,26 @@ export default function ProductImages() {
     }
   }, [user, activeBrandId]);
   
-  // Save product and processed image to localStorage when they change
+  // Save product and upscaled image to localStorage when they change
   useEffect(() => {
     if (!user || !activeBrandId) return;
     if (!selectedProduct) return;
     
-    const cacheKey = `product-images-cache-${user.uid}-${activeBrandId}`;
+    const cacheKey = `upscale-images-cache-${user.uid}-${activeBrandId}`;
     const dataToCache = {
       product: selectedProduct,
-      processedImageUrl: removedUrl
+      upscaledImageUrl: upscaledUrl
     };
     
     localStorage.setItem(cacheKey, JSON.stringify(dataToCache));
     console.log('Cached product and image data');
-  }, [user, activeBrandId, selectedProduct, removedUrl]);
+  }, [user, activeBrandId, selectedProduct, upscaledUrl]);
   
   // Save modified products list to localStorage when it changes
   useEffect(() => {
     if (!user || !activeBrandId || !modifiedProducts.length) return;
     
-    const modifiedKey = `modified-products-${user.uid}-${activeBrandId}`;
+    const modifiedKey = `upscaled-products-${user.uid}-${activeBrandId}`;
     localStorage.setItem(modifiedKey, JSON.stringify(modifiedProducts));
     console.log('Saved modified products list:', modifiedProducts.length);
   }, [user, activeBrandId, modifiedProducts]);
@@ -204,15 +210,15 @@ export default function ProductImages() {
         const product = await response.json();
         
         setSelectedProduct(product);
-        setRemovedUrl(null);
-        setRemoveError(null);
+        setUpscaledUrl(null);
+        setUpscaleError(null);
         setUploadedImage(null);
         setUseOriginalImage(true);
         
-        // Load the processed image if available
-        if (product.processedImage) {
-          console.log('Found processed image in API response:', product.processedImage);
-          setRemovedUrl(product.processedImage);
+        // Load the upscaled image if available
+        if (product.upscaledImage) {
+          console.log('Found upscaled image in API response:', product.upscaledImage);
+          setUpscaledUrl(product.upscaledImage);
         }
         
         return;
@@ -242,15 +248,15 @@ export default function ProductImages() {
             loadingFromFirestore: false // Clear the loading flag
           });
           
-          // Load the processed image if available
-          if (productData.processedImage) {
-            console.log('Found processed image in Firestore:', productData.processedImage);
-            setRemovedUrl(productData.processedImage);
+          // Load the upscaled image if available
+          if (productData.upscaledImage) {
+            console.log('Found upscaled image in Firestore:', productData.upscaledImage);
+            setUpscaledUrl(productData.upscaledImage);
           } else {
-            setRemovedUrl(null);
+            setUpscaledUrl(null);
           }
           
-          setRemoveError(null);
+          setUpscaleError(null);
           setUploadedImage(null);
           setUseOriginalImage(true);
           return;
@@ -262,7 +268,7 @@ export default function ProductImages() {
       }
     } catch (err) {
       console.error('Error fetching product details:', err);
-      setRemoveError(`Could not load product: ${err.message}`);
+      setUpscaleError(`Could not load product: ${err.message}`);
       // Don't clear the selected product if it's just a refresh error
       if (!selectedProduct || selectedProduct.id !== productId) {
         setSelectedProduct(null);
@@ -276,16 +282,54 @@ export default function ProductImages() {
     }
   };
 
-  // Handle remove background
-  const handleRemoveBackground = async () => {
+  // Handle upscale
+  const handleUpscaleImage = async () => {
     const imageUrl = useOriginalImage ? selectedProduct?.image : uploadedImage;
     if (!imageUrl) return;
     
-    setRemoving(true);
-    setRemoveError(null);
-    setRemovedUrl(null);
+    // Check image dimensions before proceeding
+    try {
+      // Create a promise to load the image and get its dimensions
+      const getDimensions = (url) => {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve({ width: img.width, height: img.height });
+          img.onerror = () => reject(new Error('Failed to load image for dimension check'));
+          img.src = url;
+        });
+      };
+      
+      const dimensions = await getDimensions(imageUrl);
+      
+      if (dimensions.width > 1024 || dimensions.height > 1024) {
+        showToast(`Image size (${dimensions.width}×${dimensions.height} px) exceeds the 1024×1024 pixel limit for upscaling.`, 'error');
+        return;
+      }
+    } catch (error) {
+      showToast('Failed to check image dimensions', 'error');
+      console.error('Dimension check error:', error);
+      return;
+    }
+    
+    setUpscaling(true);
+    setUpscaleError(null);
+    setUpscaledUrl(null);
     
     try {
+      // First check if user has enough credits
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userDocRef);
+      if (!userDoc.exists() || userDoc.data().credits < 1) {
+        showToast('You need at least 1 credit to upscale an image', 'error');
+        setUpscaling(false);
+        return;
+      }
+
+      // Deduct one credit
+      await updateDoc(userDocRef, {
+        credits: userDoc.data().credits - 1
+      });
+      
       const idToken = await user.getIdToken();
       
       // Extract original filename if we have it
@@ -293,27 +337,59 @@ export default function ProductImages() {
         selectedProduct.image.substring(selectedProduct.image.lastIndexOf('/') + 1) : 
         null;
       
-      const res = await fetch(`${process.env.REACT_APP_API_URL}/runware/remove-background`, {
+      // Prepare the payload for the upscale request
+      const payload = [{
+        taskType: "imageUpscale",
+        inputImage: imageUrl,
+        outputType: ["URL"],
+        outputFormat: outputFormat,
+        upscaleFactor: upscaleFactor,
+        includeCost: true
+      }];
+      
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/runware/imageupscale`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${idToken}`
         },
         body: JSON.stringify({ 
-          imageUrl, 
+          payload, 
           brandId: activeBrandId,
           originalFilename: originalFilename // Pass original filename to API
         })
       });
+      
       const data = await res.json();
+      
       if (!res.ok || !data.url) {
-        throw new Error(data.error || 'Failed to remove background');
+        // If the upscale fails, refund the credit
+        await updateDoc(userDocRef, {
+          credits: userDoc.data().credits + 1
+        });
+        throw new Error(data.error || 'Failed to upscale image');
       }
-      setRemovedUrl(data.url);
+      
+      // Store the dimensions for display
+      if (data.dimensions) {
+        // Add dimensions to the selected product object
+        setSelectedProduct(prev => ({
+          ...prev,
+          originalDimensions: data.dimensions.original 
+            ? `${data.dimensions.original.width}×${data.dimensions.original.height}`
+            : null,
+          upscaledDimensions: data.dimensions.upscaled
+            ? `${data.dimensions.upscaled.width}×${data.dimensions.upscaled.height}`
+            : null
+        }));
+      }
+      
+      setUpscaledUrl(data.url);
     } catch (err) {
-      setRemoveError(err.message);
+      setUpscaleError(err.message);
+      showToast(err.message || 'Failed to upscale image', 'error');
     } finally {
-      setRemoving(false);
+      setUpscaling(false);
     }
   };
 
@@ -323,12 +399,12 @@ export default function ProductImages() {
     if (!file) return;
 
     setUploading(true);
-    setRemoveError(null); // Clear previous errors
+    setUpscaleError(null); // Clear previous errors
     
     try {
       const storage = getStorage();
       // Use the public folder so images are accessible to the API
-      const storageRef = ref(storage, `public/product-uploads/${activeBrandId}/${Date.now()}_${file.name}`);
+      const storageRef = ref(storage, `public/upscale-uploads/${activeBrandId}/${Date.now()}_${file.name}`);
       const uploadTask = uploadBytesResumable(storageRef, file);
 
       // Show upload progress
@@ -367,7 +443,7 @@ export default function ProductImages() {
         errorMessage += err.message;
       }
       
-      setRemoveError(errorMessage);
+      setUpscaleError(errorMessage);
     } finally {
       setUploading(false);
     }
@@ -377,7 +453,7 @@ export default function ProductImages() {
   const clearProductImageCache = (productId) => {
     if (!user || !activeBrandId) return;
     
-    const cacheKey = `product-images-cache-${user.uid}-${activeBrandId}`;
+    const cacheKey = `upscale-images-cache-${user.uid}-${activeBrandId}`;
     
     try {
       const cachedData = localStorage.getItem(cacheKey);
@@ -402,8 +478,8 @@ export default function ProductImages() {
     }
     
     // Clear state first
-    setRemovedUrl(null);
-    setRemoveError(null);
+    setUpscaledUrl(null);
+    setUpscaleError(null);
     setUploadedImage(null);
     setUseOriginalImage(true);
     setSaveSuccess(false);
@@ -412,17 +488,17 @@ export default function ProductImages() {
     // Then set the selected product
     setSelectedProduct(product);
     
-    // Check if we have a cached processed image for this product
+    // Check if we have a cached upscaled image for this product
     if (user && activeBrandId && product) {
-      const cacheKey = `product-images-cache-${user.uid}-${activeBrandId}`;
+      const cacheKey = `upscale-images-cache-${user.uid}-${activeBrandId}`;
       const cachedData = localStorage.getItem(cacheKey);
       
       if (cachedData) {
         try {
-          const { product: cachedProduct, processedImageUrl } = JSON.parse(cachedData);
-          if (cachedProduct && cachedProduct.id === product.id && processedImageUrl) {
-            console.log('Loading cached processed image for product');
-            setRemovedUrl(processedImageUrl);
+          const { product: cachedProduct, upscaledImageUrl } = JSON.parse(cachedData);
+          if (cachedProduct && cachedProduct.id === product.id && upscaledImageUrl) {
+            console.log('Loading cached upscaled image for product');
+            setUpscaledUrl(upscaledImageUrl);
           }
         } catch (err) {
           console.error('Error parsing cached product data:', err);
@@ -432,16 +508,15 @@ export default function ProductImages() {
   };
 
   // Update product after save
-  const updateProductAfterSave = async (productId, processedImageUrl, backgroundColor) => {
+  const updateProductAfterSave = async (productId, upscaledImageUrl) => {
     try {
       // Update the selected product in the state
       setSelectedProduct(prevProduct => {
         if (prevProduct && prevProduct.id === productId) {
           const updatedProduct = {
             ...prevProduct,
-            processedImage: processedImageUrl,
-            image: processedImageUrl, // Update main image as well
-            backgroundColor: backgroundColor,
+            upscaledImage: upscaledImageUrl,
+            image: upscaledImageUrl, // Update main image as well
             imageModified: true // Flag that this product has a modified image
           };
           console.log('Updated product state after save:', updatedProduct);
@@ -458,8 +533,8 @@ export default function ProductImages() {
   };
   
   // Add product to modified list for CSV export
-  const addToModifiedList = (product, processedImageUrl) => {
-    if (!product || !processedImageUrl) return;
+  const addToModifiedList = (product, upscaledImageUrl) => {
+    if (!product || !upscaledImageUrl) return;
     
     setModifiedProducts(prev => {
       // Check if already in the list
@@ -471,9 +546,11 @@ export default function ProductImages() {
           p.id === product.id 
             ? { 
                 ...p, 
-                processedImage: processedImageUrl, 
+                upscaledImage: upscaledImageUrl, 
                 originalImage: product.originalImage || product.image,
                 name: product.name,
+                originalDimensions: product.originalDimensions,
+                upscaledDimensions: product.upscaledDimensions,
                 modified: new Date().toISOString()
               } 
             : p
@@ -483,17 +560,19 @@ export default function ProductImages() {
         return [...prev, {
           id: product.id,
           name: product.name,
-          processedImage: processedImageUrl,
+          upscaledImage: upscaledImageUrl,
           originalImage: product.originalImage || product.image,
+          originalDimensions: product.originalDimensions,
+          upscaledDimensions: product.upscaledDimensions,
           modified: new Date().toISOString()
         }];
       }
     });
   };
   
-  // Save the processed image
-  const handleSaveChanges = async (backgroundEnabled, backgroundTab, backgroundColor) => {
-    if (!selectedProduct?.id || !removedUrl) return;
+  // Save the upscaled image
+  const handleSaveChanges = async () => {
+    if (!selectedProduct?.id || !upscaledUrl) return;
     
     setSaving(true);
     setSaveError(null);
@@ -506,20 +585,6 @@ export default function ProductImages() {
     const originalImage = selectedProduct.originalImage || selectedProduct.image;
     
     try {
-      // First check if user has enough credits
-      const userDocRef = doc(db, 'users', user.uid);
-      const userDoc = await getDoc(userDocRef);
-      if (!userDoc.exists() || userDoc.data().credits < 1) {
-        showToast('You need at least 1 credit to save a processed image', 'error');
-        setSaving(false);
-        return;
-      }
-
-      // Deduct one credit
-      await updateDoc(userDocRef, {
-        credits: userDoc.data().credits - 1
-      });
-      
       // Ensure all IDs are strings
       const userId = String(user?.uid || '');
       const brandId = String(activeBrandId || '');
@@ -537,8 +602,9 @@ export default function ProductImages() {
         userId,
         brandId,
         productId,
-        processedImage: removedUrl ? 'present' : 'missing',
-        backgroundColor: backgroundEnabled && backgroundTab === 'color' ? backgroundColor : null
+        upscaledImage: upscaledUrl ? 'present' : 'missing',
+        upscaleFactor,
+        outputFormat
       });
       
       const productRef = doc(db, 'users', userId, 'brands', brandId, 'products', productId);
@@ -546,19 +612,18 @@ export default function ProductImages() {
       // First verify the product exists
       const productDoc = await getDoc(productRef);
       if (!productDoc.exists()) {
-        // Refund the credit if product doesn't exist
-        await updateDoc(userDocRef, {
-          credits: userDoc.data().credits + 1
-        });
         throw new Error(`Product with ID ${productId} not found in Firestore`);
       }
       
-      // Update the document with processed image
+      // Update the document with upscaled image
       await updateDoc(productRef, {
-        processedImage: removedUrl,
-        image: removedUrl, // Also update the main image field
+        upscaledImage: upscaledUrl,
+        image: upscaledUrl, // Also update the main image field
         originalImage: originalImage, // Store the original image URL
-        backgroundColor: backgroundEnabled && backgroundTab === 'color' ? backgroundColor : null,
+        upscaleFactor: upscaleFactor,
+        outputFormat: outputFormat,
+        originalDimensions: selectedProduct.originalDimensions || null,
+        upscaledDimensions: selectedProduct.upscaledDimensions || null,
         imageModified: true, // Flag that this image has been modified
         lastUpdated: new Date().toISOString()
       });
@@ -567,14 +632,10 @@ export default function ProductImages() {
       const updatedDoc = await getDoc(productRef);
       const updatedData = updatedDoc.data();
       
-      if (updatedData.processedImage !== removedUrl || updatedData.image !== removedUrl) {
-        // Refund the credit if update verification fails
-        await updateDoc(userDocRef, {
-          credits: userDoc.data().credits + 1
-        });
+      if (updatedData.upscaledImage !== upscaledUrl || updatedData.image !== upscaledUrl) {
         console.error('Document update verification failed - image not updated correctly');
-        console.error('Expected:', removedUrl);
-        console.error('Got processedImage:', updatedData.processedImage);
+        console.error('Expected:', upscaledUrl);
+        console.error('Got upscaledImage:', updatedData.upscaledImage);
         console.error('Got image:', updatedData.image);
         throw new Error('Document failed to update properly in database');
       }
@@ -582,8 +643,7 @@ export default function ProductImages() {
       console.log('Successfully saved to Ecommander database:', updatedData);
       
       // Update the product in state
-      const bgColor = backgroundEnabled && backgroundTab === 'color' ? backgroundColor : null;
-      await updateProductAfterSave(productId, removedUrl, bgColor);
+      await updateProductAfterSave(productId, upscaledUrl);
       
       // Add to modified products list for CSV export
       addToModifiedList(
@@ -591,7 +651,7 @@ export default function ProductImages() {
           ...selectedProduct, 
           originalImage: originalImage 
         }, 
-        removedUrl
+        upscaledUrl
       );
       
       // Update UI
@@ -629,11 +689,13 @@ export default function ProductImages() {
         const data = productSnap.data();
         console.log('Product data from Firestore:', {
           id: productIdString,
-          hasProcessedImage: !!data.processedImage,
-          processedImageUrl: data.processedImage,
+          hasUpscaledImage: !!data.upscaledImage,
+          upscaledImageUrl: data.upscaledImage,
           originalImage: data.originalImage,
-          hasBackgroundColor: !!data.backgroundColor,
-          backgroundColor: data.backgroundColor,
+          upscaleFactor: data.upscaleFactor,
+          outputFormat: data.outputFormat,
+          originalDimensions: data.originalDimensions,
+          upscaledDimensions: data.upscaledDimensions,
           imageModified: !!data.imageModified,
           lastUpdated: data.lastUpdated
         });
@@ -655,11 +717,11 @@ export default function ProductImages() {
     }
   }, [selectedProduct]);
   
-  // Force display of the processed image if available
+  // Force display of the upscaled image if available
   useEffect(() => {
-    if (selectedProduct?.processedImage && !removedUrl) {
-      console.log('Using existing processed image from product data:', selectedProduct.processedImage);
-      setRemovedUrl(selectedProduct.processedImage);
+    if (selectedProduct?.upscaledImage && !upscaledUrl) {
+      console.log('Using existing upscaled image from product data:', selectedProduct.upscaledImage);
+      setUpscaledUrl(selectedProduct.upscaledImage);
     }
   }, [selectedProduct]);
 
@@ -670,7 +732,7 @@ export default function ProductImages() {
     return (
       <Box mb={3} p={2} bgcolor="info.light" borderRadius={1}>
         <Typography variant="body1" mb={1}>
-          {modifiedProducts.length} product{modifiedProducts.length !== 1 ? 's' : ''} with modified images ready for export.
+          {modifiedProducts.length} product{modifiedProducts.length !== 1 ? 's' : ''} with upscaled images ready for export.
         </Typography>
         
         <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
@@ -724,7 +786,7 @@ export default function ProductImages() {
             <Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Typography variant="h4" component="h1">
-                  Product Images
+                  Upscale Images
                 </Typography>
                 
                 <Button size="small" variant="outlined" onClick={toggleDrawer(true)}>
@@ -732,16 +794,16 @@ export default function ProductImages() {
                 </Button>
               </Box>
 
-              {/* Image Processing Panel */}
+              {/* Image Upscale Panel */}
               <Box mb={4}>
-                <ImageProcessingPanel 
+                <ImageUpscalePanel 
                   user={user}
                   activeBrandId={activeBrandId}
                   selectedProduct={selectedProduct}
-                  removedUrl={removedUrl}
-                  setRemovedUrl={setRemovedUrl}
-                  removeError={removeError}
-                  setRemoveError={setRemoveError}
+                  upscaledUrl={upscaledUrl}
+                  setUpscaledUrl={setUpscaledUrl}
+                  upscaleError={upscaleError}
+                  setUpscaleError={setUpscaleError}
                   uploading={uploading}
                   uploadedImage={uploadedImage}
                   setUploadedImage={setUploadedImage}
@@ -750,10 +812,14 @@ export default function ProductImages() {
                   saving={saving}
                   saveSuccess={saveSuccess}
                   saveError={saveError}
-                  handleRemoveBackground={handleRemoveBackground}
+                  upscaling={upscaling}
+                  handleUpscaleImage={handleUpscaleImage}
                   handleUploadImage={handleUploadImage}
                   handleSaveChanges={handleSaveChanges}
-                  removing={removing}
+                  upscaleFactor={upscaleFactor}
+                  setUpscaleFactor={setUpscaleFactor}
+                  outputFormat={outputFormat}
+                  setOutputFormat={setOutputFormat}
                 />
               </Box>
               
