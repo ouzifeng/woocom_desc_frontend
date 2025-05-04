@@ -22,6 +22,7 @@ import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import Chip from '@mui/material/Chip';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import LocalOfferIcon from '@mui/icons-material/LocalOffer';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../../../firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -53,6 +54,7 @@ const secondaryListItems = [
   { text: 'Your Brands', icon: <BusinessRoundedIcon />, link: '/your-brands' },
   { text: 'Brand Settings', icon: <BusinessRoundedIcon />, link: '/brand-settings' },
   { text: 'Integrations', icon: <SettingsRoundedIcon />, link: '/settings' },
+  { text: 'Redeem Code', icon: <LocalOfferIcon />, link: '/redeem' },
   { text: 'Credit FAQ', icon: <InfoRoundedIcon /> },
   { text: 'Feedback', icon: <HelpRoundedIcon /> },
 ];

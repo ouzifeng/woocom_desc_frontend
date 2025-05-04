@@ -41,6 +41,7 @@ const YourBrands = React.lazy(() => import('./pages/your-brands/YourBrands'));
 const AcceptInvite = React.lazy(() => import('./pages/AcceptInvite'));
 const ProductImages = React.lazy(() => import('./pages/product-images/ProductImages'));
 const UpscaleImages = React.lazy(() => import('./pages/upscale-images/UpscaleImages'));
+const RedeemPage = React.lazy(() => import('./pages/redeem'));
 
 
 function App() {
@@ -91,6 +92,7 @@ function App() {
                       <Route path="/checkout" element={<Checkout />} />
                       <Route path="/product-images" element={<ProductImages />} />
                       <Route path="/upscale-images" element={<UpscaleImages />} />
+                      <Route path="/redeem" element={<RedeemPage />} />
                     </>
                   ) : (
                     <Route path="*" element={<Navigate to="/sign-in" />} />
